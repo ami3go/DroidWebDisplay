@@ -42,7 +42,7 @@ def main() -> int:
                 f"pydantic={pydantic.__version__}, "
                 f"starlette={starlette.__version__}"
             )
-            print('Install the canonical environment with: python -m pip install --upgrade --force-reinstall -e ".[dev]"')
+            print("Install the canonical locked environment with: uv sync --locked --extra dev")
             return 1
         print(f"OpenAPI document is current: {output}")
         return 0

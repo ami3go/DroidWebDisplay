@@ -1,4 +1,4 @@
-name: Current Release Gate
+name: DroidWebDisplay Release Gate
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,9 +19,13 @@ jobs:
           cache-dependency-path: |
             apps/web-client/package-lock.json
             packages/scrcpy-protocol/package-lock.json
-      - run: python -m pip install -e ".[dev]"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
       - run: npm ci
         working-directory: packages/scrcpy-protocol
       - run: npm ci
         working-directory: apps/web-client
-      - run: python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
+      - name: Run release gate
+        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json

@@ -22,5 +22,5 @@ def test_runtime_preflight_accepts_installed_backend(monkeypatch: pytest.MonkeyP
 
 def test_runtime_preflight_has_actionable_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(runtime, "find_websocket_backend", lambda: None)
-    with pytest.raises(RuntimeError, match=r"pip install.*websockets"):
+    with pytest.raises(RuntimeError, match=r"uv sync --locked"):
         runtime.require_websocket_backend()

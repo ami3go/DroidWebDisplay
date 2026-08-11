@@ -1,11 +1,12 @@
-# Current release Run Guide
+# DroidWebDisplay Run Guide
 
 ## Start
 
+From the repository root, install/sync the locked Python environment with UV:
+
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+uv python install 3.11
+uv sync --locked --extra dev
 .\scripts\phase8-service.ps1
 ```
 
@@ -25,11 +26,11 @@ An untrusted or expired browser sees the PIN gate before bridge APIs or WebSocke
 
 ## Revoke
 
-Use the left-side **PC-local access** card:
+Use the **Access** drawer:
 
 - **Revoke** beside one browser.
 - **Forget this browser** for the current browser.
-- **Revoke all sessions** after entering the current PIN.
+- **Revoke all trusted sessions** after entering the current PIN.
 
 ## Change PIN
 
@@ -37,10 +38,10 @@ Open **Change PIN**, enter the current PIN and the new PIN twice. Every existing
 
 ## Reset after losing the PIN
 
-Stop the bridge:
+Stop DroidWebDisplay, then run:
 
 ```powershell
-python tools\reset_auth.py --yes
+uv run python tools\reset_auth.py --yes
 ```
 
 Restart and create a new PIN.
@@ -48,5 +49,11 @@ Restart and create a new PIN.
 ## Gate
 
 ```powershell
-python tools\phase8_gate.py --output .\evidence\phase8\gate8.json
+uv run python tools\phase8_gate.py --output .\evidence\phase8\gate8.json
+```
+
+For the current complete release gate, prefer:
+
+```powershell
+uv run python tools\release_gate.py --output .\evidence\release\gate.json
 ```

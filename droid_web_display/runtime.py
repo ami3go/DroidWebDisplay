@@ -28,8 +28,7 @@ def require_websocket_backend() -> str:
     backend = find_websocket_backend()
     if backend is None:
         raise RuntimeError(
-            "No Python WebSocket backend is installed. Run "
-            "`python -m pip install -e \".[dev]\"` or "
-            "`python -m pip install \"websockets>=13,<17\"`, then restart the service."
+            "No Python WebSocket backend is installed. Run `uv sync --locked` "
+            "from the DroidWebDisplay repository root, then restart the service."
         )
     return backend
