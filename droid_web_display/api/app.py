@@ -426,7 +426,7 @@ def create_app(
         response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; script-src 'self' 'sha256-4dO+HdOGICFC5JOvaEBsNT4DSnMORzt+qUR0T/Q3lng='; style-src 'self'; img-src 'self' data:; "
+            "default-src 'self'; script-src 'self' 'sha256-0u7HdijpKCtbMJSF/CxBDiwEw6/NSTMjgCYEMe9Byl0='; style-src 'self'; img-src 'self' data:; "
             "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'",
         )
         if path.startswith("/api/v1/auth"):
