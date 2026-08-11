@@ -1,13 +1,174 @@
-__pycache__/
-.pytest_cache/
-*.pyc
+# DroidWebDisplay repository ignore rules
+# Keep source, documentation, uv.lock, manifests, and intentional fixtures tracked.
+
+# -----------------------------------------------------------------------------
+# Python / uv
+# -----------------------------------------------------------------------------
 .venv/
-node_modules/
-server/scrcpy-server-v4.1
-server/scrcpy-server.manifest.json
-data/
-downloads/
+**/.venv/
+.uv-cache/
+**/.uv-cache/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# uv.lock is intentionally committed for reproducible installs.
+!uv.lock
+
+# -----------------------------------------------------------------------------
+# Robot Framework / test evidence
+# -----------------------------------------------------------------------------
+results/
+**/results/
+robot-results/
+**/robot-results/
+test-results/
+**/test-results/
+evidence/
+**/evidence/
+artifacts/
+**/artifacts/
+logs/
+**/logs/
+output.xml
+log.html
+report.html
+xunit.xml
+*.log
+
+# Keep the release evidence directory placeholder tracked.
+!evidence/release/
 evidence/release/*.json
 !evidence/release/.gitkeep
+
+# -----------------------------------------------------------------------------
+# Browser / Playwright generated output
+# -----------------------------------------------------------------------------
+playwright-report/
+**/playwright-report/
+blob-report/
+**/blob-report/
+.cache/ms-playwright/
+**/.cache/ms-playwright/
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Web-client distribution staging/backup folders
 apps/web-client/.dist-stage-*/
 apps/web-client/.dist-backup-*/
+
+# -----------------------------------------------------------------------------
+# Local configuration / secrets
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+local.yaml
+local.yml
+**/local.yaml
+**/local.yml
+*.local.yaml
+*.local.yml
+*.local.json
+*.secret
+*.secrets
+*.key
+*.pem
+*.p12
+*.pfx
+
+# -----------------------------------------------------------------------------
+# Android / ADB / Gradle generated files
+# -----------------------------------------------------------------------------
+.gradle/
+**/.gradle/
+**/build/
+local.properties
+**/local.properties
+.cxx/
+**/.cxx/
+.externalNativeBuild/
+**/.externalNativeBuild/
+captures/
+*.apk
+*.aab
+
+# Runtime/download directories
+/data/
+data/
+downloads/
+
+# Bundled/generated scrcpy server artifacts are supplied separately.
+server/scrcpy-server-v4.1
+server/scrcpy-server.manifest.json
+
+# -----------------------------------------------------------------------------
+# DroidWebDisplay generated release / integration output
+# -----------------------------------------------------------------------------
+dist/
+out/
+release-output/
+DroidWebDisplayReleaseOutput/
+DroidWebDisplay_*_candidate/
+*.whl
+
+# UI integration backup folders created during local patch/apply operations
+.droidwebdisplay-main-ui-backup/
+.gptbridge-main-ui-backup/
+.single-drawer-backup/
+
+# -----------------------------------------------------------------------------
+# Temporary files
+# -----------------------------------------------------------------------------
+.cache/
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*~
+
+# -----------------------------------------------------------------------------
+# IDE / editor
+# -----------------------------------------------------------------------------
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# -----------------------------------------------------------------------------
+# Operating system metadata
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# -----------------------------------------------------------------------------
+# Windows / Linux transient files
+# -----------------------------------------------------------------------------
+*.stackdump
+.nfs*
