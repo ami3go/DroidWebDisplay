@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from droid_web_display import RELEASE_PHASE
 from droid_web_display.adb.client import AdbClient
 from droid_web_display.api import create_app
 from droid_web_display.config import BridgeConfig
@@ -35,11 +36,12 @@ def test_health_and_device_api(tmp_path: Path) -> None:
     with TestClient(app) as client:
         health = client.get("/api/v1/health")
         assert health.status_code == 200
-        assert health.json()["phase"] == 9
+        assert health.json()["phase"] == RELEASE_PHASE
         devices = client.get("/api/v1/devices")
         assert devices.status_code == 200
         assert devices.json()["devices"][0]["serial"] == "PHONE"
         diagnostics = client.get("/api/v1/diagnostics")
+        assert diagnostics.json()["phase"] == RELEASE_PHASE
         assert diagnostics.json()["bridgeStreamRole"] == "opaque-binary-proxy"
 
 
