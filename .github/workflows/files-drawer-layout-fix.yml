@@ -197,6 +197,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web-client/static/droidwebdisplay-main-drawer.css apps/web-client/dist/droidwebdisplay-main-drawer.css apps/web-client/dist-manifest.json
+          git add apps/web-client/static/droidwebdisplay-main-drawer.css apps/web-client/dist-manifest.json
+          git add -f apps/web-client/dist/droidwebdisplay-main-drawer.css
           git commit -m "Fix Files drawer layout density"
           git push origin HEAD:fix/files-drawer-layout
