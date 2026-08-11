@@ -26,7 +26,6 @@ interface Elements {
     readonly autoReconnect: HTMLInputElement;
     readonly reconnectAttempts: HTMLSelectElement;
     readonly reconnect: HTMLButtonElement;
-    readonly workspaceLayout: HTMLSelectElement;
     readonly sessionChannels: HTMLElement;
     readonly clipboardAutoSync: HTMLInputElement;
     readonly clipboardMaxKib: HTMLInputElement;
@@ -109,7 +108,6 @@ export declare class DroidWebDisplayController {
     private scheduleReconnect;
     private cancelReconnect;
     private reconnectNow;
-    private applyWorkspaceLayout;
     private browserSettings;
     private saveBrowserSettings;
     private restoreBrowserSettings;

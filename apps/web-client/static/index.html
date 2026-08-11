@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="gb-single-drawer-enabled">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
+  <meta http-equiv="Cache-Control" content="no-store, max-age=0">
   <title>DroidWebDisplay</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="importmap">
@@ -14,7 +15,7 @@
   }
   </script>
   <!-- DroidWebDisplay Main Single Drawer UI v1.0.0 -->
-  <link rel="stylesheet" href="./droidwebdisplay-main-drawer.css" data-gb-main-drawer="css">
+  <link rel="stylesheet" href="./droidwebdisplay-main-drawer.css?v=0.11.2-native1" data-gb-main-drawer="css">
 </head>
 <body>
   <section id="auth-gate" class="auth-gate" aria-label="DroidWebDisplay authentication">
@@ -53,7 +54,7 @@
     </form>
   </section>
   <div id="unsupported" class="unsupported" hidden></div>
-  <main id="app" class="shell" hidden>
+  <main id="app" class="shell" hidden data-ui="droidwebdisplay-native-single-drawer-v1">
     <header class="topbar">
       <div class="topbar-brand">
         <h1>DroidWebDisplay</h1>
@@ -83,21 +84,166 @@
           <button id="rotate" class="secondary compact" disabled>Rotate</button>
           <button id="power" class="secondary compact" disabled>Screen off</button>
           <button id="fullscreen" class="secondary compact" disabled>Fullscreen</button>
-          <label class="toolbar-layout-control">
-            <span class="visually-hidden">Workspace layout</span>
-            <select id="workspace-layout" aria-label="Workspace layout" title="Workspace layout">
-              <option value="auto">Automatic</option>
-              <option value="screen">Screen focus</option>
-              <option value="compact">Compact panels</option>
-            </select>
-          </label>
         </div>
       </div>
     </header>
-
-    <section class="workspace">
-      <aside class="sidepanel">
-        <section class="help-card display-mode-card">
+    <div id="gb-single-drawer-root" data-version="1.1.0">
+      <nav class="gb-rail" aria-label="DroidWebDisplay tools">
+        <button type="button" class="gb-rail-button" data-group="apps" aria-selected="false" title="Apps"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Apps</span></button>
+        <button type="button" class="gb-rail-button" data-group="files" aria-selected="false" title="Files"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Files</span></button>
+        <button type="button" class="gb-rail-button" data-group="clipboard" aria-selected="false" title="Clipboard"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Clipboard</span></button>
+        <button type="button" class="gb-rail-button" data-group="display" aria-selected="false" title="Display"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Display</span></button>
+        <button type="button" class="gb-rail-button" data-group="audio" aria-selected="false" title="Audio"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Audio</span></button>
+        <button type="button" class="gb-rail-button" data-group="access" aria-selected="false" title="Access"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Access</span></button>
+        <button type="button" class="gb-rail-button" data-group="network" aria-selected="false" title="Network"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Network</span></button>
+        <button type="button" class="gb-rail-button" data-group="diagnostics" aria-selected="false" title="Diagnostics"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Diagnostics</span></button>
+        <button type="button" class="gb-rail-button" data-group="settings" aria-selected="false" title="Settings"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Settings</span></button>
+        <div class="gb-rail-spacer"></div>
+      </nav>
+      <aside class="gb-drawer" aria-hidden="true">
+        <div class="gb-drawer-header">
+          <div class="gb-drawer-title">Tools</div>
+          <button type="button" class="gb-drawer-pin" data-action="pin" aria-pressed="false" title="Pin drawer"><span aria-hidden="true">📌</span><span class="gb-pin-text">Pin</span></button>
+          <button type="button" class="gb-drawer-close" aria-label="Close drawer" title="Close drawer">×</button>
+        </div>
+        <div class="gb-drawer-body">
+          <div class="gb-drawer-slot" data-slot="apps"><section class="help-card running-app-card" aria-label="Running Android applications">
+          <div class="section-heading running-app-heading">
+            <h2>Running apps</h2>
+            <button id="running-app-refresh" type="button" class="secondary compact">Refresh</button>
+          </div>
+          <p>Choose a running Android application with a graphical activity and bring it onto the active virtual display.</p>
+          <label>Application
+            <select id="running-app-select">
+              <option value="">No GUI applications detected</option>
+            </select>
+          </label>
+          <button id="running-app-move" type="button" disabled>Move to virtual display</button>
+          <p id="running-app-status" class="running-app-status">Start a virtual display to enable task relocation.</p>
+        </section></div>
+          <div class="gb-drawer-slot" data-slot="files"><details class="gb-accordion" data-section-key="files-load" open>
+  <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Load</span></summary>
+  <div class="gb-accordion-content">
+<p>Files are transferred through structured ADB Sync. The PC does not need Internet access.</p>
+          <input id="upload-file" type="file" multiple>
+          <input id="context-upload-file" type="file" multiple hidden>
+          <label>Android destination folder
+            <select id="upload-directory">
+              <option value="/sdcard/Download/DroidWebDisplayInbox">DroidWebDisplayInbox</option>
+              <option value="/sdcard/Download">Internal storage · Download</option>
+              <option value="/sdcard/Documents">Internal storage · Documents</option>
+              <option value="/sdcard/Pictures">Internal storage · Pictures</option>
+            </select>
+          </label>
+          <label>Duplicate handling
+            <select id="duplicate-policy">
+              <option value="rename">Rename safely</option>
+              <option value="overwrite">Overwrite</option>
+              <option value="fail">Fail</option>
+            </select>
+          </label>
+          <div class="two-button-row uniform-buttons"><button id="upload-file-button">Load</button><button id="open-upload-folder" class="secondary">Browse</button></div></div>
+</details>
+<details class="gb-accordion" data-section-key="files-explorer" open>
+  <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Android File Explorer</span></summary>
+  <div class="gb-accordion-content"><div class="section-heading">
+<span>Double-click to open · Right-click for actions</span>
+          </div>
+          <div class="explorer-toolbar">
+            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
+            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
+            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
+          </div>
+          <label>Storage location
+            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
+          </label>
+          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
+          <div class="explorer-options">
+            <label>Destination folder
+              <select id="destination-profile"></select>
+            </label>
+            <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>
+          </div>
+          <div class="explorer-frame" role="table" aria-label="Android files">
+            <div class="explorer-header" role="row">
+              <div class="explorer-cell select-cell"><input id="storage-select-all" type="checkbox" aria-label="Select all files"></div>
+              <button type="button" class="explorer-header-button name-cell" data-storage-sort="name" data-label="Name" aria-sort="ascending">Name ▲</button>
+              <button type="button" class="explorer-header-button size-cell" data-storage-sort="size" data-label="Size" aria-sort="none">Size</button>
+              <button type="button" class="explorer-header-button modified-cell" data-storage-sort="modified" data-label="Modified" aria-sort="none">Modified</button>
+              <div class="explorer-cell menu-cell" aria-hidden="true"></div>
+            </div>
+            <div id="storage-body" class="storage-list explorer-body" role="rowgroup"><p class="empty-state">Select a device.</p></div>
+          </div>
+          <p class="explorer-help">Right-click a file to download it. Right-click a folder or empty space to upload files into that Android folder.</p></div>
+</details>
+<div id="storage-context-menu" class="context-menu" role="menu" tabindex="-1" hidden>
+          <button id="context-open" type="button" role="menuitem">Open folder</button>
+          <button id="context-download" type="button" role="menuitem">Download</button>
+          <button id="context-upload" type="button" role="menuitem">Upload to current folder</button>
+          <div class="context-separator" role="separator"></div>
+<details class="gb-accordion" data-section-key="files-sync">
+  <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">File sync</span></summary>
+  <div class="gb-accordion-content"><div class="section-heading">
+<span id="auto-download-status">Disabled</span></div>
+          <p>Watch one Android folder and one PC folder. Stable Android files can download to the PC, and stable PC files can upload to Android. Monitoring is non-recursive and both directions are disabled by default.</p>
+          <div class="checkbox-stack sync-direction-options">
+            <label><input id="auto-download-enabled" type="checkbox"> Android → PC automatic download</label>
+            <label><input id="auto-upload-enabled" type="checkbox"> PC → Android automatic upload</label>
+          </div>
+          <label>Android folder
+            <select id="auto-download-source"><option value="/sdcard/Download">Internal storage · Download</option></select>
+          </label>
+          <label>PC watched folder
+            <select id="auto-download-destination"></select>
+          </label>
+          <label>PC → Android duplicate handling
+            <select id="auto-upload-duplicate">
+              <option value="overwrite" selected>Overwrite same-name file</option>
+              <option value="rename">Rename safely</option>
+              <option value="fail">Fail</option>
+            </select>
+          </label>
+          <div class="three-field-row">
+            <label>Scan, sec<input id="auto-download-scan" type="number" min="1" max="60" step="1" value="2"></label>
+            <label>Stable, sec<input id="auto-download-stability" type="number" min="1" max="300" step="1" value="3"></label>
+            <label>Checks<input id="auto-download-observations" type="number" min="2" max="20" step="1" value="3"></label>
+          </div>
+          <div class="checkbox-stack">
+            <label><input id="auto-download-existing" type="checkbox"> Download existing Android files on first scan</label>
+            <label><input id="auto-upload-existing" type="checkbox"> Upload existing PC files on first scan</label>
+            <label><input id="auto-download-delete" type="checkbox"> Delete Android source only after verified PC download</label>
+            <label><input id="auto-download-notifications" type="checkbox"> Show browser notifications</label>
+          </div>
+          <p class="sync-safety-note">Files created by one sync direction are fingerprinted so they are not immediately sent back by the other direction.</p>
+          <div class="three-button-row uniform-buttons">
+            <button id="auto-download-save">Save</button>
+            <button id="auto-download-scan-now" class="secondary">Scan now</button>
+            <button id="auto-download-reset" class="secondary">Reset</button>
+          </div>
+          <div id="auto-download-summary" class="monitor-summary">No sync activity.</div>
+          <div id="auto-download-events" class="monitor-events"><p class="empty-state">No automatic transfers yet.</p></div></div>
+</details>
+<details class="gb-accordion" data-section-key="files-queue">
+  <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Transfer queue</span></summary>
+  <div class="gb-accordion-content"><div class="section-heading">
+<span id="transfer-status">Ready</span></div>
+          <div id="transfer-list" class="transfer-list"><p class="empty-state">No transfers yet.</p></div></div>
+</details></div>
+          <div class="gb-drawer-slot" data-slot="clipboard"><div class="help-card clipboard-card">
+          <h2>Clipboard and text</h2>
+          <p>First click the text field inside the mirrored Android screen. The primary button reads the PC clipboard. If browser permission is blocked, paste text into the box below.</p>
+          <textarea id="clipboard-text" rows="4" placeholder="Clipboard text" disabled></textarea>
+          <div class="clipboard-actions">
+            <button id="clipboard" aria-label="Paste PC clipboard to Android" title="Paste PC clipboard" disabled>Paste</button>
+            <button id="clipboard-text-paste" class="secondary" aria-label="Type text into Android" title="Type text into Android" disabled>Type</button>
+            <button id="clipboard-copy-android" class="secondary" aria-label="Copy Android clipboard to PC" title="Copy Android clipboard" disabled>Copy</button>
+          </div>
+          <label class="toggle-row"><input id="clipboard-auto-sync" type="checkbox"> Automatic clipboard synchronization</label>
+          <p class="clipboard-sync-note">Automatic sync mirrors clipboard content only; it never pastes into the focused Android field.</p>
+          <label>Maximum clipboard size, KiB<input id="clipboard-max-kib" type="number" min="1" max="256" value="256"></label>
+          <p>With the Android screen focused, Ctrl+V pastes and Ctrl+C copies the Android selection. Clipboard text is never written to diagnostics.</p>
+        </div></div>
+          <div class="gb-drawer-slot" data-slot="display"><section class="help-card display-mode-card">
           <h2>Display mode</h2>
           <label>Mode
             <select id="display-mode">
@@ -150,9 +296,8 @@
             </div>
             <p id="virtual-capability" class="capability-text">Select an authorized device to probe virtual-display support.</p>
           </div>
-        </section>
-
-        <section class="help-card phase9-session-card" aria-label="Audio and reconnect settings">
+        </section></div>
+          <div class="gb-drawer-slot" data-slot="audio"><section class="help-card phase9-session-card" aria-label="Audio and reconnect settings">
           <div class="section-heading"><h2>Audio</h2></div>
           <label class="toggle-row"><input id="audio-enabled" type="checkbox"> Enable Android audio</label>
           <p class="audio-note">Browser audio may have interruptions or delay. Video and control remain active.</p>
@@ -167,37 +312,37 @@
           </label>
           <button id="reconnect" type="button" class="secondary" disabled>Reconnect</button>
           <p id="session-channels" class="running-app-status">No active channels.</p>
-        </section>
-
-        <section id="security-card" class="help-card security-card" hidden>
-          <div class="section-heading">
-            <h2>PC-local access</h2>
-            <button id="auth-refresh-sessions" type="button" class="secondary compact">Refresh</button>
-          </div>
-          <p id="auth-session-summary">Authenticated session</p>
-          <p class="auth-trust-note">These trusted sessions belong to this PC-local bridge. They are not stored or approved by the Android phone.</p>
-          <div id="auth-session-list" class="trusted-session-list"></div>
-          <button id="auth-logout" type="button" class="secondary">Forget this browser</button>
-          <details>
-            <summary>Change PIN</summary>
-            <div class="security-form">
-              <label>Current PIN<input id="auth-current-pin" type="password" inputmode="numeric" maxlength="12"></label>
-              <label>New PIN<input id="auth-new-pin" type="password" inputmode="numeric" maxlength="12"></label>
-              <label>Confirm new PIN<input id="auth-confirm-new-pin" type="password" inputmode="numeric" maxlength="12"></label>
-              <button id="auth-change-pin" type="button">Change PIN and revoke all sessions</button>
-            </div>
-          </details>
-          <details>
-            <summary>Revoke all trusted sessions</summary>
-            <div class="security-form">
-              <label>Current PIN<input id="auth-revoke-all-pin" type="password" inputmode="numeric" maxlength="12"></label>
-              <button id="auth-revoke-all" type="button" class="danger">Revoke all sessions</button>
-            </div>
-          </details>
-          <p id="auth-security-status" class="running-app-status">Session protection active.</p>
-        </section>
-
-        <section id="network-card" class="help-card network-access-card" hidden aria-label="Network access settings">
+        </section></div>
+          <div class="gb-drawer-slot" data-slot="access"><section id="security-card" class="help-card security-card" hidden aria-label="Access settings">
+  <details class="gb-accordion" data-section-key="access-web-browser" open>
+    <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Web browser</span></summary>
+    <div class="gb-accordion-content">
+      <div class="section-heading"><h2>Web browser</h2><button id="auth-refresh-sessions" type="button" class="secondary compact">Refresh</button></div>
+      <p id="auth-session-summary">Authenticated session</p>
+      <p class="auth-trust-note">Trusted sessions belong to this DroidWebDisplay service and are not stored or approved by the Android phone.</p>
+      <div id="auth-session-list" class="trusted-session-list"></div>
+      <button id="auth-logout" type="button" class="secondary">Forget this browser</button>
+    </div>
+  </details>
+  <details class="gb-accordion" data-section-key="access-pin">
+    <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Pin</span></summary>
+    <div class="gb-accordion-content security-form">
+      <label>Current PIN<input id="auth-current-pin" type="password" inputmode="numeric" maxlength="12"></label>
+      <label>New PIN<input id="auth-new-pin" type="password" inputmode="numeric" maxlength="12"></label>
+      <label>Confirm new PIN<input id="auth-confirm-new-pin" type="password" inputmode="numeric" maxlength="12"></label>
+      <button id="auth-change-pin" type="button">Change PIN and revoke all sessions</button>
+    </div>
+  </details>
+  <details class="gb-accordion" data-section-key="access-revoke-all">
+    <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Revoke all trusted sessions</span></summary>
+    <div class="gb-accordion-content security-form">
+      <label>Current PIN<input id="auth-revoke-all-pin" type="password" inputmode="numeric" maxlength="12"></label>
+      <button id="auth-revoke-all" type="button" class="danger">Revoke all sessions</button>
+    </div>
+  </details>
+  <p id="auth-security-status" class="running-app-status">Session protection active.</p>
+</section></div>
+          <div class="gb-drawer-slot" data-slot="network"><section id="network-card" class="help-card network-access-card" hidden aria-label="Network access settings">
           <div class="section-heading">
             <h2>Network access</h2>
             <span id="network-mode-badge" class="network-mode-badge">Local only</span>
@@ -245,170 +390,28 @@
           <p id="network-url" class="network-url">http://127.0.0.1:8765</p>
           <p id="network-status" class="running-app-status">Local-only access is active.</p>
           <p class="network-recovery-note">Recovery: <code>python tools\reset_network_access.py --local-only</code></p>
-        </section>
-
-        <section class="help-card running-app-card" aria-label="Running Android applications">
-          <div class="section-heading running-app-heading">
-            <h2>Running apps</h2>
-            <button id="running-app-refresh" type="button" class="secondary compact">Refresh</button>
-          </div>
-          <p>Choose a running Android application with a graphical activity and bring it onto the active virtual display.</p>
-          <label>Application
-            <select id="running-app-select">
-              <option value="">No GUI applications detected</option>
-            </select>
-          </label>
-          <button id="running-app-move" type="button" disabled>Move to virtual display</button>
-          <p id="running-app-status" class="running-app-status">Start a virtual display to enable task relocation.</p>
-        </section>
-
-<section class="help-card settings-card">
+        </section></div>
+          <div class="gb-drawer-slot" data-slot="diagnostics"><section class="help-card statistics-card">
+          <h2>Mode statistic</h2>
+          <div id="statistics" class="statistics">No video statistics</div>
+        </section></div>
+          <div class="gb-drawer-slot" data-slot="settings"><section class="help-card settings-card">
           <h2>Settings</h2>
-          <p>Export or restore browser-side display, audio, clipboard, reconnect and layout preferences.</p>
+          <p>Export or restore browser-side display, audio, clipboard, reconnect and interface preferences.</p>
           <input id="settings-file" type="file" accept="application/json,.json" hidden>
           <div class="two-button-row uniform-buttons"><button id="settings-export" type="button" class="secondary">Export</button><button id="settings-import" type="button" class="secondary">Import</button></div>
           <p id="settings-status" class="running-app-status">Settings are stored in this browser.</p>
-        </section>
-        <section class="help-card statistics-card">
-          <h2>Statistics</h2>
-          <div id="statistics" class="statistics">No video statistics</div>
-        </section>
+        </section></div>
+        </div>
+        <div class="gb-drawer-footer"><button type="button" class="gb-drawer-action" data-action="close">Close</button></div>
       </aside>
-
-      <section id="stage" class="stage" aria-label="Android display">
+    </div>
+    <section class="workspace native-workspace"><section id="stage" class="stage" aria-label="Android display">
         <canvas id="screen" tabindex="0" aria-label="Mirrored Android screen"></canvas>
         <div class="stage-hint">Connect an authorized Android phone over USB</div>
-      </section>
-
-      <aside class="transfer-panel" aria-label="File transfer">
-        <div class="help-card clipboard-card">
-          <h2>Clipboard and text</h2>
-          <p>First click the text field inside the mirrored Android screen. The primary button reads the PC clipboard. If browser permission is blocked, paste text into the box below.</p>
-          <textarea id="clipboard-text" rows="4" placeholder="Clipboard text" disabled></textarea>
-          <div class="clipboard-actions">
-            <button id="clipboard" aria-label="Paste PC clipboard to Android" title="Paste PC clipboard" disabled>Paste</button>
-            <button id="clipboard-text-paste" class="secondary" aria-label="Type text into Android" title="Type text into Android" disabled>Type</button>
-            <button id="clipboard-copy-android" class="secondary" aria-label="Copy Android clipboard to PC" title="Copy Android clipboard" disabled>Copy</button>
-          </div>
-          <label class="toggle-row"><input id="clipboard-auto-sync" type="checkbox"> Automatic clipboard synchronization</label>
-          <p class="clipboard-sync-note">Automatic sync mirrors clipboard content only; it never pastes into the focused Android field.</p>
-          <label>Maximum clipboard size, KiB<input id="clipboard-max-kib" type="number" min="1" max="256" value="256"></label>
-          <p>With the Android screen focused, Ctrl+V pastes and Ctrl+C copies the Android selection. Clipboard text is never written to diagnostics.</p>
-        </div>
-
-        <section class="help-card transfer-section">
-          <h2>Upload to Android</h2>
-          <p>Files are transferred through structured ADB Sync. The PC does not need Internet access.</p>
-          <input id="upload-file" type="file" multiple>
-          <input id="context-upload-file" type="file" multiple hidden>
-          <label>Android destination
-            <select id="upload-directory">
-              <option value="/sdcard/Download/DroidWebDisplayInbox">DroidWebDisplayInbox</option>
-              <option value="/sdcard/Download">Internal storage · Download</option>
-              <option value="/sdcard/Documents">Internal storage · Documents</option>
-              <option value="/sdcard/Pictures">Internal storage · Pictures</option>
-            </select>
-          </label>
-          <label>Duplicate handling
-            <select id="duplicate-policy">
-              <option value="rename">Rename safely</option>
-              <option value="overwrite">Overwrite</option>
-              <option value="fail">Fail</option>
-            </select>
-          </label>
-          <div class="two-button-row uniform-buttons"><button id="upload-file-button">Upload</button><button id="open-upload-folder" class="secondary">Browse</button></div>
-        </section>
-
-        <section class="help-card transfer-section storage-browser">
-          <div class="section-heading">
-            <h2>Android File Explorer</h2>
-            <span>Double-click to open · Right-click for actions</span>
-          </div>
-          <div class="explorer-toolbar">
-            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
-            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
-            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
-          </div>
-          <label>Storage location
-            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
-          </label>
-          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
-          <div class="explorer-options">
-            <label>PC destination
-              <select id="destination-profile"></select>
-            </label>
-            <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>
-          </div>
-          <div class="explorer-frame" role="table" aria-label="Android files">
-            <div class="explorer-header" role="row">
-              <div class="explorer-cell select-cell"><input id="storage-select-all" type="checkbox" aria-label="Select all files"></div>
-              <button type="button" class="explorer-header-button name-cell" data-storage-sort="name" data-label="Name" aria-sort="ascending">Name ▲</button>
-              <button type="button" class="explorer-header-button size-cell" data-storage-sort="size" data-label="Size" aria-sort="none">Size</button>
-              <button type="button" class="explorer-header-button modified-cell" data-storage-sort="modified" data-label="Modified" aria-sort="none">Modified</button>
-              <div class="explorer-cell menu-cell" aria-hidden="true"></div>
-            </div>
-            <div id="storage-body" class="storage-list explorer-body" role="rowgroup"><p class="empty-state">Select a device.</p></div>
-          </div>
-          <p class="explorer-help">Right-click a file to download it. Right-click a folder or empty space to upload files into that Android folder.</p>
-        </section>
-
-        <div id="storage-context-menu" class="context-menu" role="menu" tabindex="-1" hidden>
-          <button id="context-open" type="button" role="menuitem">Open folder</button>
-          <button id="context-download" type="button" role="menuitem">Download</button>
-          <button id="context-upload" type="button" role="menuitem">Upload to current folder</button>
-          <div class="context-separator" role="separator"></div>
-          <button id="context-refresh" type="button" role="menuitem">Refresh</button>
-        </div>
-
-        <section class="help-card transfer-section auto-download-card">
-          <div class="section-heading"><h2>Automatic two-way folder sync</h2><span id="auto-download-status">Disabled</span></div>
-          <p>Watch one Android folder and one PC folder. Stable Android files can download to the PC, and stable PC files can upload to Android. Monitoring is non-recursive and both directions are disabled by default.</p>
-          <div class="checkbox-stack sync-direction-options">
-            <label><input id="auto-download-enabled" type="checkbox"> Android → PC automatic download</label>
-            <label><input id="auto-upload-enabled" type="checkbox"> PC → Android automatic upload</label>
-          </div>
-          <label>Android folder
-            <select id="auto-download-source"><option value="/sdcard/Download">Internal storage · Download</option></select>
-          </label>
-          <label>PC watched folder
-            <select id="auto-download-destination"></select>
-          </label>
-          <label>PC → Android duplicate handling
-            <select id="auto-upload-duplicate">
-              <option value="overwrite" selected>Overwrite same-name file</option>
-              <option value="rename">Rename safely</option>
-              <option value="fail">Fail</option>
-            </select>
-          </label>
-          <div class="three-field-row">
-            <label>Scan, sec<input id="auto-download-scan" type="number" min="1" max="60" step="1" value="2"></label>
-            <label>Stable, sec<input id="auto-download-stability" type="number" min="1" max="300" step="1" value="3"></label>
-            <label>Checks<input id="auto-download-observations" type="number" min="2" max="20" step="1" value="3"></label>
-          </div>
-          <div class="checkbox-stack">
-            <label><input id="auto-download-existing" type="checkbox"> Download existing Android files on first scan</label>
-            <label><input id="auto-upload-existing" type="checkbox"> Upload existing PC files on first scan</label>
-            <label><input id="auto-download-delete" type="checkbox"> Delete Android source only after verified PC download</label>
-            <label><input id="auto-download-notifications" type="checkbox"> Show browser notifications</label>
-          </div>
-          <p class="sync-safety-note">Files created by one sync direction are fingerprinted so they are not immediately sent back by the other direction.</p>
-          <div class="three-button-row uniform-buttons">
-            <button id="auto-download-save">Save</button>
-            <button id="auto-download-scan-now" class="secondary">Scan now</button>
-            <button id="auto-download-reset" class="secondary">Reset</button>
-          </div>
-          <div id="auto-download-summary" class="monitor-summary">No sync activity.</div>
-          <div id="auto-download-events" class="monitor-events"><p class="empty-state">No automatic transfers yet.</p></div>
-        </section>
-
-        <section class="help-card transfer-section">
-          <div class="section-heading"><h2>Transfer queue</h2><span id="transfer-status">Ready</span></div>
-          <div id="transfer-list" class="transfer-list"><p class="empty-state">No transfers yet.</p></div>
-        </section>
-</aside>
-    </section>
+      </section></section>
   </main>
-  <script type="module" src="/assets/main.js"></script>
-  <script defer src="./droidwebdisplay-main-drawer.js" data-gb-main-drawer="js"></script>
+  <script type="module" src="/assets/main.js?v=0.11.2-native1"></script>
+  <script defer src="./droidwebdisplay-main-drawer.js?v=0.11.2-native1"></script>
 </body>
 </html>

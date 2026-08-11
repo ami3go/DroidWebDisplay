@@ -11,44 +11,6 @@ function required(selector) {
         throw new Error(`Missing UI element: ${selector}`);
     return value;
 }
-function initializeCollapsibleCards() {
-    const cards = document.querySelectorAll(".sidepanel > .help-card, .transfer-panel > .help-card");
-    cards.forEach((card, index) => {
-        if (card.classList.contains("collapsible-card"))
-            return;
-        card.classList.add("collapsible-card");
-        let header = Array.from(card.children).find((child) => child.classList.contains("section-heading"));
-        if (!header) {
-            const heading = Array.from(card.children).find((child) => child.tagName === "H2");
-            if (!heading)
-                return;
-            header = document.createElement("div");
-            header.className = "card-header";
-            card.insertBefore(header, heading);
-            header.append(heading);
-        }
-        else {
-            header.classList.add("card-header");
-        }
-        const heading = header.querySelector("h2");
-        const title = heading?.textContent?.trim() || `Card ${index + 1}`;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "card-collapse-button secondary compact";
-        button.setAttribute("aria-expanded", "true");
-        button.setAttribute("aria-label", `Collapse ${title}`);
-        button.title = `Collapse ${title}`;
-        button.textContent = "−";
-        button.addEventListener("click", () => {
-            const collapsed = card.classList.toggle("is-collapsed");
-            button.setAttribute("aria-expanded", String(!collapsed));
-            button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${title}`);
-            button.title = `${collapsed ? "Expand" : "Collapse"} ${title}`;
-            button.textContent = collapsed ? "+" : "−";
-        });
-        header.append(button);
-    });
-}
 async function bootstrap() {
     const auth = new AuthController({
         gate: required("#auth-gate"),
@@ -88,7 +50,6 @@ async function bootstrap() {
     }
     else {
         app.hidden = false;
-        initializeCollapsibleCards();
         const networkController = new NetworkAccessController({
             card: required("#network-card"),
             badge: required("#network-mode-badge"),
@@ -152,7 +113,6 @@ async function bootstrap() {
             autoReconnect: required("#auto-reconnect"),
             reconnectAttempts: required("#reconnect-attempts"),
             reconnect: required("#reconnect"),
-            workspaceLayout: required("#workspace-layout"),
             sessionChannels: required("#session-channels"),
             clipboardAutoSync: required("#clipboard-auto-sync"),
             clipboardMaxKib: required("#clipboard-max-kib"),

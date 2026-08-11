@@ -12,12 +12,14 @@ const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf
 
 
 
-test("workspace uses one page-level vertical scrollbar", () => {
-  assert.match(css, /\.workspace \{[^}]*align-items: start;/s);
-  assert.match(css, /\.transfer-panel \{[^}]*overflow: visible;[^}]*max-height: none;/s);
-  assert.equal(/\.transfer-panel \{[^}]*overflow:\s*auto;/s.test(css), false);
-  assert.equal(/\.transfer-panel \{[^}]*max-height:\s*calc\(100vh/s.test(css), false);
+test("workspace is the native single-stage production layout", () => {
+  assert.match(html, /data-ui="droidwebdisplay-native-single-drawer-v1"/);
+  assert.match(html, /class="workspace native-workspace"/);
+  assert.equal(html.includes('<aside class="sidepanel">'), false);
+  assert.equal(html.includes('<aside class="transfer-panel"'), false);
+  assert.match(css, /\.native-workspace \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) !important;/);
 });
+
 test("Display Mode controls are contained inside their card", () => {
   assert.match(css, /select \{ min-width: 0; max-width: 100%;/);
   assert.match(css, /\.display-mode-card > label,/);
@@ -34,13 +36,12 @@ test("Display Mode numeric fields collapse safely on narrow viewports", () => {
   assert.match(html, /id="virtual-dpi"/);
 });
 
-test("running applications panel is located in the left side panel", () => {
-  const sideStart = html.indexOf('<aside class="sidepanel">');
-  const stageStart = html.indexOf('<section id="stage"');
+test("running applications panel is native to the Apps drawer", () => {
+  const appsSlot = html.indexOf('data-slot="apps"');
+  const filesSlot = html.indexOf('data-slot="files"');
   const panel = html.indexOf('id="running-app-select"');
-  assert.ok(sideStart >= 0 && panel > sideStart && panel < stageStart);
+  assert.ok(appsSlot >= 0 && panel > appsSlot && panel < filesSlot);
   assert.match(html, /id="running-app-move"/);
-  assert.match(css, /\.running-app-card/);
 });
 
 test("PIN gate and PC-local trust wording are present", () => {
@@ -59,40 +60,37 @@ test("PIN gate and PC-local trust wording are present", () => {
 });
 
 
-test("Phase 9 controls use compact labels and old gate checkboxes are removed", () => {
-  for (const label of [">Upload<", ">Browse<", ">Download<", ">Reset<"]) assert.match(html, new RegExp(label));
-  for (const old of ["Upload selected file(s)", "Browse upload folder", "Download selected", "Reset history", "data-gate4-check", "data-gate5-check", "data-gate6-check", "data-gate7-check"]) assert.equal(html.includes(old), false);
+test("file controls use the accepted production labels", () => {
+  for (const label of [">Load<", ">Browse<", ">Download<", ">Reset<"]) assert.match(html, new RegExp(label));
+  for (const required of ["Destination folder", "File sync", "Transfer queue"]) assert.match(html, new RegExp(required));
+  for (const old of ["Upload selected file(s)", "Automatic two-way folder sync", "PC destination", "data-gate4-check", "data-gate5-check", "data-gate6-check", "data-gate7-check"]) assert.equal(html.includes(old), false);
   assert.match(css, /\.uniform-buttons > button \{ min-height: 2\.55rem; height: 2\.55rem;/);
   assert.match(css, /#screen \{ cursor: default; \}/);
 });
 
-test("Phase 9 audio reconnect clipboard layout and settings controls are present", () => {
-  for (const id of ["audio-enabled", "audio-mute", "audio-volume", "auto-reconnect", "reconnect", "workspace-layout", "clipboard-auto-sync", "clipboard-max-kib", "clipboard-copy-android", "settings-export", "settings-import"]) {
-    assert.match(html, new RegExp(`id=\"${id}\"`));
-  }
-  assert.match(css, /body\[data-layout="screen"\]/);
+test("audio reconnect clipboard and settings controls are present without layout modes", () => {
+  for (const id of ["audio-enabled", "audio-mute", "audio-volume", "auto-reconnect", "reconnect", "clipboard-auto-sync", "clipboard-max-kib", "clipboard-copy-android", "settings-export", "settings-import"]) assert.match(html, new RegExp(`id=\"${id}\"`));
+  assert.equal(html.includes('id="workspace-layout"'), false);
+  assert.equal(controllerSource.includes("workspaceLayout"), false);
   assert.match(css, /:focus-visible/);
 });
 
-
-test("side cards are collapsible and expanded by default", () => {
-  assert.match(html, /class="help-card display-mode-card"/);
-  assert.equal(html.includes("<h2>Controls</h2>"), false);
-  assert.match(css, /\.card-collapse-button/);
-  assert.match(css, /\.collapsible-card\.is-collapsed/);
-  assert.match(mainSource, /initializeCollapsibleCards/);
-  assert.match(mainSource, /aria-expanded", "true"/);
+test("native drawer uses persisted accordions only for multi-section groups", () => {
+  assert.match(html, /id="gb-single-drawer-root"/);
+  assert.match(html, /data-section-key="files-load"/);
+  assert.match(html, /data-section-key="access-web-browser"/);
+  assert.equal(mainSource.includes("initializeCollapsibleCards"), false);
+  assert.equal(html.includes("card-collapse-button"), false);
 });
 
-test("focus layout is reversible from the always-visible header selector", () => {
+test("Focus-style workspace is permanent and has no layout selector", () => {
   const headerStart = html.indexOf('<header class="topbar">');
   const headerEnd = html.indexOf('</header>', headerStart);
   const header = html.slice(headerStart, headerEnd);
   assert.match(header, /id="fullscreen"/);
-  assert.match(header, /id="workspace-layout"/);
-  assert.equal(header.includes('id="exit-focus"'), false);
-  assert.equal(controllerSource.includes("exitFocus"), false);
-  assert.match(controllerSource, /workspaceLayout\.addEventListener\("change", \(\) => this\.applyWorkspaceLayout\(\)\)/);
+  assert.equal(header.includes('id="workspace-layout"'), false);
+  assert.equal(controllerSource.includes("applyWorkspaceLayout"), false);
+  assert.equal(controllerSource.includes("workspaceLayout"), false);
 });
 
 test("audio card uses the concise label without the experimental badge", () => {
@@ -103,11 +101,10 @@ test("audio card uses the concise label without the experimental badge", () => {
   assert.equal(css.includes(".experimental-badge"), false);
 });
 
-test("two-way watched-folder controls are present", () => {
-  for (const id of ["auto-download-enabled", "auto-upload-enabled", "auto-upload-duplicate", "auto-upload-existing"]) {
-    assert.match(html, new RegExp(`id="${id}"`));
-  }
-  assert.match(html, /Automatic two-way folder sync/);
+test("File sync controls are present", () => {
+  for (const id of ["auto-download-enabled", "auto-upload-enabled", "auto-upload-duplicate", "auto-upload-existing"]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /File sync/);
+  assert.equal(html.includes("Automatic two-way folder sync"), false);
   assert.match(html, /Files created by one sync direction are fingerprinted/);
 });
 

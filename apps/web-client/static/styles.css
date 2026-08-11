@@ -360,3 +360,16 @@ body[data-layout="compact"] .statistics-card { padding: 0.75rem; }
 .help-card .card-collapse-button { width: 1.25rem; min-width: 1.25rem; max-width: 1.25rem; height: 1.25rem; min-height: 1.25rem; max-height: 1.25rem; padding: 0; border-radius: 5px; font-size: 0.72rem; line-height: 1; }
 
 .virtual-keyboard-note { margin: -0.15rem 0 0.15rem 1.55rem !important; color: #8f9bb0 !important; font-size: 0.74rem !important; }
+
+
+/* DroidWebDisplay native single-drawer production layout */
+.native-workspace { grid-template-columns: minmax(0, 1fr) !important; align-items: stretch !important; gap: 0 !important; min-height: calc(100vh - 54px); padding: 0.75rem !important; }
+.native-workspace > .stage { width: 100%; min-height: calc(100vh - 78px); }
+#gb-single-drawer-root .help-card { margin: 0; }
+#gb-single-drawer-root .gb-drawer-slot > .help-card + .help-card { margin-top: 8px; }
+#gb-single-drawer-root .gb-accordion-content > .help-card { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+#gb-single-drawer-root .clipboard-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#gb-single-drawer-root .clipboard-actions button { min-width: 0; }
+#gb-single-drawer-root .security-card { display: grid; gap: 8px; }
+#gb-single-drawer-root .security-card[hidden], #gb-single-drawer-root .network-access-card[hidden] { display: none !important; }
+@media (max-width: 700px) { .native-workspace { padding: 0.5rem !important; } .native-workspace > .stage { min-height: calc(100vh - 72px); } }
