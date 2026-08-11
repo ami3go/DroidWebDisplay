@@ -7,12 +7,6 @@ from typing import Any
 from droid_web_display.auth import AuthError, AuthService as _BaseAuthService
 from droid_web_display.errors import TransferValidationError
 from droid_web_display.models import ChannelName, SessionState
-from droid_web_display.network_access import (
-    LAN_HTTPS,
-    LOCAL_ONLY,
-    NetworkAccessConfig,
-    NetworkConfigStore as _BaseNetworkConfigStore,
-)
 from droid_web_display.scrcpy.session import SessionManager as _BaseSessionManager
 from droid_web_display.transfers.manager import TransferManager as _BaseTransferManager
 from droid_web_display.transfers.models import TransferDirection, TransferRecord
@@ -34,29 +28,6 @@ class HardenedAuthService(_BaseAuthService):
                 code="setup_requires_local",
             )
         return super().setup(pin, access_mode=access_mode, **kwargs)
-
-
-class AuthSafeNetworkConfigStore(_BaseNetworkConfigStore):
-    """Fail back to loopback whenever the sibling auth store is unconfigured."""
-
-    def load(self) -> NetworkAccessConfig:
-        config = super().load()
-        if config.mode != LAN_HTTPS:
-            return config
-
-        auth_path = self.path.with_name("auth.json")
-        try:
-            auth_configured = _BaseAuthService(auth_path).configured
-        except Exception:
-            auth_configured = False
-        if auth_configured:
-            return config
-
-        return NetworkAccessConfig(
-            mode=LOCAL_ONLY,
-            bind_address="127.0.0.1",
-            port=config.port,
-        )
 
 
 class HardenedTransferManager(_BaseTransferManager):
@@ -138,14 +109,12 @@ def install_runtime_hardening() -> None:
     """Install hardened implementations while preserving historical import paths."""
 
     import droid_web_display.auth as auth_module
-    import droid_web_display.network_access as network_module
     import droid_web_display.scrcpy as scrcpy_package
     import droid_web_display.scrcpy.session as session_module
     import droid_web_display.transfers as transfers_package
     import droid_web_display.transfers.manager as transfer_manager_module
 
     auth_module.AuthService = HardenedAuthService
-    network_module.NetworkConfigStore = AuthSafeNetworkConfigStore
     session_module.SessionManager = ResilientSessionManager
     scrcpy_package.SessionManager = ResilientSessionManager
     transfer_manager_module.TransferManager = HardenedTransferManager
