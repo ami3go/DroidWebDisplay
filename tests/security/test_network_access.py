@@ -138,7 +138,7 @@ def test_network_api_requires_pin_validates_and_persists_lan_config(tmp_path: Pa
         assert client.get("/api/v1/devices").status_code == 401  # sessions revoked after trust-boundary change
 
 
-def test_lan_cookie_is_secure(tmp_path: Path) -> None:
+def test_lan_cookie_is_secure_after_local_pin_bootstrap(tmp_path: Path) -> None:
     cert = tmp_path / "cert.pem"
     key = tmp_path / "key.pem"
     generate_certificate(cert, key, bind_address="192.168.50.20")
@@ -155,10 +155,18 @@ def test_lan_cookie_is_secure(tmp_path: Path) -> None:
         tls_certificate_path=cert,
         tls_private_key_path=key,
     )
-    app = create_app(config=config, manager=FakeSessionManager(), adb=FakeAdb(), auth=AuthService(config.resolved_auth_data_file))  # type: ignore[arg-type]
+    auth = AuthService(config.resolved_auth_data_file)
+    auth.setup(
+        "123456",
+        duration="1-day",
+        custom_seconds=None,
+        user_agent="local bootstrap",
+        access_mode="local",
+    )
+    app = create_app(config=config, manager=FakeSessionManager(), adb=FakeAdb(), auth=auth)  # type: ignore[arg-type]
     with TestClient(app, base_url="https://192.168.50.20:8765") as client:
-        response = client.post("/api/v1/auth/setup", json={"pin": "123456", "confirmPin": "123456", "duration": "1-day"})
-        assert response.status_code == 201
+        response = client.post("/api/v1/auth/login", json={"pin": "123456", "duration": "1-day"})
+        assert response.status_code == 200
         cookie = response.headers["set-cookie"].lower()
         assert "secure" in cookie
         assert "httponly" in cookie
