@@ -49,6 +49,7 @@ report.html
 xunit.xml
 *.log
 
+<<<<<<< HEAD
 # Keep the release evidence directory placeholder tracked.
 !evidence/release/
 evidence/release/*.json
@@ -57,6 +58,9 @@ evidence/release/*.json
 # -----------------------------------------------------------------------------
 # Browser / Playwright generated output
 # -----------------------------------------------------------------------------
+=======
+# Browser / Playwright generated output
+>>>>>>> e6d70fcb733f5bffea15745a6ec9efba04b0a39d
 playwright-report/
 **/playwright-report/
 blob-report/
@@ -70,10 +74,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+<<<<<<< HEAD
 # Web-client distribution staging/backup folders
 apps/web-client/.dist-stage-*/
 apps/web-client/.dist-backup-*/
 
+=======
+>>>>>>> e6d70fcb733f5bffea15745a6ec9efba04b0a39d
 # -----------------------------------------------------------------------------
 # Local configuration / secrets
 # -----------------------------------------------------------------------------
@@ -95,7 +102,11 @@ local.yml
 *.pfx
 
 # -----------------------------------------------------------------------------
+<<<<<<< HEAD
 # Android / ADB / Gradle generated files
+=======
+# Android / Gradle generated files
+>>>>>>> e6d70fcb733f5bffea15745a6ec9efba04b0a39d
 # -----------------------------------------------------------------------------
 .gradle/
 **/.gradle/
@@ -110,6 +121,7 @@ captures/
 *.apk
 *.aab
 
+<<<<<<< HEAD
 # Runtime/download directories
 /data/
 data/
@@ -119,6 +131,8 @@ downloads/
 server/scrcpy-server-v4.1
 server/scrcpy-server.manifest.json
 
+=======
+>>>>>>> e6d70fcb733f5bffea15745a6ec9efba04b0a39d
 # -----------------------------------------------------------------------------
 # DroidWebDisplay generated release / integration output
 # -----------------------------------------------------------------------------
@@ -131,7 +145,11 @@ DroidWebDisplay_*_candidate/
 
 # UI integration backup folders created during local patch/apply operations
 .droidwebdisplay-main-ui-backup/
+<<<<<<< HEAD
 .droidwebdisplay-main-ui-backup/
+=======
+.gptbridge-main-ui-backup/
+>>>>>>> e6d70fcb733f5bffea15745a6ec9efba04b0a39d
 .single-drawer-backup/
 
 # -----------------------------------------------------------------------------
