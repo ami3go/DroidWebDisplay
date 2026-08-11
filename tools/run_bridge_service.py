@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import suppress
 import os
 from pathlib import Path
+import socket
+import ssl
 import sys
 import threading
+import urllib.error
+import urllib.request
 import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +24,58 @@ from droid_web_display.api import create_app
 from droid_web_display.config import BridgeConfig
 from droid_web_display.network_access import LAN_HTTPS, LOCAL_ONLY, FirewallManager, NetworkAccessError, NetworkConfigStore
 from droid_web_display.runtime import require_websocket_backend
+
+
+PRODUCT_TITLE_MARKER = "<title>DroidWebDisplay</title>"
+WEB_UI_MARKER = "droidwebdisplay-native-single-drawer-v1"
+
+
+class ExistingWebServiceError(RuntimeError):
+    """Raised when the configured listener belongs to an older or unrelated service."""
+
+
+def _probe_host(bind_host: str) -> str:
+    if bind_host in {"0.0.0.0", ""}:
+        return "127.0.0.1"
+    if bind_host == "::":
+        return "::1"
+    return bind_host
+
+
+def _port_is_listening(bind_host: str, port: int) -> bool:
+    try:
+        with socket.create_connection((_probe_host(bind_host), port), timeout=0.35):
+            return True
+    except OSError:
+        return False
+
+
+def _fetch_root_html(url: str) -> str | None:
+    context = None
+    if url.lower().startswith("https://"):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "DroidWebDisplay-runtime-probe/1"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=0.8, context=context) as response:
+            return response.read(512 * 1024).decode("utf-8", errors="replace")
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def _is_current_web_ui(html: str | None) -> bool:
+    return bool(html and PRODUCT_TITLE_MARKER in html and WEB_UI_MARKER in html)
+
+
+def _classify_existing_service(url: str, bind_host: str, port: int) -> str:
+    if not _port_is_listening(bind_host, port):
+        return "none"
+    return "current" if _is_current_web_ui(_fetch_root_html(url)) else "other"
 
 
 def _bridge_config(args: argparse.Namespace, network) -> BridgeConfig:
@@ -47,6 +104,23 @@ def _bridge_config(args: argparse.Namespace, network) -> BridgeConfig:
 async def _serve_once(args: argparse.Namespace, network, websocket_backend: str, *, open_browser: bool) -> bool:
     config = _bridge_config(args, network)
     config.validate()
+    scheme = "https" if config.tls_enabled else "http"
+    display_host = config.configured_hostname or config.bind_host
+    url = f"{scheme}://{display_host}:{config.bind_port}/"
+
+    existing = _classify_existing_service(url, config.bind_host, config.bind_port)
+    if existing == "current":
+        print(f"DroidWebDisplay is already running at {url}")
+        print("Existing listener serves the current DroidWebDisplay web UI marker.")
+        if open_browser:
+            webbrowser.open(url)
+        return False
+    if existing == "other":
+        raise ExistingWebServiceError(
+            f"Port {config.bind_port} on {config.bind_host} is already in use by an older or unrelated web service. "
+            "Stop that process (or choose another port) before starting this DroidWebDisplay checkout."
+        )
+
     restart_requested = False
     server_holder: dict[str, uvicorn.Server] = {}
 
@@ -69,10 +143,9 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
     )
     server = uvicorn.Server(uvicorn_config)
     server_holder["server"] = server
-    scheme = "https" if config.tls_enabled else "http"
-    display_host = config.configured_hostname or config.bind_host
-    url = f"{scheme}://{display_host}:{config.bind_port}/"
     print(f"DroidWebDisplay: {url}")
+    print(f"Web root: {config.repo_root / 'apps' / 'web-client' / 'dist'}")
+    print(f"Web UI marker: {WEB_UI_MARKER}")
     print(f"Network access mode: {config.network_mode}")
     print(f"WebSocket backend: {websocket_backend}")
     print(f"PC download folder: {config.resolved_default_download_directory}")
@@ -80,9 +153,21 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
     print(f"Authentication store: {config.resolved_auth_data_file}")
     print(f"Network configuration: {config.resolved_network_config_file}")
     print("Trust authority: this PC bridge (not the Android phone)")
-    if open_browser:
-        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    await server.serve()
+
+    async def open_browser_after_start() -> None:
+        while not server.started and not server.should_exit:
+            await asyncio.sleep(0.05)
+        if server.started and not server.should_exit:
+            webbrowser.open(url)
+
+    browser_task = asyncio.create_task(open_browser_after_start()) if open_browser else None
+    try:
+        await server.serve()
+    finally:
+        if browser_task is not None and not browser_task.done():
+            browser_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await browser_task
     return restart_requested
 
 
@@ -136,6 +221,10 @@ def main() -> int:
                 network = store.reset_local_only(port=args.port or 8765)
             try:
                 restart = asyncio.run(_serve_once(args, network, websocket_backend, open_browser=open_browser))
+            except ExistingWebServiceError as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                print("The browser was not opened, so an older page cannot be mistaken for this checkout.", file=sys.stderr)
+                return 4
             except (OSError, SystemExit, ValueError) as exc:
                 if network.mode == LAN_HTTPS:
                     print(f"ERROR: LAN listener failed: {exc}", file=sys.stderr)
