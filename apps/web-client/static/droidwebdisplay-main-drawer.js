@@ -1,11 +1,11 @@
-/* DroidWebDisplay native single-drawer controller v1.1.0 */
+/* DroidWebDisplay native single-drawer controller v1.1.1 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
   const LAST_GROUP_KEY = 'droidwebdisplay.ui.drawer.lastGroup.v1';
   const ACCORDION_KEY = 'droidwebdisplay.ui.drawer.accordions.v1';
   const ROOT_ID = 'gb-single-drawer-root';
-  const GROUPS = ['apps','files','clipboard','display','audio','access','network','diagnostics','settings'];
+  const GROUPS = ['display','clipboard','files','apps','audio','access','network','diagnostics','settings'];
   let activeGroup = null;
   let pinned = false;
   const root = () => document.getElementById(ROOT_ID);
@@ -14,6 +14,15 @@
   function set(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
   function storedPinned() { return get(PIN_KEY, '0') === '1'; }
   function storedGroup() { const value = get(LAST_GROUP_KEY, 'display'); return GROUPS.includes(value) ? value : 'display'; }
+  function applyRailOrder() {
+    const rail = root()?.querySelector('.gb-rail');
+    if (!rail) return;
+    const spacer = rail.querySelector('.gb-rail-spacer');
+    GROUPS.forEach(group => {
+      const button = rail.querySelector(`.gb-rail-button[data-group="${group}"]`);
+      if (button) rail.insertBefore(button, spacer);
+    });
+  }
   function applyPinned(value, persist = true) {
     pinned = Boolean(value);
     document.documentElement.classList.toggle('gb-single-drawer-pinned', pinned);
@@ -54,6 +63,7 @@
   function boot() {
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
+    applyRailOrder();
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));
     ui.querySelector('.gb-drawer-pin')?.addEventListener('click', () => applyPinned(!pinned));
     ui.querySelectorAll('[data-action="close"], .gb-drawer-close').forEach(button => button.addEventListener('click', closeDrawer));
