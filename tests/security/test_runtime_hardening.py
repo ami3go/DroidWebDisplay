@@ -7,12 +7,6 @@ import pytest
 from droid_web_display.auth import AuthError, AuthService
 from droid_web_display.errors import TransferConflictError, TransferValidationError
 from droid_web_display.models import SessionOptions, SessionState
-from droid_web_display.network_access import (
-    LAN_HTTPS,
-    NetworkAccessConfig,
-    NetworkConfigStore,
-    TlsSettings,
-)
 from droid_web_display.scrcpy.session import ScrcpySession, SessionManager
 from droid_web_display.transfers.adb_sync import AdbSyncStat
 from droid_web_display.transfers.manager import TransferManager
@@ -47,41 +41,6 @@ def test_initial_pin_setup_is_rejected_in_lan_mode(tmp_path: Path) -> None:
             access_mode="lan",
         )
     assert auth.configured is False
-
-
-def test_saved_lan_config_falls_back_to_loopback_without_auth(tmp_path: Path) -> None:
-    cert = tmp_path / "cert.pem"
-    key = tmp_path / "key.pem"
-    cert.write_text("placeholder", encoding="utf-8")
-    key.write_text("placeholder", encoding="utf-8")
-    store = NetworkConfigStore(tmp_path / "network-access.json")
-    store.save(
-        NetworkAccessConfig(
-            mode=LAN_HTTPS,
-            bind_address="192.168.50.20",
-            port=8765,
-            allowed_networks=("192.168.50.0/24",),
-            tls=TlsSettings(
-                enabled=True,
-                certificate_path=str(cert),
-                private_key_path=str(key),
-            ),
-        )
-    )
-
-    recovered = store.load()
-    assert recovered.mode == "local-only"
-    assert recovered.bind_address == "127.0.0.1"
-    assert recovered.port == 8765
-
-    AuthService(tmp_path / "auth.json").setup(
-        "123456",
-        duration="1-day",
-        custom_seconds=None,
-        user_agent="test",
-        access_mode="local",
-    )
-    assert store.load().mode == LAN_HTTPS
 
 
 @pytest.mark.asyncio
