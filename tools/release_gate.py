@@ -308,14 +308,23 @@ def main() -> int:
         "virtualDisplayOnly": True,
         "physicalDisplayAffected": False,
     }
+    permanent_native_layout = (
+        'data-ui="droidwebdisplay-native-single-drawer-v1"' in html_source
+        and 'id="gb-single-drawer-root"' in html_source
+        and 'id="workspace-layout"' not in html_source
+        and '<aside class="sidepanel">' not in html_source
+        and '<aside class="transfer-panel"' not in html_source
+        and "workspaceLayout" not in controller_source
+    )
     checks["reconnectAndLayout"] = {
-        "status": "PASS" if all(token in controller_source + html_source + css_source for token in (
-            "scheduleReconnect", "reconnectNow", "requestFullscreen", 'id="workspace-layout"', ':focus-visible', 'aria-live="polite"',
+        "status": "PASS" if permanent_native_layout and all(token in controller_source + html_source + css_source for token in (
+            "scheduleReconnect", "reconnectNow", "requestFullscreen", ':focus-visible', 'aria-live="polite"',
         )) else "FAIL",
         "automaticReconnect": True,
         "manualReconnect": True,
         "fullscreen": True,
         "keyboardFocus": True,
+        "permanentNativeLayout": permanent_native_layout,
     }
     checks["settingsRoundTrip"] = {
         "status": "PASS" if all(token in controller_source + html_source for token in (
@@ -324,7 +333,7 @@ def main() -> int:
         "schemaVersion": 1,
     }
     old_gate_tokens = ("data-gate4-check", "data-gate5-check", "data-gate6-check", "data-gate7-check", "Gate 4 verification", "Gate 5 verification", "Gate 6 verification", "Gate 7 verification")
-    compact_labels = all(token in html_source for token in (">Upload<", ">Browse<", ">Download<", ">Reset<", ">Save<", ">Scan now<"))
+    compact_labels = all(token in html_source for token in (">Load<", ">Browse<", ">Download<", ">Reset<", ">Save<", ">Scan now<")) and ">Upload<" not in html_source
     checks["storageAndUiAdjustments"] = {
         "status": "PASS" if compact_labels and all(token not in html_source for token in old_gate_tokens) and all(token in path_source + adb_source + css_source for token in (
             "/sdcard/Documents", "external_storage_roots", "SD card ·", "#screen { cursor: default; }", ".uniform-buttons > button",
@@ -351,29 +360,31 @@ def main() -> int:
         "legacySideCardPresent": 'class="status-card"' in html_source,
     }
 
-    collapse_tokens = ("initializeCollapsibleCards", "card-collapse-button", "collapsible-card", "is-collapsed", 'aria-expanded", "true"')
+    drawer_source = (root / "apps/web-client/static/droidwebdisplay-main-drawer.js").read_text(encoding="utf-8")
+    native_accordion_contract = all(token in html_source for token in (
+        'id="gb-single-drawer-root"', 'data-section-key="files-load"', 'data-section-key="files-sync"',
+        'data-section-key="access-web-browser"', 'data-section-key="access-pin"', 'data-section-key="access-revoke-all"',
+    )) and "droidwebdisplay.ui.drawer.accordions.v1" in drawer_source
     checks["collapsibleCards"] = {
-        "status": "PASS" if all(token in html_source + css_source + main_source for token in collapse_tokens) else "FAIL",
-        "expandedByDefault": 'aria-expanded", "true"' in main_source,
-        "leftAndRightPanels": ".sidepanel > .help-card, .transfer-panel > .help-card" in main_source,
+        "status": "PASS" if native_accordion_contract and permanent_native_layout and "initializeCollapsibleCards" not in main_source else "FAIL",
+        "nativePersistedAccordions": native_accordion_contract,
+        "legacyPanelsPresent": '<aside class="sidepanel">' in html_source or '<aside class="transfer-panel"' in html_source,
         "obsoleteControlsCardRemoved": "<h2>Controls</h2>" not in html_source,
     }
     checks["singlePageVerticalScroll"] = {
-        "status": "PASS" if all(token in css_source for token in (
-            ".workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px 1fr; align-items: start;",
-            ".transfer-panel { display: flex; min-width: 0; flex-direction: column; gap: 1rem; overflow: visible; max-height: none;",
-        )) and "overflow: auto; max-height: calc(100vh - 72px);" not in css_source else "FAIL",
+        "status": "PASS" if permanent_native_layout and ".native-workspace" in css_source and "overflow: auto; max-height: calc(100vh - 72px);" not in css_source else "FAIL",
         "pageScrollbarOnly": True,
         "rightPanelOwnScrollbar": False,
         "workspaceTopAligned": True,
+        "nativeWorkspace": True,
     }
 
     checks["focusLayoutEscape"] = {
-        "status": "PASS" if all(token in html_source + controller_source for token in (
-            'id="fullscreen"', 'id="workspace-layout"', 'workspaceLayout.addEventListener("change", () => this.applyWorkspaceLayout())',
-        )) and 'id="exit-focus"' not in html_source and "exitFocus" not in controller_source else "FAIL",
+        "status": "PASS" if permanent_native_layout and 'id="fullscreen"' in html_source and 'id="exit-focus"' not in html_source and "exitFocus" not in controller_source else "FAIL",
         "toolbarPlacement": True,
-        "selectorAlwaysVisible": True,
+        "selectorAlwaysVisible": False,
+        "selectorPresent": 'id="workspace-layout"' in html_source,
+        "permanentFocusStyle": True,
         "dedicatedExitButton": False,
     }
 

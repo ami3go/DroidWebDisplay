@@ -80,18 +80,18 @@
     },
     {
       "path": "assets/controller.d.ts",
-      "bytes": 4371,
-      "sha256": "ff7d3b4a46f953ed5e4af40a97deb1c9f34813705806963d30c68d066706dfba"
+      "bytes": 4288,
+      "sha256": "1e26e409944d52b33b7698e19146a8ff8cfd1a50e7ef5989a0aaed84bee9a764"
     },
     {
       "path": "assets/controller.js",
-      "bytes": 49553,
-      "sha256": "0c994c4b5022bc7a0f30fd3222ba8f4c02947152e6452c8e6dc613aa4fac3e3c"
+      "bytes": 49024,
+      "sha256": "2823d37a5ee8e632607f65697f0954f33175cd1afa91b6c54dadd283ff93d855"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 46696,
-      "sha256": "ffdf683fbb8e63e54b9096597a3e18ec20bd25fbac2e0584d997e98dd4d4dde2"
+      "bytes": 46083,
+      "sha256": "88fd38431273a6e2db240ec115003f4dda0e6c20180352350f57be4f8e20280c"
     },
     {
       "path": "assets/display-config.d.ts",
@@ -130,13 +130,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 13044,
-      "sha256": "945abd1270f667d006af0ec94eb2373fba74266ccca60bbabd589b2bc9d36569"
+      "bytes": 11145,
+      "sha256": "06bb39ae706a0dd05411bc3ba471dd68c35e1e1a2ea3f2c396f9422a043b6142"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 10357,
-      "sha256": "967145b923834c6ea3dd091912a0137d1966b961277997db6041d7ec6472b734"
+      "bytes": 8407,
+      "sha256": "27a10c9b05a266f5aed34d5a9f44437a294c723eb78b407624db3294783e6928"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -235,18 +235,18 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 26327,
-      "sha256": "d7c423507c7cd0e2b6ead28523b1f3d4db5b45fdc75c51f6329f0aea57546ecc"
+      "bytes": 4078,
+      "sha256": "f01d25ae0d8ab3dd4f7bd45ba6ad27c9a77393f2a2850c51872c430cc31b50ae"
     },
     {
       "path": "index.html",
-      "bytes": 26417,
-      "sha256": "b17d6782631e6ce04022f52d01bfb2b5b77a60bcf0d22581354cf2c8046c1bcf"
+      "bytes": 30532,
+      "sha256": "9a2397038fca6030f6a6e641e533fb61ea8c78de5b6c1660459736c173c023e6"
     },
     {
       "path": "styles.css",
-      "bytes": 25439,
-      "sha256": "e4d60b3c864ef8814f64c953e940b3f35a4af3eeae248dd20aa0e880e4fa26f2"
+      "bytes": 26601,
+      "sha256": "66bc32e73126c117fb9ea4ac5e1f196d2d1da860f98b33220d914830a203efef"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",

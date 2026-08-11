@@ -14,44 +14,6 @@ function required<T extends Element>(selector: string): T {
 
 
 
-function initializeCollapsibleCards(): void {
-  const cards = document.querySelectorAll<HTMLElement>(".sidepanel > .help-card, .transfer-panel > .help-card");
-  cards.forEach((card, index) => {
-    if (card.classList.contains("collapsible-card")) return;
-    card.classList.add("collapsible-card");
-
-    let header = Array.from(card.children).find((child) => child.classList.contains("section-heading")) as HTMLElement | undefined;
-    if (!header) {
-      const heading = Array.from(card.children).find((child) => child.tagName === "H2") as HTMLElement | undefined;
-      if (!heading) return;
-      header = document.createElement("div");
-      header.className = "card-header";
-      card.insertBefore(header, heading);
-      header.append(heading);
-    } else {
-      header.classList.add("card-header");
-    }
-
-    const heading = header.querySelector<HTMLElement>("h2");
-    const title = heading?.textContent?.trim() || `Card ${index + 1}`;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "card-collapse-button secondary compact";
-    button.setAttribute("aria-expanded", "true");
-    button.setAttribute("aria-label", `Collapse ${title}`);
-    button.title = `Collapse ${title}`;
-    button.textContent = "−";
-    button.addEventListener("click", () => {
-      const collapsed = card.classList.toggle("is-collapsed");
-      button.setAttribute("aria-expanded", String(!collapsed));
-      button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${title}`);
-      button.title = `${collapsed ? "Expand" : "Collapse"} ${title}`;
-      button.textContent = collapsed ? "+" : "−";
-    });
-    header.append(button);
-  });
-}
-
 async function bootstrap(): Promise<void> {
   const auth = new AuthController({
     gate: required<HTMLElement>("#auth-gate"),
@@ -91,7 +53,6 @@ async function bootstrap(): Promise<void> {
     unsupported.textContent = `This browser is unsupported. Missing: ${capabilities.missing.join(", ")}. Use a current Chromium browser with WebCodecs.`;
   } else {
     app.hidden = false;
-    initializeCollapsibleCards();
     const networkController = new NetworkAccessController({
       card: required<HTMLElement>("#network-card"),
       badge: required<HTMLElement>("#network-mode-badge"),
@@ -156,7 +117,6 @@ async function bootstrap(): Promise<void> {
       autoReconnect: required<HTMLInputElement>("#auto-reconnect"),
       reconnectAttempts: required<HTMLSelectElement>("#reconnect-attempts"),
       reconnect: required<HTMLButtonElement>("#reconnect"),
-      workspaceLayout: required<HTMLSelectElement>("#workspace-layout"),
       sessionChannels: required<HTMLElement>("#session-channels"),
       clipboardAutoSync: required<HTMLInputElement>("#clipboard-auto-sync"),
       clipboardMaxKib: required<HTMLInputElement>("#clipboard-max-kib"),

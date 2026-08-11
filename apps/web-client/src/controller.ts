@@ -52,7 +52,6 @@ interface Elements {
   readonly autoReconnect: HTMLInputElement;
   readonly reconnectAttempts: HTMLSelectElement;
   readonly reconnect: HTMLButtonElement;
-  readonly workspaceLayout: HTMLSelectElement;
   readonly sessionChannels: HTMLElement;
   readonly clipboardAutoSync: HTMLInputElement;
   readonly clipboardMaxKib: HTMLInputElement;
@@ -124,7 +123,7 @@ export class DroidWebDisplayController {
   }
 
   public async initialize(): Promise<void> {
-    this.applyProfile(localStorage.getItem("gptBridgeVirtualProfile") ?? "chatgpt-desktop");
+    this.applyProfile(localStorage.getItem("droidwebdisplay-virtual-profile-v1") ?? "chatgpt-desktop");
     this.restoreBrowserSettings();
     await this.refreshDevices();
     await this.refreshVirtualCapabilities();
@@ -192,7 +191,7 @@ export class DroidWebDisplayController {
             if (this.#serverSession) this.elements.audioStatus.textContent = `Audio unavailable: ${errorMessage(error)}. Video and control remain active.`;
           });
         } else {
-          this.elements.audioStatus.textContent = "Experimental Android audio capture is unavailable. Video and control remain active.";
+          this.elements.audioStatus.textContent = "Android audio capture is unavailable. Video and control remain active.";
         }
       } else {
         this.elements.audioStatus.textContent = "Audio disabled.";
@@ -289,7 +288,6 @@ export class DroidWebDisplayController {
     this.elements.autoReconnect.addEventListener("change", () => this.saveBrowserSettings());
     this.elements.reconnectAttempts.addEventListener("change", () => this.saveBrowserSettings());
     this.elements.reconnect.addEventListener("click", () => void this.runUiAction(() => this.reconnectNow()));
-    this.elements.workspaceLayout.addEventListener("change", () => this.applyWorkspaceLayout());
     this.elements.clipboardAutoSync.addEventListener("change", () => void this.runUiAction(async () => {
       this.saveBrowserSettings();
       await this.startClipboardPolling(true);
@@ -350,7 +348,7 @@ export class DroidWebDisplayController {
     this.elements.preserveAspect.checked = profile.preserveAspectRatio;
     this.elements.videoBitrate.value = String(profile.videoBitRate / 1_000_000);
     this.elements.virtualMaxFps.value = String(profile.maxFps);
-    localStorage.setItem("gptBridgeVirtualProfile", profile.profileId);
+    localStorage.setItem("droidwebdisplay-virtual-profile-v1", profile.profileId);
   }
 
   private onCustomDisplayChange(): void {
@@ -927,11 +925,6 @@ export class DroidWebDisplayController {
     await this.connect();
   }
 
-  private applyWorkspaceLayout(): void {
-    const layout = this.elements.workspaceLayout.value;
-    document.body.dataset.layout = layout === "auto" ? "" : layout;
-    this.saveBrowserSettings();
-  }
 
   private browserSettings(): Record<string, unknown> {
     return {
@@ -940,7 +933,6 @@ export class DroidWebDisplayController {
       audio: { enabled: this.elements.audioEnabled.checked, muted: this.elements.audioMute.textContent === "Unmute", volume: Number(this.elements.audioVolume.value) },
       clipboard: { automatic: this.elements.clipboardAutoSync.checked, maximumKiB: Number(this.elements.clipboardMaxKib.value) },
       reconnect: { enabled: this.elements.autoReconnect.checked, attempts: Number(this.elements.reconnectAttempts.value) },
-      layout: this.elements.workspaceLayout.value,
     };
   }
 
@@ -991,8 +983,6 @@ export class DroidWebDisplayController {
     this.elements.clipboardMaxKib.value = String(Math.max(1, Math.min(256, Number(clipboard?.maximumKiB ?? 256))));
     this.elements.autoReconnect.checked = reconnect?.enabled !== false;
     this.elements.reconnectAttempts.value = String([3, 5, 10].includes(Number(reconnect?.attempts)) ? Number(reconnect?.attempts) : 5);
-    this.elements.workspaceLayout.value = ["auto", "screen", "compact"].includes(String(value.layout)) ? String(value.layout) : "auto";
-    this.applyWorkspaceLayout();
   }
 
   private exportSettings(): void {
