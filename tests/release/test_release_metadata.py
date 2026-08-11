@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 import tomllib
 
+from fastapi.testclient import TestClient
+
 from droid_web_display import RELEASE_PHASE, __version__
+from droid_web_display.api import create_app
+from droid_web_display.config import BridgeConfig
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,3 +35,28 @@ def test_release_version_metadata_is_consistent() -> None:
 
 def test_release_phase_is_phase_11() -> None:
     assert RELEASE_PHASE == 11
+
+
+def test_public_api_exposes_canonical_release_phase(tmp_path: Path) -> None:
+    config = BridgeConfig(
+        repo_root=ROOT,
+        transfer_data_directory=tmp_path / "data",
+        default_download_directory=tmp_path / "downloads",
+        auth_data_file=tmp_path / "data" / "auth.json",
+        network_config_file=tmp_path / "data" / "network-access.json",
+        authentication_required=False,
+    )
+    app = create_app(config=config)
+
+    with TestClient(app) as client:
+        version = client.get("/api/v1/version")
+        assert version.status_code == 200
+        assert version.json()["phase"] == RELEASE_PHASE
+        assert version.json()["version"] == __version__
+
+        diagnostics = client.get("/api/v1/diagnostics")
+        assert diagnostics.status_code == 200
+        assert diagnostics.json()["phase"] == RELEASE_PHASE
+
+        with client.websocket_connect("/ws/v1/events") as websocket:
+            assert websocket.receive_json()["phase"] == RELEASE_PHASE
