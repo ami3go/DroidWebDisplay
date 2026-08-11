@@ -71,7 +71,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm tools/native_ui_migration.py .github/workflows/native-ui-migration.yml
+          git rm -f tools/native_ui_migration.py .github/workflows/native-ui-migration.yml
           git add -A
           git commit -m 'Make DroidWebDisplay single drawer native'
           git push origin HEAD:fix/native-droidwebdisplay-ui
