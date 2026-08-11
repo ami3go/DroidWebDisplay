@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_requested_button_labels_and_legacy_gate_controls_are_removed() -> None:
     html = (ROOT / "apps/web-client/dist/index.html").read_text(encoding="utf-8")
-    assert '>Upload<' in html
+    assert '>Load<' in html
     assert '>Browse<' in html
     assert '>Download<' in html
     assert '>Reset<' in html
-    for old in ("Upload selected file(s)", "Browse upload folder", "Download selected", "Reset history"):
+    for old in ("Upload selected file(s)", "Browse upload folder", "Download selected", "Reset history", ">Upload<"):
         assert old not in html
     assert "data-gate4-check" not in html
     assert "data-gate5-check" not in html
@@ -23,19 +23,23 @@ def test_requested_button_labels_and_legacy_gate_controls_are_removed() -> None:
     assert "verification" not in html
 
 
-def test_phase9_layout_audio_clipboard_and_reconnect_controls_are_bundled() -> None:
+def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled() -> None:
     html = (ROOT / "apps/web-client/dist/index.html").read_text(encoding="utf-8")
     css = (ROOT / "apps/web-client/dist/styles.css").read_text(encoding="utf-8")
     for element_id in (
         'id="audio-enabled"', 'id="audio-mute"', 'id="audio-volume"',
-        'id="auto-reconnect"', 'id="reconnect"', 'id="workspace-layout"',
+        'id="auto-reconnect"', 'id="reconnect"',
         'id="clipboard-auto-sync"', 'id="clipboard-max-kib"',
         'id="clipboard-copy-android"', 'id="settings-export"', 'id="settings-import"',
+        'id="gb-single-drawer-root"',
     ):
         assert element_id in html
+    assert 'data-ui="droidwebdisplay-native-single-drawer-v1"' in html
+    assert 'id="workspace-layout"' not in html
+    assert '<aside class="sidepanel">' not in html
+    assert '<aside class="transfer-panel"' not in html
     assert "#screen { cursor: default; }" in css
     assert ".uniform-buttons > button" in css
-    assert 'body[data-layout="screen"]' in css
     assert "<h2>Audio</h2>" in html
     assert "Audio experimental" not in html
     assert "Experimental:" not in html
@@ -45,20 +49,13 @@ def test_phase9_layout_audio_clipboard_and_reconnect_controls_are_bundled() -> N
     assert 'id="auto-upload-existing"' in html
     assert 'id="exit-focus"' not in html
     assert "<h2>Controls</h2>" not in html
-    assert "card-collapse-button" in css
-    assert "collapsible-card" in css
     assert 'class="status-ring-progress"' in html
     assert "connection-ring-spin" in css
-    assert ".help-card .card-collapse-button" in css
-    assert "max-width: 1.25rem" in css
     assert ">Paste</button>" in html
     assert ">Type</button>" in html
     assert ">Copy</button>" in html
-    side_start = html.index('<aside class="sidepanel">')
-    right_start = html.index('<aside class="transfer-panel"')
-    assert 'class="help-card clipboard-card"' not in html[side_start:right_start]
-    assert 'class="help-card clipboard-card"' in html[right_start:]
-
+    for group in ("apps", "files", "clipboard", "display", "audio", "access", "network", "diagnostics", "settings"):
+        assert f'data-group="{group}"' in html
 
 def test_audio_server_mapping_uses_opus_and_keeps_channel_order() -> None:
     options = SessionOptions(audio=True, audio_codec="opus", audio_bit_rate=128_000)

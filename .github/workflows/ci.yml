@@ -4,16 +4,11 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   release:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -24,9 +19,6 @@ jobs:
           cache-dependency-path: |
             apps/web-client/package-lock.json
             packages/scrcpy-protocol/package-lock.json
-      - name: Apply final native UI repair
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/native-droidwebdisplay-ui'
-        run: python tools/finalize_native_ui.py
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Sync locked Python environment
@@ -35,31 +27,5 @@ jobs:
         working-directory: packages/scrcpy-protocol
       - run: npm ci
         working-directory: apps/web-client
-      - name: Build repaired web distribution
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/native-droidwebdisplay-ui'
-        run: npm run build
-        working-directory: apps/web-client
       - name: Run release gate
         run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
-      - name: Verify native served distribution
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/native-droidwebdisplay-ui'
-        run: |
-          for file in apps/web-client/static/index.html apps/web-client/dist/index.html; do
-            grep -q '<title>DroidWebDisplay</title>' "$file"
-            grep -q 'droidwebdisplay-native-single-drawer-v1' "$file"
-            grep -q 'id="context-refresh"' "$file"
-            ! grep -Eqi 'GptBridge|GPT Bridge|Gpt-Bridge|gpt_bridge|gpt-bridge|gptBridge' "$file"
-            ! grep -q 'id="workspace-layout"' "$file"
-            ! grep -q '<aside class="sidepanel">' "$file"
-            ! grep -q '<aside class="transfer-panel"' "$file"
-          done
-      - name: Publish validated native UI repair
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/native-droidwebdisplay-ui'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm -f tools/finalize_native_ui.py .github/workflows/native-ui-finalize.yml
-          git checkout 407a2868f153c5afcf538d874b074745f14e9fde -- .github/workflows/ci.yml
-          git add -A
-          git commit -m 'Complete native DroidWebDisplay UI repair'
-          git push origin HEAD:fix/native-droidwebdisplay-ui
