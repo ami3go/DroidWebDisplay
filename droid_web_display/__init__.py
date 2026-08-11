@@ -5,7 +5,7 @@ RELEASE_PHASE = 11
 
 # Install compatibility-preserving hardened runtime classes before consumers
 # import concrete submodules such as droid_web_display.scrcpy.session.
-from .runtime_hardening import install_runtime_hardening
+from .runtime_hardening import install_runtime_hardening  # noqa: E402
 
 install_runtime_hardening()
 
