@@ -1,0 +1,66 @@
+import type { AndroidStorageEntryDto } from "./types.js";
+interface TransferElements {
+    readonly device: HTMLSelectElement;
+    readonly file: HTMLInputElement;
+    readonly contextUploadFile: HTMLInputElement;
+    readonly uploadDirectory: HTMLSelectElement;
+    readonly duplicatePolicy: HTMLSelectElement;
+    readonly upload: HTMLButtonElement;
+    readonly openUploadFolder: HTMLButtonElement;
+    readonly storageRoot: HTMLSelectElement;
+    readonly storagePath: HTMLInputElement;
+    readonly storageBreadcrumbs: HTMLElement;
+    readonly storageUp: HTMLButtonElement;
+    readonly storageRefresh: HTMLButtonElement;
+    readonly storageSelectAll: HTMLInputElement;
+    readonly storageBody: HTMLElement;
+    readonly contextMenu: HTMLElement;
+    readonly contextOpen: HTMLButtonElement;
+    readonly contextDownload: HTMLButtonElement;
+    readonly contextUpload: HTMLButtonElement;
+    readonly contextRefresh: HTMLButtonElement;
+    readonly destinationProfile: HTMLSelectElement;
+    readonly downloadSelected: HTMLButtonElement;
+    readonly openPcFolder: HTMLButtonElement;
+    readonly transferList: HTMLElement;
+    readonly transferStatus: HTMLElement;
+}
+type StorageSortKey = "name" | "size" | "modified";
+type SortDirection = "ascending" | "descending";
+export declare class TransferController {
+    #private;
+    private readonly elements;
+    constructor(elements: TransferElements);
+    initialize(): Promise<void>;
+    private bindEvents;
+    private refreshStorageRoots;
+    private browse;
+    private renderBreadcrumbs;
+    private renderStorage;
+    private handleRowSelection;
+    private prepareContextSelection;
+    private setFileSelected;
+    private clearSelection;
+    private updateSelectionControls;
+    private updateSortHeaders;
+    private showContextMenu;
+    private hideContextMenu;
+    private chooseUploadFiles;
+    private uploadFiles;
+    private download;
+    private downloadSelected;
+    private refreshTransfers;
+    private renderTransfers;
+    private duplicatePolicy;
+    private requireSerial;
+    private runAction;
+    private setStatus;
+}
+export declare function formatBytes(bytes: number): string;
+export declare function parentAndroidPath(path: string): string;
+export declare function androidBreadcrumbs(path: string): readonly {
+    label: string;
+    path: string;
+}[];
+export declare function sortStorageEntries(entries: readonly AndroidStorageEntryDto[], key: StorageSortKey, direction: SortDirection): readonly AndroidStorageEntryDto[];
+export {};

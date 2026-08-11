@@ -1,0 +1,11 @@
+# DroidWebDisplay Phase 6.1 canonical Python environment
+# Keep synchronized with pyproject.toml.
+fastapi==0.128.2
+pydantic==2.13.4
+starlette==0.50.0
+uvicorn==0.48.0
+websockets==16.0
+python-multipart==0.0.29
+httpx==0.28.1
+pytest==9.0.2
+pytest-asyncio==1.3.0

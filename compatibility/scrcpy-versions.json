@@ -1,0 +1,42 @@
+{
+  "defaultAdapter": "scrcpy-4.1",
+  "schemaVersion": 2,
+  "supportedVersions": {
+    "scrcpy-4.1": {
+      "adapterModule": "versions/v4_1",
+      "androidGradlePlugin": "9.1.0",
+      "automatedEvidence": [
+        "packages/scrcpy-protocol/protocol-sources.json",
+        "packages/scrcpy-protocol/tests/upstream-vectors.test.mjs",
+        "packages/scrcpy-protocol/fixtures/manifest.json",
+        "tests/regression"
+      ],
+      "browserEvidence": [],
+      "compileSdk": 36,
+      "gradleDistributionSha256": "b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06",
+      "gradleVersion": "9.3.1",
+      "hardwareEvidence": [
+        "docs/VIRTUAL_DISPLAY_TEST_REPORT.md"
+      ],
+      "knownLimitations": [
+        "Browser audio remains experimental and may have interruptions or delay."
+      ],
+      "minSdk": 21,
+      "minimumAudioApi": 30,
+      "officialReleaseServerSha256": "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae",
+      "officialReleaseServerUrl": "https://github.com/Genymobile/scrcpy/releases/download/v4.1/scrcpy-server-v4.1",
+      "patchSeries": [],
+      "protocolEvidence": [
+        "packages/scrcpy-protocol/protocol-sources.json",
+        "packages/scrcpy-protocol/tests/upstream-vectors.test.mjs",
+        "packages/scrcpy-protocol/fixtures/manifest.json"
+      ],
+      "repository": "https://github.com/Genymobile/scrcpy.git",
+      "status": "stable",
+      "targetSdk": 36,
+      "upstreamCommit": "2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0",
+      "upstreamTag": "v4.1",
+      "version": "4.1"
+    }
+  }
+}

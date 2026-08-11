@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "scrcpyVersion": "4.1",
+  "upstreamCommit": "2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0",
+  "policy": "The exact pinned source and tests are normative. Narrative documentation is informative only.",
+  "evidence": [
+    {
+      "feature": "channel-order-dummy-byte-device-name",
+      "implementation": ["src/versions/v4_1/adapter.ts", "src/versions/v4_1/handshake.ts"],
+      "sources": [
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/device/DesktopConnection.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/device/DesktopConnection.java",
+          "lines": [[16, 18], [51, 108], [111, 118], [146, 155]]
+        }
+      ]
+    },
+    {
+      "feature": "media-codec-session-and-packet-framing",
+      "implementation": ["src/versions/v4_1/media.ts", "src/versions/v4_1/constants.ts"],
+      "sources": [
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/device/Streamer.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/device/Streamer.java",
+          "lines": [[14, 24], [35, 59], [61, 112]]
+        },
+        {
+          "path": "app/src/demuxer.c",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/app/src/demuxer.c",
+          "lines": [[57, 147], [176, 247]]
+        }
+      ]
+    },
+    {
+      "feature": "control-message-ids-and-layouts",
+      "implementation": ["src/versions/v4_1/control.ts"],
+      "sources": [
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/control/ControlMessage.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/control/ControlMessage.java",
+          "lines": [[7, 35]]
+        },
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/control/ControlMessageReader.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/control/ControlMessageReader.java",
+          "lines": [[29, 200]]
+        },
+        {
+          "path": "app/src/control_msg.c",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/app/src/control_msg.c",
+          "lines": [[95, 375]]
+        },
+        {
+          "path": "app/tests/test_control_msg_serialize.c",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/app/tests/test_control_msg_serialize.c",
+          "lines": [[7, 527]]
+        }
+      ]
+    },
+    {
+      "feature": "device-messages",
+      "implementation": ["src/versions/v4_1/device.ts"],
+      "sources": [
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/control/DeviceMessageWriter.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/control/DeviceMessageWriter.java",
+          "lines": [[10, 42]]
+        },
+        {
+          "path": "app/tests/test_device_msg_deserialize.c",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/app/tests/test_device_msg_deserialize.c",
+          "lines": [[8, 86]]
+        }
+      ]
+    },
+    {
+      "feature": "big-endian-and-fixed-point-conversion",
+      "implementation": ["src/common/binary.ts"],
+      "sources": [
+        {
+          "path": "app/src/util/binary.h",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/app/src/util/binary.h",
+          "lines": [[7, 86]]
+        },
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/util/Binary.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/util/Binary.java",
+          "lines": [[1, 38]]
+        }
+      ]
+    },
+    {
+      "feature": "h264-annex-b-decoder-configuration",
+      "implementation": ["src/versions/v4_1/h264.ts"],
+      "sources": [
+        {
+          "path": "server/src/main/java/com/genymobile/scrcpy/device/Streamer.java",
+          "url": "https://raw.githubusercontent.com/Genymobile/scrcpy/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/server/src/main/java/com/genymobile/scrcpy/device/Streamer.java",
+          "lines": [[61, 80], [96, 112]]
+        }
+      ],
+      "note": "The stream packet remains unmodified. SPS and PPS are extracted from the encoder configuration packet for a WebCodecs decoder configuration."
+    }
+  ]
+}

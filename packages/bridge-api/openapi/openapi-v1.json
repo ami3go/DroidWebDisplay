@@ -1,0 +1,2485 @@
+{
+  "components": {
+    "schemas": {
+      "ApplicationLaunchResultRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "ApplicationLaunchResultRequest",
+        "type": "object"
+      },
+      "AuthChangePinRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmPin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Confirmpin",
+            "type": "string"
+          },
+          "currentPin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Currentpin",
+            "type": "string"
+          },
+          "newPin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Newpin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPin",
+          "newPin",
+          "confirmPin"
+        ],
+        "title": "AuthChangePinRequest",
+        "type": "object"
+      },
+      "AuthLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "customSeconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customseconds"
+          },
+          "duration": {
+            "default": "browser-session",
+            "title": "Duration",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "pin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "AuthLoginRequest",
+        "type": "object"
+      },
+      "AuthPinRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "pin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "AuthPinRequest",
+        "type": "object"
+      },
+      "AuthSetupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmPin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Confirmpin",
+            "type": "string"
+          },
+          "customSeconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customseconds"
+          },
+          "duration": {
+            "default": "browser-session",
+            "title": "Duration",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "pin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin",
+          "confirmPin"
+        ],
+        "title": "AuthSetupRequest",
+        "type": "object"
+      },
+      "AutoDownloadConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "deleteAfterVerified": {
+            "default": false,
+            "title": "Deleteafterverified",
+            "type": "boolean"
+          },
+          "destinationProfile": {
+            "default": "default-downloads",
+            "title": "Destinationprofile",
+            "type": "string"
+          },
+          "duplicatePolicy": {
+            "$ref": "#/components/schemas/DuplicatePolicy",
+            "default": "rename"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "includeExisting": {
+            "default": false,
+            "title": "Includeexisting",
+            "type": "boolean"
+          },
+          "includeExistingPc": {
+            "default": false,
+            "title": "Includeexistingpc",
+            "type": "boolean"
+          },
+          "pcToAndroidEnabled": {
+            "default": false,
+            "title": "Pctoandroidenabled",
+            "type": "boolean"
+          },
+          "scanIntervalSeconds": {
+            "default": 2.0,
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Scanintervalseconds",
+            "type": "number"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "sourcePath": {
+            "default": "/sdcard/Download",
+            "title": "Sourcepath",
+            "type": "string"
+          },
+          "stabilityObservations": {
+            "default": 3,
+            "maximum": 20.0,
+            "minimum": 2.0,
+            "title": "Stabilityobservations",
+            "type": "integer"
+          },
+          "stabilitySeconds": {
+            "default": 3.0,
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Stabilityseconds",
+            "type": "number"
+          },
+          "uploadDuplicatePolicy": {
+            "$ref": "#/components/schemas/DuplicatePolicy",
+            "default": "overwrite"
+          }
+        },
+        "title": "AutoDownloadConfigRequest",
+        "type": "object"
+      },
+      "Body_transfer_upload_api_v1_transfers_upload_post": {
+        "properties": {
+          "destinationPath": {
+            "default": "/sdcard/Download/DroidWebDisplayInbox",
+            "title": "Destinationpath",
+            "type": "string"
+          },
+          "duplicatePolicy": {
+            "$ref": "#/components/schemas/DuplicatePolicy",
+            "default": "rename"
+          },
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "serial": {
+            "title": "Serial",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "serial"
+        ],
+        "title": "Body_transfer_upload_api_v1_transfers_upload_post",
+        "type": "object"
+      },
+      "DisplayImePolicy": {
+        "enum": [
+          "default",
+          "local",
+          "fallback",
+          "hide"
+        ],
+        "title": "DisplayImePolicy",
+        "type": "string"
+      },
+      "DisplayMode": {
+        "enum": [
+          "physical",
+          "virtual"
+        ],
+        "title": "DisplayMode",
+        "type": "string"
+      },
+      "DownloadTransferRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "destinationProfile": {
+            "default": "default-downloads",
+            "title": "Destinationprofile",
+            "type": "string"
+          },
+          "duplicatePolicy": {
+            "$ref": "#/components/schemas/DuplicatePolicy",
+            "default": "rename"
+          },
+          "serial": {
+            "title": "Serial",
+            "type": "string"
+          },
+          "sourcePath": {
+            "title": "Sourcepath",
+            "type": "string"
+          }
+        },
+        "required": [
+          "serial",
+          "sourcePath"
+        ],
+        "title": "DownloadTransferRequest",
+        "type": "object"
+      },
+      "DuplicatePolicy": {
+        "enum": [
+          "rename",
+          "overwrite",
+          "fail"
+        ],
+        "title": "DuplicatePolicy",
+        "type": "string"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MoveRunningAppRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "componentName": {
+            "maxLength": 512,
+            "minLength": 3,
+            "title": "Componentname",
+            "type": "string"
+          },
+          "taskId": {
+            "minimum": 1.0,
+            "title": "Taskid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "taskId",
+          "componentName"
+        ],
+        "title": "MoveRunningAppRequest",
+        "type": "object"
+      },
+      "NetworkConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allowedNetworks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowednetworks",
+            "type": "array"
+          },
+          "bindAddress": {
+            "default": "127.0.0.1",
+            "title": "Bindaddress",
+            "type": "string"
+          },
+          "certificatePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certificatepath"
+          },
+          "certificateSource": {
+            "default": "generated",
+            "pattern": "^(generated|existing)$",
+            "title": "Certificatesource",
+            "type": "string"
+          },
+          "certificateValidityDays": {
+            "default": 365,
+            "maximum": 825.0,
+            "minimum": 30.0,
+            "title": "Certificatevaliditydays",
+            "type": "integer"
+          },
+          "currentPin": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentpin"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "manageFirewall": {
+            "default": false,
+            "title": "Managefirewall",
+            "type": "boolean"
+          },
+          "mode": {
+            "pattern": "^(local-only|lan-https)$",
+            "title": "Mode",
+            "type": "string"
+          },
+          "port": {
+            "default": 8765,
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "privateKeyPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privatekeypath"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "NetworkConfigRequest",
+        "type": "object"
+      },
+      "NetworkPinRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "currentPin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Currentpin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPin"
+        ],
+        "title": "NetworkPinRequest",
+        "type": "object"
+      },
+      "ResizeVirtualDisplayRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "maximum": 2160.0,
+            "minimum": 480.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "width": {
+            "maximum": 3840.0,
+            "minimum": 640.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ],
+        "title": "ResizeVirtualDisplayRequest",
+        "type": "object"
+      },
+      "StartSessionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
+            "default": false,
+            "title": "Audio",
+            "type": "boolean"
+          },
+          "audioBitRate": {
+            "default": 128000,
+            "maximum": 512000.0,
+            "minimum": 16000.0,
+            "title": "Audiobitrate",
+            "type": "integer"
+          },
+          "audioCodec": {
+            "default": "opus",
+            "pattern": "^(opus|aac|flac|raw)$",
+            "title": "Audiocodec",
+            "type": "string"
+          },
+          "control": {
+            "default": true,
+            "title": "Control",
+            "type": "boolean"
+          },
+          "displayMode": {
+            "$ref": "#/components/schemas/DisplayMode",
+            "default": "physical"
+          },
+          "maxFps": {
+            "default": 30,
+            "maximum": 120.0,
+            "minimum": 15.0,
+            "title": "Maxfps",
+            "type": "integer"
+          },
+          "maxSize": {
+            "default": 1920,
+            "maximum": 8192.0,
+            "minimum": 0.0,
+            "title": "Maxsize",
+            "type": "integer"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "video": {
+            "default": true,
+            "title": "Video",
+            "type": "boolean"
+          },
+          "videoBitRate": {
+            "default": 8000000,
+            "maximum": 50000000.0,
+            "minimum": 2000000.0,
+            "title": "Videobitrate",
+            "type": "integer"
+          },
+          "videoCodec": {
+            "default": "h264",
+            "title": "Videocodec",
+            "type": "string"
+          },
+          "virtualDisplay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VirtualDisplayRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "StartSessionRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VirtualDisplayRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "destroyContentOnClose": {
+            "default": true,
+            "title": "Destroycontentonclose",
+            "type": "boolean"
+          },
+          "dpi": {
+            "default": 240,
+            "maximum": 640.0,
+            "minimum": 120.0,
+            "title": "Dpi",
+            "type": "integer"
+          },
+          "forceStopBeforeLaunch": {
+            "default": false,
+            "title": "Forcestopbeforelaunch",
+            "type": "boolean"
+          },
+          "height": {
+            "default": 900,
+            "maximum": 2160.0,
+            "minimum": 480.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "imePolicy": {
+            "$ref": "#/components/schemas/DisplayImePolicy",
+            "default": "local"
+          },
+          "keepActive": {
+            "default": true,
+            "title": "Keepactive",
+            "type": "boolean"
+          },
+          "preserveAspectRatio": {
+            "default": true,
+            "title": "Preserveaspectratio",
+            "type": "boolean"
+          },
+          "profileId": {
+            "default": "chatgpt-desktop",
+            "title": "Profileid",
+            "type": "string"
+          },
+          "sizeMode": {
+            "$ref": "#/components/schemas/VirtualDisplaySizeMode",
+            "default": "fixed"
+          },
+          "startApp": {
+            "default": "com.openai.chatgpt",
+            "maxLength": 255,
+            "title": "Startapp",
+            "type": "string"
+          },
+          "systemDecorations": {
+            "default": true,
+            "title": "Systemdecorations",
+            "type": "boolean"
+          },
+          "width": {
+            "default": 1600,
+            "maximum": 3840.0,
+            "minimum": 640.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "title": "VirtualDisplayRequest",
+        "type": "object"
+      },
+      "VirtualDisplaySizeMode": {
+        "enum": [
+          "fixed",
+          "flex"
+        ],
+        "title": "VirtualDisplaySizeMode",
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "pcLocalSession": {
+        "description": "Opaque PC-local trusted-session cookie. PINs and raw tokens are never logged.",
+        "in": "cookie",
+        "name": "droid_web_display_id",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "DroidWebDisplay Local Service",
+    "version": "0.11.2",
+    "x-trust-model": "PC-local by default; optional authenticated private-LAN HTTPS; the Android phone is not the trust authority"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/auth/audit": {
+      "get": {
+        "operationId": "auth_audit_api_v1_auth_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Audit Api V1 Auth Audit Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auth Audit"
+      }
+    },
+    "/api/v1/auth/change-pin": {
+      "post": {
+        "operationId": "auth_change_pin_api_v1_auth_change_pin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthChangePinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Change Pin Api V1 Auth Change Pin Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auth Change Pin"
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "auth_login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Login Api V1 Auth Login Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Login"
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "auth_logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Logout Api V1 Auth Logout Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auth Logout"
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "operationId": "auth_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Sessions Api V1 Auth Sessions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auth Sessions"
+      }
+    },
+    "/api/v1/auth/sessions/revoke-all": {
+      "post": {
+        "operationId": "auth_revoke_all_api_v1_auth_sessions_revoke_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthPinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Revoke All Api V1 Auth Sessions Revoke All Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auth Revoke All"
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "operationId": "auth_revoke_session_api_v1_auth_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Revoke Session Api V1 Auth Sessions  Session Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auth Revoke Session"
+      }
+    },
+    "/api/v1/auth/setup": {
+      "post": {
+        "operationId": "auth_setup_api_v1_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthSetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Setup Api V1 Auth Setup Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Setup"
+      }
+    },
+    "/api/v1/auth/status": {
+      "get": {
+        "operationId": "auth_status_api_v1_auth_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Status Api V1 Auth Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Status"
+      }
+    },
+    "/api/v1/auto-download": {
+      "get": {
+        "operationId": "auto_download_get_api_v1_auto_download_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auto Download Get Api V1 Auto Download Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auto Download Get"
+      },
+      "put": {
+        "operationId": "auto_download_put_api_v1_auto_download_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoDownloadConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auto Download Put Api V1 Auto Download Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auto Download Put"
+      }
+    },
+    "/api/v1/auto-download/reset": {
+      "post": {
+        "operationId": "auto_download_reset_api_v1_auto_download_reset_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auto Download Reset Api V1 Auto Download Reset Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auto Download Reset"
+      }
+    },
+    "/api/v1/auto-download/scan": {
+      "post": {
+        "operationId": "auto_download_scan_api_v1_auto_download_scan_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auto Download Scan Api V1 Auto Download Scan Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Auto Download Scan"
+      }
+    },
+    "/api/v1/browser-support": {
+      "get": {
+        "operationId": "browser_support_api_v1_browser_support_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Browser Support Api V1 Browser Support Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Browser Support"
+      }
+    },
+    "/api/v1/destination-profiles": {
+      "get": {
+        "operationId": "destination_profiles_api_v1_destination_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Destination Profiles Api V1 Destination Profiles Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Destination Profiles"
+      }
+    },
+    "/api/v1/destination-profiles/{profile_id}/open": {
+      "post": {
+        "operationId": "destination_profile_open_api_v1_destination_profiles__profile_id__open_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Destination Profile Open Api V1 Destination Profiles  Profile Id  Open Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Destination Profile Open"
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "devices_api_v1_devices_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "enrich",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Enrich",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Devices Api V1 Devices Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Devices"
+      }
+    },
+    "/api/v1/devices/{serial}/apps": {
+      "get": {
+        "operationId": "installed_apps_api_v1_devices__serial__apps_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Installed Apps Api V1 Devices  Serial  Apps Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Installed Apps"
+      }
+    },
+    "/api/v1/devices/{serial}/running-apps": {
+      "get": {
+        "operationId": "running_apps_api_v1_devices__serial__running_apps_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Running Apps Api V1 Devices  Serial  Running Apps Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Running Apps"
+      }
+    },
+    "/api/v1/devices/{serial}/virtual-display-capabilities": {
+      "get": {
+        "operationId": "virtual_display_probe_api_v1_devices__serial__virtual_display_capabilities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "startApp",
+            "required": false,
+            "schema": {
+              "default": "com.openai.chatgpt",
+              "title": "Startapp",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Virtual Display Probe Api V1 Devices  Serial  Virtual Display Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Virtual Display Probe"
+      }
+    },
+    "/api/v1/diagnostics": {
+      "get": {
+        "operationId": "diagnostics_api_v1_diagnostics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Diagnostics Api V1 Diagnostics Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Diagnostics"
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Health"
+      }
+    },
+    "/api/v1/network/apply": {
+      "post": {
+        "operationId": "network_apply_api_v1_network_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Network Apply Api V1 Network Apply Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Apply"
+      }
+    },
+    "/api/v1/network/certificate/public": {
+      "get": {
+        "operationId": "network_public_certificate_api_v1_network_certificate_public_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Public Certificate"
+      }
+    },
+    "/api/v1/network/config": {
+      "get": {
+        "operationId": "network_config_api_v1_network_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Network Config Api V1 Network Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Config"
+      }
+    },
+    "/api/v1/network/disable": {
+      "post": {
+        "operationId": "network_disable_api_v1_network_disable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkPinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Network Disable Api V1 Network Disable Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Disable"
+      }
+    },
+    "/api/v1/network/interfaces": {
+      "get": {
+        "operationId": "network_interfaces_api_v1_network_interfaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Network Interfaces Api V1 Network Interfaces Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Interfaces"
+      }
+    },
+    "/api/v1/network/status": {
+      "get": {
+        "operationId": "network_status_api_v1_network_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Network Status Api V1 Network Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Status"
+      }
+    },
+    "/api/v1/network/validate": {
+      "post": {
+        "operationId": "network_validate_api_v1_network_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Network Validate Api V1 Network Validate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Network Validate"
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "operationId": "sessions_api_v1_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sessions Api V1 Sessions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Sessions"
+      },
+      "post": {
+        "operationId": "create_session_api_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Session Api V1 Sessions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Create Session"
+      }
+    },
+    "/api/v1/sessions/{session_id}": {
+      "delete": {
+        "operationId": "delete_session_api_v1_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Session Api V1 Sessions  Session Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Delete Session"
+      },
+      "get": {
+        "operationId": "get_session_api_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Session Api V1 Sessions  Session Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Get Session"
+      }
+    },
+    "/api/v1/sessions/{session_id}/virtual-display/application-launch": {
+      "post": {
+        "operationId": "record_application_launch_api_v1_sessions__session_id__virtual_display_application_launch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationLaunchResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Application Launch Api V1 Sessions  Session Id  Virtual Display Application Launch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Record Application Launch"
+      }
+    },
+    "/api/v1/sessions/{session_id}/virtual-display/move-running-app": {
+      "post": {
+        "operationId": "move_running_app_api_v1_sessions__session_id__virtual_display_move_running_app_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveRunningAppRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Move Running App Api V1 Sessions  Session Id  Virtual Display Move Running App Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Move Running App"
+      }
+    },
+    "/api/v1/sessions/{session_id}/virtual-display/resize": {
+      "post": {
+        "operationId": "record_virtual_resize_api_v1_sessions__session_id__virtual_display_resize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResizeVirtualDisplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Virtual Resize Api V1 Sessions  Session Id  Virtual Display Resize Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Record Virtual Resize"
+      }
+    },
+    "/api/v1/storage/android": {
+      "get": {
+        "operationId": "android_storage_api_v1_storage_android_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Serial",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "default": "/sdcard/Download",
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Android Storage Api V1 Storage Android Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Android Storage"
+      }
+    },
+    "/api/v1/storage/android-roots": {
+      "get": {
+        "operationId": "android_storage_roots_api_v1_storage_android_roots_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "serial",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Serial"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Android Storage Roots Api V1 Storage Android Roots Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Android Storage Roots"
+      }
+    },
+    "/api/v1/transfers": {
+      "get": {
+        "operationId": "transfer_list_api_v1_transfers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Transfer List Api V1 Transfers Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Transfer List"
+      }
+    },
+    "/api/v1/transfers/download": {
+      "post": {
+        "operationId": "transfer_download_api_v1_transfers_download_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadTransferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Transfer Download Api V1 Transfers Download Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Transfer Download"
+      }
+    },
+    "/api/v1/transfers/upload": {
+      "post": {
+        "operationId": "transfer_upload_api_v1_transfers_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_transfer_upload_api_v1_transfers_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Transfer Upload Api V1 Transfers Upload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Transfer Upload"
+      }
+    },
+    "/api/v1/transfers/{transfer_id}": {
+      "get": {
+        "operationId": "transfer_get_api_v1_transfers__transfer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "title": "Transfer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Transfer Get Api V1 Transfers  Transfer Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Transfer Get"
+      }
+    },
+    "/api/v1/transfers/{transfer_id}/cancel": {
+      "post": {
+        "operationId": "transfer_cancel_api_v1_transfers__transfer_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "title": "Transfer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Transfer Cancel Api V1 Transfers  Transfer Id  Cancel Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Transfer Cancel"
+      }
+    },
+    "/api/v1/transfers/{transfer_id}/retry": {
+      "post": {
+        "operationId": "transfer_retry_api_v1_transfers__transfer_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "title": "Transfer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Transfer Retry Api V1 Transfers  Transfer Id  Retry Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Transfer Retry"
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "operationId": "version_api_v1_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Version Api V1 Version Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Version"
+      }
+    },
+    "/api/v1/virtual-display-profiles": {
+      "get": {
+        "operationId": "virtual_display_profiles_api_v1_virtual_display_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Virtual Display Profiles Api V1 Virtual Display Profiles Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Virtual Display Profiles"
+      }
+    }
+  }
+}

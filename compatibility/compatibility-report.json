@@ -1,0 +1,20 @@
+{
+  "adapters": [
+    {
+      "adapterId": "scrcpy-4.1",
+      "automatedEvidenceCount": 4,
+      "browserEvidenceCount": 0,
+      "hardwareEvidenceCount": 1,
+      "knownLimitations": [
+        "Browser audio remains experimental and may have interruptions or delay."
+      ],
+      "serverSha256": "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae",
+      "status": "stable",
+      "upstreamCommit": "2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0",
+      "version": "4.1"
+    }
+  ],
+  "defaultAdapter": "scrcpy-4.1",
+  "generatedAt": "2026-08-06T16:37:51.946500+00:00",
+  "schemaVersion": 1
+}

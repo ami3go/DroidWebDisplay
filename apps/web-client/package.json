@@ -1,0 +1,21 @@
+{
+  "name": "@droid-web-display/web-client",
+  "version": "0.10.1",
+  "private": true,
+  "type": "module",
+  "description": "Browser client for physical and virtual Android display sessions",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "clean": "node tools/clean.mjs",
+    "build": "node tools/build.mjs",
+    "test": "npm run build && node tools/run-tests.mjs"
+  },
+  "dependencies": {
+    "@droid-web-display/scrcpy-protocol": "file:../../packages/scrcpy-protocol"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}

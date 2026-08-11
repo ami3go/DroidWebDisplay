@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://droidwebdisplay.local/schema/scrcpy-versions-v2.json",
+  "title": "DroidWebDisplay scrcpy compatibility manifest",
+  "type": "object",
+  "required": ["schemaVersion", "defaultAdapter", "supportedVersions"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "minimum": 1},
+    "defaultAdapter": {"type": "string", "minLength": 1},
+    "supportedVersions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["version", "upstreamCommit", "adapterModule", "status"],
+        "properties": {
+          "version": {"type": "string"},
+          "upstreamCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "adapterModule": {"type": "string"},
+          "status": {"enum": ["experimental", "candidate", "stable"]},
+          "automatedEvidence": {"type": "array", "items": {"type": "string"}},
+          "browserEvidence": {"type": "array", "items": {"type": "string"}},
+          "hardwareEvidence": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

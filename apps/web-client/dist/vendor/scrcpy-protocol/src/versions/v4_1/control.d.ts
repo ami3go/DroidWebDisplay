@@ -1,0 +1,100 @@
+import type { Position } from "../../common/types.js";
+export declare enum ControlMessageType {
+    InjectKeycode = 0,
+    InjectText = 1,
+    InjectTouchEvent = 2,
+    InjectScrollEvent = 3,
+    BackOrScreenOn = 4,
+    ExpandNotificationPanel = 5,
+    ExpandSettingsPanel = 6,
+    CollapsePanels = 7,
+    GetClipboard = 8,
+    SetClipboard = 9,
+    SetDisplayPower = 10,
+    RotateDevice = 11,
+    UhidCreate = 12,
+    UhidInput = 13,
+    UhidDestroy = 14,
+    OpenHardKeyboardSettings = 15,
+    StartApp = 16,
+    ResetVideo = 17,
+    CameraSetTorch = 18,
+    CameraZoomIn = 19,
+    CameraZoomOut = 20,
+    ResizeDisplay = 21,
+    ScanFile = 22
+}
+export declare enum CopyKey {
+    None = 0,
+    Copy = 1,
+    Cut = 2
+}
+export type ControlMessage = {
+    readonly type: ControlMessageType.InjectKeycode;
+    readonly action: number;
+    readonly keycode: number;
+    readonly repeat: number;
+    readonly metaState: number;
+} | {
+    readonly type: ControlMessageType.InjectText;
+    readonly text: string;
+} | {
+    readonly type: ControlMessageType.InjectTouchEvent;
+    readonly action: number;
+    readonly pointerId: bigint;
+    readonly position: Position;
+    readonly pressure: number;
+    readonly actionButton: number;
+    readonly buttons: number;
+} | {
+    readonly type: ControlMessageType.InjectScrollEvent;
+    readonly position: Position;
+    readonly horizontal: number;
+    readonly vertical: number;
+    readonly buttons: number;
+} | {
+    readonly type: ControlMessageType.BackOrScreenOn;
+    readonly action: number;
+} | {
+    readonly type: ControlMessageType.GetClipboard;
+    readonly copyKey: CopyKey;
+} | {
+    readonly type: ControlMessageType.SetClipboard;
+    readonly sequence: bigint;
+    readonly paste: boolean;
+    readonly text: string;
+} | {
+    readonly type: ControlMessageType.SetDisplayPower;
+    readonly on: boolean;
+} | {
+    readonly type: ControlMessageType.UhidCreate;
+    readonly id: number;
+    readonly vendorId: number;
+    readonly productId: number;
+    readonly name: string;
+    readonly reportDescriptor: Uint8Array;
+} | {
+    readonly type: ControlMessageType.UhidInput;
+    readonly id: number;
+    readonly data: Uint8Array;
+} | {
+    readonly type: ControlMessageType.UhidDestroy;
+    readonly id: number;
+} | {
+    readonly type: ControlMessageType.StartApp;
+    readonly name: string;
+} | {
+    readonly type: ControlMessageType.CameraSetTorch;
+    readonly on: boolean;
+} | {
+    readonly type: ControlMessageType.ResizeDisplay;
+    readonly width: number;
+    readonly height: number;
+} | {
+    readonly type: ControlMessageType.ScanFile;
+    readonly path: string;
+} | {
+    readonly type: EmptyControlMessageType;
+};
+export type EmptyControlMessageType = ControlMessageType.ExpandNotificationPanel | ControlMessageType.ExpandSettingsPanel | ControlMessageType.CollapsePanels | ControlMessageType.RotateDevice | ControlMessageType.OpenHardKeyboardSettings | ControlMessageType.ResetVideo | ControlMessageType.CameraZoomIn | ControlMessageType.CameraZoomOut;
+export declare function serializeControlMessage(message: ControlMessage): Uint8Array;

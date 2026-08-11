@@ -1,0 +1,124 @@
+# Changelog
+
+## 0.11.2 — Unified page scrolling
+
+- Removed the independent vertical scrollbar from the right-side transfer panel.
+- Both left and right card columns now scroll with the single browser/page scrollbar.
+- Top-aligned workspace grid items so a tall side panel does not stretch the Android display stage vertically.
+- Added browser and release-gate regression coverage for the single-scrollbar layout.
+
+## 0.11.1 — Clipboard shortcuts and virtual-display keyboard suppression
+
+- Restored explicit Ctrl+V paste handling without reintroducing automatic-paste behavior.
+- Added Ctrl+C remote-copy handling through scrcpy GetClipboard/Copy.
+- Added a virtual-display-only checkbox to hide the Android on-screen keyboard.
+- Physical phone-screen mode never emits a display IME policy and remains unaffected.
+
+## 0.11.0 — Packaging, migration, and clipboard-sync reliability
+
+- Fixed automatic PC-to-Android clipboard synchronization so it updates the Android clipboard with `paste=false`; automatic sync no longer repeatedly triggers Android paste UI or blocks normal PC keyboard typing.
+- Added platform release-tree generation for Windows, Linux, and source bundles with deterministic version/component manifests.
+- Added SHA-256 verification of the pinned scrcpy server during packaging.
+- Added optional bundled adb, Python runtime, and offline wheelhouse inputs with an explicit offline-readiness gate.
+- Added Windows and Linux install/uninstall launchers with data-preserving upgrade behavior.
+- Added supported configuration migration for authentication, network-access, monitor state, and TLS material.
+- Added license layout, package inventory validation, runtime-state/private-key leak checks, and packaging regression tests.
+
+## 0.10.2 — UI layout corrections
+
+- Fixed the Display Mode collapse button being stretched by the card-wide button rule; collapse controls are now compact 1.25 rem square buttons.
+- Moved Clipboard and text to the right-side panel.
+- Renamed clipboard actions to Paste, Type, and Copy and kept all three in one row.
+- Renamed the Session card to Audio and removed the experimental badge while retaining the latency/interruption warning.
+- Removed the redundant Exit focus button; Screen focus is reversed with the always-visible workspace-layout selector.
+- Updated browser and release-gate regression coverage for the corrected layout.
+
+## 0.10.1 — Optional authenticated private-LAN HTTPS access
+
+- Kept `127.0.0.1` local-only access as the default.
+- Added explicit private-interface LAN HTTPS mode with private IPv4 subnet allowlisting.
+- Added generated or existing TLS certificate validation, Secure cookies, Host/Origin enforcement, and authenticated WebSocket protection.
+- Added per-client login throttling metadata, network-session source information, and trust-boundary session revocation.
+- Added the authenticated Network access UI, optional Windows Firewall rule management, controlled restart, public certificate download, and local-only recovery tool.
+
+
+## 0.10.0 — Controlled scrcpy upstream update automation
+
+- Added clean upstream fetch, revision selection and source-cleanliness enforcement.
+- Added protocol-sensitive diff inspection with JSON and Markdown reports.
+- Added isolated experimental adapter scaffolding without overwriting the stable v4.1 adapter.
+- Added temporary-workspace patch application with fatal failure and automatic reset.
+- Added isolated matching-server build tooling and SHA-256 build manifests.
+- Added compatibility matrix generation and evidence-gated experimental/candidate/stable promotion.
+- Added an offline temporary-Git Gate 10 self-test and update workflow documentation.
+
+## 0.9.4 — Focus-mode escape and restored collapsible cards
+
+- Moved the workspace-layout selector into the header toolbar beside Fullscreen.
+- Added an explicit Exit focus button that appears whenever Screen focus layout is active.
+- Restored functional collapse/expand controls for all left- and right-side cards.
+- Removed the obsolete informational card titled “Controls”; this was the card intended by the earlier removal request.
+- Kept every card expanded by default on each page load.
+- Added accessible labels and `aria-expanded` state to each card control.
+- Added browser and release-gate regression coverage for focus-mode recovery and collapsible cards.
+
+## 0.9.3 — Two-way folder sync and status UX refinement
+
+- Removed the non-functional card collapse controls and restored static card layouts.
+- Marked browser audio as experimental with an interruption/latency warning while keeping it available.
+- Added optional PC-to-Android watched-folder upload alongside Android-to-PC automatic download.
+- Added stable-file detection, first-scan baselining, upload duplicate policy, verified upload queueing, and persistent counters.
+- Added bidirectional fingerprints so files downloaded from Android are not uploaded back, and PC uploads are not downloaded back.
+- Replaced the text/Unicode connection indicator with an animated ring status chip and removed the old pulsing Connect button state.
+- Added backend, browser, API, and release-gate regression coverage for two-way sync and the new status indicator.
+
+## 0.9.2 — Compact connection-status toolbar indicator
+
+- Moved connection status out of the left panel and into the main connection toolbar.
+- Matched the status control height to the compact connection and Android-control buttons.
+- Added green connected, red disconnected and amber connecting state icons.
+- Preserved detailed status text as a tooltip and screen-reader announcement.
+- Corrected stream-failure ordering so the status icon changes to disconnected before reconnect handling.
+- Added browser, Python and release-gate regression checks for toolbar placement and state styling.
+
+## 0.9.1 — Collapsible side cards and compact command header
+
+- Added a small collapse/expand button to every left- and right-side card.
+- Cards are expanded by default and collapse to their header only.
+- Moved Android Back, Home, Recent, Rotate, Screen off and Fullscreen controls into the connection toolbar.
+- Placed the Android device selector, connection actions and Android controls on the same line as the DroidWebDisplay title on desktop widths.
+- Reduced header padding and updated available viewport height for the video and transfer panels.
+- Added browser regression checks for collapsible cards and the compact header layout.
+
+## 0.9.0 — Audio, clipboard, reconnect, storage and UX completion
+
+- Added optional Opus audio playback through browser WebCodecs and Web Audio.
+- Isolated Android audio capture/configuration failures from video and control.
+- Added bidirectional clipboard synchronization controls and size limits.
+- Added automatic and manual reconnect flows, fullscreen shortcut and workspace layouts.
+- Added settings import/export and improved keyboard focus/accessibility behavior.
+- Added dynamic removable SD-card discovery under `/storage/<XXXX-XXXX>`.
+- Canonicalized internal Documents paths to `/sdcard/Documents`.
+- Simplified Upload, Browse, Download and Reset button labels and normalized action-row heights.
+- Replaced the crosshair over the Android screen with the normal pointer cursor.
+- Removed historical gate verification checkboxes from the web interface.
+
+## 0.8.3 — Current-state repository cleanup
+
+- Removed Phase 1–7 workflows, scripts, gate tools, historical evidence, and duplicate documentation.
+- Removed the obsolete scrcpy source-build/submodule framework from the runtime release.
+- Reorganized retained regression tests by feature instead of implementation phase.
+- Consolidated browser evidence validation and static release checks.
+- Renamed current launch and gate commands to generic `service` and `gate` entry points.
+- Removed generated Python caches and runtime evidence from the distributed package.
+- Preserved all current authentication, browser control, virtual display, transfer, automatic-download, and running-app features.
+
+## 0.8.2 — Gate 8 generated-artifact correction
+
+- Regenerated browser static hashes after connection-toolbar alignment changes.
+- Regenerated OpenAPI metadata for the package version.
+- Added regression coverage for left-aligned inline connection controls.
+
+## 0.8.0 — PC-local authentication and trusted sessions
+
+- Added first-run PIN setup, login throttling, trusted-browser durations, revocation, CSRF protection, authenticated WebSockets, audit redaction, and fail-closed local storage.

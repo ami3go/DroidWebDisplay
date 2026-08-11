@@ -1,0 +1,21 @@
+# DroidWebDisplay v0.11.1 pinned runtime environment.
+# Intended for offline wheelhouse preparation on the target platform.
+fastapi==0.128.2
+pydantic==2.13.4
+starlette==0.50.0
+uvicorn==0.48.0
+websockets==16.0
+python-multipart==0.0.29
+cryptography==46.0.4
+psutil==7.2.2
+anyio==4.13.0
+click==8.1.8
+h11==0.16.0
+typing-extensions==4.15.0
+annotated-types==0.7.0
+pydantic-core==2.46.4
+typing-inspection==0.4.2
+annotated-doc==0.0.4
+idna==3.17
+cffi==2.0.0
+pycparser==3.0

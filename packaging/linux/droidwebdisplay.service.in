@@ -1,0 +1,15 @@
+[Unit]
+Description=DroidWebDisplay Android browser bridge
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=@INSTALL_ROOT@
+ExecStart=@INSTALL_ROOT@/DroidWebDisplay.sh --no-browser
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
