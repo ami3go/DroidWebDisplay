@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
+from droid_web_display.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
 
 
 def main() -> int:

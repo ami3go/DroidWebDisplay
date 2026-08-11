@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.upstream_update.build import build_matching_server
+from droid_web_display.upstream_update.build import build_matching_server
 
 
 def main() -> int:

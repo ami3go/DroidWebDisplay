@@ -4,7 +4,7 @@ import {
   ScrcpyV41Adapter,
   type ControlMessage,
   type ScrcpyV41Session,
-} from "@gpt-bridge/scrcpy-protocol";
+} from "@droid-web-display/scrcpy-protocol";
 import { BridgeApi, type StartSessionRequest } from "./api.js";
 import {
   alignedFlexSize,
@@ -84,7 +84,7 @@ interface Elements {
   readonly restoreProfile: HTMLButtonElement;
 }
 
-export class GptBridgeController {
+export class DroidWebDisplayController {
   readonly #api = new BridgeApi();
   readonly #adapter = new ScrcpyV41Adapter();
   #transport: WebSocketBridgeTransport | null = null;
@@ -945,16 +945,16 @@ export class GptBridgeController {
   }
 
   private saveBrowserSettings(): void {
-    localStorage.setItem("gpt-bridge-settings-v1", JSON.stringify(this.browserSettings()));
+    localStorage.setItem("droidwebdisplay-settings-v1", JSON.stringify(this.browserSettings()));
   }
 
   private restoreBrowserSettings(): void {
     try {
-      const raw = localStorage.getItem("gpt-bridge-settings-v1");
+      const raw = localStorage.getItem("droidwebdisplay-settings-v1");
       if (!raw) return;
       this.applyImportedSettings(JSON.parse(raw) as Record<string, unknown>);
     } catch {
-      localStorage.removeItem("gpt-bridge-settings-v1");
+      localStorage.removeItem("droidwebdisplay-settings-v1");
     }
   }
 
@@ -996,7 +996,7 @@ export class GptBridgeController {
   }
 
   private exportSettings(): void {
-    this.downloadJson("gpt-bridge-settings.json", this.browserSettings());
+    this.downloadJson("droidwebdisplay-settings.json", this.browserSettings());
     this.elements.settingsStatus.textContent = "Settings exported.";
   }
 

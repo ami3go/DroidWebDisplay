@@ -15,10 +15,10 @@ if str(ROOT) not in sys.path:
 
 import uvicorn
 
-from gpt_bridge.api import create_app
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.network_access import LAN_HTTPS, LOCAL_ONLY, FirewallManager, NetworkAccessError, NetworkConfigStore
-from gpt_bridge.runtime import require_websocket_backend
+from droid_web_display.api import create_app
+from droid_web_display.config import BridgeConfig
+from droid_web_display.network_access import LAN_HTTPS, LOCAL_ONLY, FirewallManager, NetworkAccessError, NetworkConfigStore
+from droid_web_display.runtime import require_websocket_backend
 
 
 def _bridge_config(args: argparse.Namespace, network) -> BridgeConfig:
@@ -72,7 +72,7 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
     scheme = "https" if config.tls_enabled else "http"
     display_host = config.configured_hostname or config.bind_host
     url = f"{scheme}://{display_host}:{config.bind_port}/"
-    print(f"Gpt-Bridge: {url}")
+    print(f"DroidWebDisplay: {url}")
     print(f"Network access mode: {config.network_mode}")
     print(f"WebSocket backend: {websocket_backend}")
     print(f"PC download folder: {config.resolved_default_download_directory}")
@@ -87,7 +87,7 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the Gpt-Bridge browser service")
+    parser = argparse.ArgumentParser(description="Run the DroidWebDisplay browser service")
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--adb", help="ADB executable; defaults to bundled adb/ when present, otherwise PATH")
     parser.add_argument("--host", help="Emergency local bind override; normally loaded from network-access.json")
@@ -149,7 +149,7 @@ def main() -> int:
             if not restart:
                 return 0
             open_browser = False
-            print("Network configuration changed; restarting Gpt-Bridge...")
+            print("Network configuration changed; restarting DroidWebDisplay...")
     finally:
         if pid_file:
             try:

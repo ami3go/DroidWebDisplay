@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$InstallRoot = "$env:LOCALAPPDATA\Programs\GptBridgeScrcpy",
+    [string]$InstallRoot = "$env:LOCALAPPDATA\Programs\DroidWebDisplay",
     [switch]$PurgeData
 )
 $ErrorActionPreference = "Stop"
@@ -15,15 +15,15 @@ $stopTool = Join-Path $InstallRoot "tools\stop_bridge_service.py"
 if ($python -and (Test-Path $stopTool)) {
     & $python $stopTool --pid-file (Join-Path $InstallRoot "data\service.pid") 2>$null
 }
-$shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Gpt-Bridge.lnk"
+$shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\DroidWebDisplay.lnk"
 Remove-Item -Force -ErrorAction SilentlyContinue $shortcut
-Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path ([Environment]::GetFolderPath("Desktop")) "Gpt-Bridge.lnk")
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path ([Environment]::GetFolderPath("Desktop")) "DroidWebDisplay.lnk")
 if ($PurgeData) {
     Remove-Item -Recurse -Force $InstallRoot
-    Write-Host "Gpt-Bridge and runtime data removed."
+    Write-Host "DroidWebDisplay and runtime data removed."
     exit
 }
-$temp = Join-Path $env:TEMP ("GptBridge-preserve-" + [guid]::NewGuid())
+$temp = Join-Path $env:TEMP ("DroidWebDisplay-preserve-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Force -Path $temp | Out-Null
 foreach ($state in @("data", "downloads", "logs")) {
     $source = Join-Path $InstallRoot $state

@@ -5,10 +5,10 @@ import asyncio
 import pytest
 from starlette.websockets import WebSocketState
 
-from gpt_bridge.errors import SessionConflictError
-from gpt_bridge.models import ChannelName
-from gpt_bridge.scrcpy.session import PrefixedStreamReader, ScrcpyChannel
-from gpt_bridge.websocket.channels import relay_control_websocket, relay_media_websocket
+from droid_web_display.errors import SessionConflictError
+from droid_web_display.models import ChannelName
+from droid_web_display.scrcpy.session import PrefixedStreamReader, ScrcpyChannel
+from droid_web_display.websocket.channels import relay_control_websocket, relay_media_websocket
 
 
 class FakeWriter:

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from gpt_bridge.evidence import validate_runtime_browser_evidence
+from droid_web_display.evidence import validate_runtime_browser_evidence
 
 
 def test_browser_evidence_requires_video_control_and_manual_checks(tmp_path: Path) -> None:

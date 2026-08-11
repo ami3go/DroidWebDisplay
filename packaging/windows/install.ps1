@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$InstallRoot = "$env:LOCALAPPDATA\Programs\GptBridgeScrcpy",
+    [string]$InstallRoot = "$env:LOCALAPPDATA\Programs\DroidWebDisplay",
     [switch]$DesktopShortcut,
     [switch]$NoShortcut,
     [switch]$AllowOnlineDependencies
@@ -12,7 +12,7 @@ else { $Source = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path }
 $InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
 if ($Source -eq $InstallRoot) { throw "InstallRoot must be different from the release source folder." }
 
-Write-Host "Installing Gpt-Bridge to $InstallRoot"
+Write-Host "Installing DroidWebDisplay to $InstallRoot"
 # Stop an existing installed service before replacing application files.
 $oldCandidates = @(
     (Join-Path $InstallRoot "runtime\python\python.exe"),
@@ -61,9 +61,9 @@ if (-not $runtimePython) {
 }
 
 # Compile a tiny launcher using the .NET compiler available through Windows PowerShell.
-$launcher = Join-Path $InstallRoot "GptBridge.exe"
-$launcherSource = Join-Path $InstallRoot "installer\GptBridgeLauncher.cs"
-if (-not (Test-Path $launcherSource)) { $launcherSource = Join-Path $InstallRoot "packaging\windows\GptBridgeLauncher.cs" }
+$launcher = Join-Path $InstallRoot "DroidWebDisplay.exe"
+$launcherSource = Join-Path $InstallRoot "installer\DroidWebDisplayLauncher.cs"
+if (-not (Test-Path $launcherSource)) { $launcherSource = Join-Path $InstallRoot "packaging\windows\DroidWebDisplayLauncher.cs" }
 $sourceCode = Get-Content -Raw $launcherSource
 if (Test-Path $launcher) { Remove-Item -Force $launcher }
 Add-Type -TypeDefinition $sourceCode -Language CSharp -OutputAssembly $launcher -OutputType ConsoleApplication
@@ -71,13 +71,13 @@ Add-Type -TypeDefinition $sourceCode -Language CSharp -OutputAssembly $launcher 
 if (-not $NoShortcut) {
     $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
     $shell = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut((Join-Path $startMenu "Gpt-Bridge.lnk"))
+    $shortcut = $shell.CreateShortcut((Join-Path $startMenu "DroidWebDisplay.lnk"))
     $shortcut.TargetPath = $launcher
     $shortcut.WorkingDirectory = $InstallRoot
     $shortcut.Save()
     if ($DesktopShortcut) {
         $desktop = [Environment]::GetFolderPath("Desktop")
-        $shortcut = $shell.CreateShortcut((Join-Path $desktop "Gpt-Bridge.lnk"))
+        $shortcut = $shell.CreateShortcut((Join-Path $desktop "DroidWebDisplay.lnk"))
         $shortcut.TargetPath = $launcher
         $shortcut.WorkingDirectory = $InstallRoot
         $shortcut.Save()

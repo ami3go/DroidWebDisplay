@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from gpt_bridge.models import ChannelName, SessionOptions
-from gpt_bridge.scrcpy.command import build_server_arguments
-from gpt_bridge.transfers.paths import normalize_android_path
+from droid_web_display.models import ChannelName, SessionOptions
+from droid_web_display.scrcpy.command import build_server_arguments
+from droid_web_display.transfers.paths import normalize_android_path
 
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -21,7 +21,7 @@ export class AuthController {
         elements.logout.addEventListener("click", () => { void this.logout(); });
         elements.changePin.addEventListener("click", () => { void this.changePin(); });
         elements.revokeAll.addEventListener("click", () => { void this.revokeAll(); });
-        globalThis.addEventListener("gpt-bridge-auth-required", () => {
+        globalThis.addEventListener("droidwebdisplay-auth-required", () => {
             this.elements.gate.hidden = false;
             this.elements.securityStatus.textContent = "Session expired or revoked. Authenticate again.";
         });
@@ -37,10 +37,10 @@ export class AuthController {
         return new Promise((resolve) => {
             const listener = (event) => {
                 const value = event.detail;
-                globalThis.removeEventListener("gpt-bridge-authenticated", listener);
+                globalThis.removeEventListener("droidwebdisplay-authenticated", listener);
                 resolve(value);
             };
-            globalThis.addEventListener("gpt-bridge-authenticated", listener);
+            globalThis.addEventListener("droidwebdisplay-authenticated", listener);
         });
     }
     async refreshSessions() {
@@ -89,7 +89,7 @@ export class AuthController {
     }
     #renderGate(configured) {
         this.elements.gate.hidden = false;
-        this.elements.title.textContent = configured ? "Unlock Gpt-Bridge" : "Create bridge PIN";
+        this.elements.title.textContent = configured ? "Unlock DroidWebDisplay" : "Create bridge PIN";
         this.elements.explanation.textContent = configured
             ? "Enter the PIN configured on this PC. Android does not remember or authorize this browser."
             : "Create a PIN for this PC-local bridge. It protects the local web service; it is not stored on the Android phone.";
@@ -128,7 +128,7 @@ export class AuthController {
                 });
             this.#status = status;
             this.#showAuthenticated(status);
-            globalThis.dispatchEvent(new CustomEvent("gpt-bridge-authenticated", { detail: status }));
+            globalThis.dispatchEvent(new CustomEvent("droidwebdisplay-authenticated", { detail: status }));
         }
         catch (error) {
             this.elements.error.textContent = error instanceof BridgeApiError ? error.message : String(error);

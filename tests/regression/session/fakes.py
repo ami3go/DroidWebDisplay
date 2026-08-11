@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Sequence
 
-from gpt_bridge.models import AndroidDevice
+from droid_web_display.models import AndroidDevice
 
 
 class FakeProcess:

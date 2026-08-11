@@ -135,8 +135,8 @@ test("authentication API keeps setup public and adds CSRF to protected writes", 
   await api.resetAutoDownload();
   assert.equal(calls[0].url, "/api/v1/auth/status");
   assert.equal(calls[0].init.credentials, "same-origin");
-  assert.equal(new Headers(calls[0].init.headers).has("x-gpt-bridge-csrf"), false);
-  assert.equal(new Headers(calls[1].init.headers).get("x-gpt-bridge-csrf"), "csrf-test-token");
+  assert.equal(new Headers(calls[0].init.headers).has("x-droidwebdisplay-csrf"), false);
+  assert.equal(new Headers(calls[1].init.headers).get("x-droidwebdisplay-csrf"), "csrf-test-token");
 });
 
 test("authentication setup supports every required trust choice", async () => {
@@ -154,7 +154,7 @@ test("authentication setup supports every required trust choice", async () => {
   assert.equal(calls[0].url, "/api/v1/auth/setup");
   const body = JSON.parse(calls[0].init.body);
   assert.equal(body.customSeconds, 600);
-  assert.equal(new Headers(calls[0].init.headers).has("x-gpt-bridge-csrf"), false);
+  assert.equal(new Headers(calls[0].init.headers).has("x-droidwebdisplay-csrf"), false);
 });
 
 test("network access API validates and applies authenticated HTTPS configuration", async () => {

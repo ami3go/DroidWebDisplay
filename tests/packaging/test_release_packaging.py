@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import shutil
 
-from gpt_bridge.release_packaging import (
+from droid_web_display.release_packaging import (
     ReleaseInputs,
     build_release_tree,
     migrate_runtime_state,
@@ -16,7 +16,7 @@ from gpt_bridge.release_packaging import (
 def _minimal_release_repo(source_root: Path, target: Path, server_content: bytes) -> Path:
     target.mkdir(parents=True)
     for relative in (
-        "gpt_bridge",
+        "droid_web_display",
         "apps/web-client/dist",
         "apps/web-client/dist-manifest.json",
         "packages/scrcpy-protocol/dist",
@@ -72,7 +72,7 @@ def test_release_tree_verifies_server_and_excludes_runtime_state(tmp_path: Path)
     output = tmp_path / "release"
     result = build_release_tree(repo, output, ReleaseInputs(target="windows", scrcpy_server=server))
     assert result["manifest"]["scrcpy"]["server"]["present"] is True
-    assert (output / "GptBridge.ps1").is_file()
+    assert (output / "DroidWebDisplay.ps1").is_file()
     assert (output / "packaging/windows/install.ps1").is_file()
     assert (output / "tools/stop_bridge_service.py").is_file()
     assert (output / "pyproject.toml").is_file()

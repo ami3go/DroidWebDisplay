@@ -1,6 +1,6 @@
 # Optional private-LAN access
 
-Gpt-Bridge remains local-only by default and listens on `127.0.0.1:8765`.
+DroidWebDisplay remains local-only by default and listens on `127.0.0.1:8765`.
 
 The authenticated **Network access** card can enable access from approved devices on a private LAN. LAN mode requires:
 
@@ -15,7 +15,7 @@ The service never selects `0.0.0.0` automatically and the normal UI rejects publ
 
 ## Enabling LAN access
 
-1. Open Gpt-Bridge locally and authenticate.
+1. Open DroidWebDisplay locally and authenticate.
 2. Open **Network access**.
 3. Select **Private LAN with HTTPS**.
 4. Select the active Ethernet or Wi-Fi interface.

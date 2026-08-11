@@ -1,6 +1,6 @@
 # Versioned WebSocket contract
 
-All Phase 8 WebSocket endpoints require the `gpt_bridge_id` HttpOnly trusted-session cookie and a same-origin upgrade.
+All Phase 8 WebSocket endpoints require the `droid_web_display_id` HttpOnly trusted-session cookie and a same-origin upgrade.
 
 ```text
 /ws/v1/events

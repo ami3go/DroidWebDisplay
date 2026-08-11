@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://gpt-bridge.local/schema/scrcpy-versions-v2.json",
-  "title": "Gpt-Bridge scrcpy compatibility manifest",
+  "$id": "https://droidwebdisplay.local/schema/scrcpy-versions-v2.json",
+  "title": "DroidWebDisplay scrcpy compatibility manifest",
   "type": "object",
   "required": ["schemaVersion", "defaultAdapter", "supportedVersions"],
   "properties": {

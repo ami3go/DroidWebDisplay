@@ -8,7 +8,7 @@ $candidates = @(
     (Join-Path $Root ".venv\Scripts\python.exe")
 )
 $Python = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $Python) { throw "Gpt-Bridge Python runtime not found. Run install.ps1 first." }
+if (-not $Python) { throw "DroidWebDisplay Python runtime not found. Run install.ps1 first." }
 $PythonW = $Python -replace 'python\.exe$', 'pythonw.exe'
 if (-not (Test-Path $PythonW)) { $PythonW = $Python }
 $PidFile = Join-Path $Root "data\service.pid"

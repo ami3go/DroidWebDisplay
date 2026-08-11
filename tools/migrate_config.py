@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.release_packaging import migrate_runtime_state
+from droid_web_display.release_packaging import migrate_runtime_state
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Migrate supported Gpt-Bridge runtime configuration")
+    parser = argparse.ArgumentParser(description="Migrate supported DroidWebDisplay runtime configuration")
     parser.add_argument("--from", dest="previous", type=Path, required=True)
     parser.add_argument("--to", dest="new", type=Path, required=True)
     args = parser.parse_args()

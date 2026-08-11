@@ -9,12 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.auth import AuthService
-from gpt_bridge.network_access import FirewallManager, LAN_HTTPS, NetworkAccessError, NetworkConfigStore
+from droid_web_display.auth import AuthService
+from droid_web_display.network_access import FirewallManager, LAN_HTTPS, NetworkAccessError, NetworkConfigStore
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Recover Gpt-Bridge to local-only network access")
+    parser = argparse.ArgumentParser(description="Recover DroidWebDisplay to local-only network access")
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--local-only", action="store_true", required=True)
     parser.add_argument("--port", type=int)
@@ -36,7 +36,7 @@ def main() -> int:
         auth.revoke_all_for_reason("network-reset-local-only")
         auth.audit_event("network-local-fallback", port=config.port)
     print(f"Local-only access restored: {config.primary_url}")
-    print("Restart the Gpt-Bridge service.")
+    print("Restart the DroidWebDisplay service.")
     return 0
 
 

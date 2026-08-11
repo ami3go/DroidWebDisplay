@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from gpt_bridge.evidence import validate_ux_browser_evidence
+from droid_web_display.evidence import validate_ux_browser_evidence
 
 
 def test_phase9_browser_evidence_validation(tmp_path: Path) -> None:

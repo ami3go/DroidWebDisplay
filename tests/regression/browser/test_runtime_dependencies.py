@@ -5,7 +5,7 @@ import tomllib
 
 import pytest
 
-from gpt_bridge import runtime
+from droid_web_display import runtime
 
 
 def test_websocket_runtime_dependency_is_declared() -> None:

@@ -336,7 +336,7 @@ export class BridgeApi {
     const method = (init?.method ?? "GET").toUpperCase();
     const headers = new Headers(init?.headers);
     if (!publicRequest && !["GET", "HEAD", "OPTIONS"].includes(method) && sharedCsrfToken) {
-      headers.set("x-gpt-bridge-csrf", sharedCsrfToken);
+      headers.set("x-droidwebdisplay-csrf", sharedCsrfToken);
     }
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
@@ -348,7 +348,7 @@ export class BridgeApi {
     if (!response.ok) {
       if (response.status === 401 && !publicRequest) {
         setSharedCsrfToken(null);
-        globalThis.dispatchEvent?.(new CustomEvent("gpt-bridge-auth-required"));
+        globalThis.dispatchEvent?.(new CustomEvent("droidwebdisplay-auth-required"));
       }
       const message = typeof payload === "object" && payload !== null && "error" in payload
         ? String((payload as { error?: { message?: string } }).error?.message ?? response.statusText)

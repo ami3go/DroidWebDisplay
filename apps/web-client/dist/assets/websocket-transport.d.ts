@@ -1,4 +1,4 @@
-import type { BridgeTransport } from "@gpt-bridge/scrcpy-protocol";
+import type { BridgeTransport } from "@droid-web-display/scrcpy-protocol";
 export type WebSocketFactory = (url: string) => WebSocket;
 export declare class WebSocketBridgeTransport implements BridgeTransport {
     #private;

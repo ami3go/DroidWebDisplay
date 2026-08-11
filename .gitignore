@@ -131,7 +131,7 @@ DroidWebDisplay_*_candidate/
 
 # UI integration backup folders created during local patch/apply operations
 .droidwebdisplay-main-ui-backup/
-.gptbridge-main-ui-backup/
+.droidwebdisplay-main-ui-backup/
 .single-drawer-backup/
 
 # -----------------------------------------------------------------------------

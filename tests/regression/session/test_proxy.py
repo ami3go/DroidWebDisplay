@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from gpt_bridge.proxy.opaque import relay_bidirectional
+from droid_web_display.proxy.opaque import relay_bidirectional
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-from gpt_bridge.adb.devices import parse_adb_devices
+from droid_web_display.adb.devices import parse_adb_devices
 
 
 def test_parse_devices_states_and_metadata() -> None:

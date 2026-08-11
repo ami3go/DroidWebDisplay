@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.errors import ArtifactError
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.errors import ArtifactError
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
 
 
 def write_compatibility(root: Path, server_bytes: bytes) -> str:

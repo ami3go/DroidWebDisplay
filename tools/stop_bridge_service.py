@@ -9,13 +9,13 @@ import time
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Stop an installed Gpt-Bridge service by PID file")
+    parser = argparse.ArgumentParser(description="Stop an installed DroidWebDisplay service by PID file")
     parser.add_argument("--pid-file", type=Path, default=Path("data/service.pid"))
     parser.add_argument("--timeout", type=float, default=5.0)
     args = parser.parse_args()
     path = args.pid_file.resolve()
     if not path.is_file():
-        print("Gpt-Bridge is not running (PID file not present).")
+        print("DroidWebDisplay is not running (PID file not present).")
         return 0
     try:
         pid = int(path.read_text(encoding="ascii").strip())

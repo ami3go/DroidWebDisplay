@@ -1,7 +1,7 @@
 import pytest
 
-from gpt_bridge.models import ChannelName, SessionOptions
-from gpt_bridge.scrcpy.command import build_server_arguments, socket_name
+from droid_web_display.models import ChannelName, SessionOptions
+from droid_web_display.scrcpy.command import build_server_arguments, socket_name
 
 
 def test_server_arguments_force_forward_and_keep_protocol_metadata() -> None:

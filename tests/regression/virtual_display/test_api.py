@@ -4,11 +4,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from gpt_bridge.api.app import create_app
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.models import AndroidDevice
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
-from gpt_bridge.scrcpy.session import SessionManager
+from droid_web_display.api.app import create_app
+from droid_web_display.config import BridgeConfig
+from droid_web_display.models import AndroidDevice
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.scrcpy.session import SessionManager
 from tests.regression.session.fakes import FakeAdb
 
 

@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.release_packaging import validate_release_tree
+from droid_web_display.release_packaging import validate_release_tree
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate a built Gpt-Bridge release tree")
+    parser = argparse.ArgumentParser(description="Validate a built DroidWebDisplay release tree")
     parser.add_argument("release_root", type=Path)
     parser.add_argument("--require-offline-ready", action="store_true")
     parser.add_argument("--output", type=Path)

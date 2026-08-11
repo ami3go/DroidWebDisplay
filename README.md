@@ -1,10 +1,10 @@
-# Gpt-Bridge scrcpy
+# DroidWebDisplay scrcpy
 
 Browser control of an Android phone with physical and virtual displays, structured file transfer, two-way watched-folder transfer, running-app relocation, and PIN-protected trusted browser sessions, with optional authenticated private-LAN HTTPS access.
 
 ## Current baseline
 
-- Gpt-Bridge: `0.11.2`
+- DroidWebDisplay: `0.11.2`
 - scrcpy server and browser protocol adapter: `4.1`
 - Default service: `http://127.0.0.1:8765/`
 - Optional LAN mode: explicit private-interface HTTPS with client-subnet allowlisting

@@ -86,7 +86,7 @@
 - Added a small collapse/expand button to every left- and right-side card.
 - Cards are expanded by default and collapse to their header only.
 - Moved Android Back, Home, Recent, Rotate, Screen off and Fullscreen controls into the connection toolbar.
-- Placed the Android device selector, connection actions and Android controls on the same line as the Gpt-Bridge title on desktop widths.
+- Placed the Android device selector, connection actions and Android controls on the same line as the DroidWebDisplay title on desktop widths.
 - Reduced header padding and updated available viewport height for the video and transfer panels.
 - Added browser regression checks for collapsible cards and the compact header layout.
 

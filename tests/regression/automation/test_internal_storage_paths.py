@@ -1,4 +1,4 @@
-from gpt_bridge.transfers.paths import normalize_android_path, storage_root_list
+from droid_web_display.transfers.paths import normalize_android_path, storage_root_list
 
 
 def test_internal_storage_download_alias_is_supported() -> None:

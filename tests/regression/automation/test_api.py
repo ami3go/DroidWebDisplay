@@ -4,11 +4,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from gpt_bridge.api.app import create_app
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.models import AndroidDevice
-from gpt_bridge.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
-from gpt_bridge.transfers.manager import TransferManager
+from droid_web_display.api.app import create_app
+from droid_web_display.config import BridgeConfig
+from droid_web_display.models import AndroidDevice
+from droid_web_display.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
+from droid_web_display.transfers.manager import TransferManager
 
 
 class FakeAdb:

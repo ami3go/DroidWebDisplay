@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from gpt_bridge.scrcpy.protocol_checks import (
+from droid_web_display.scrcpy.protocol_checks import (
     PINNED_SCRCPY_COMMIT,
     validate_fixture_manifest,
     validate_protocol_sources,

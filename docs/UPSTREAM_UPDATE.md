@@ -7,7 +7,7 @@ Phase 10 keeps the currently approved scrcpy adapter and server available while 
 - `compatibility/scrcpy-versions.json` keeps `scrcpy-4.1` as the default until another adapter reaches `stable`.
 - Every target version receives a separate immutable directory under `packages/scrcpy-protocol/src/versions/`.
 - The clean upstream checkout must have no tracked or untracked changes before and after the workflow.
-- Optional Gpt-Bridge patches are stored outside the upstream checkout and applied only to temporary clones.
+- Optional DroidWebDisplay patches are stored outside the upstream checkout and applied only to temporary clones.
 - A failed patch aborts the operation and resets the temporary clone.
 - `experimental` is the only status assigned during registration.
 - `candidate` requires automated evidence.
@@ -80,7 +80,7 @@ Use `--select-source` only when the actual submodule checkout should move to the
 
 ## Build the matching server
 
-The official upstream build uses its Gradle wrapper for the Android server. The tool builds in a temporary clone and copies only the resulting artifact and manifest into the Gpt-Bridge tree.
+The official upstream build uses its Gradle wrapper for the Android server. The tool builds in a temporary clone and copies only the resulting artifact and manifest into the DroidWebDisplay tree.
 
 ```bash
 python tools/build_scrcpy_server.py \

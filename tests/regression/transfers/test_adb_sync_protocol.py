@@ -6,7 +6,7 @@ import struct
 
 import pytest
 
-from gpt_bridge.transfers.adb_sync import AdbSyncClient
+from droid_web_display.transfers.adb_sync import AdbSyncClient
 
 
 async def read_host_request(reader: asyncio.StreamReader) -> str:

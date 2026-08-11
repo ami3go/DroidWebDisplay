@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from gpt_bridge.release_checks import find_local_tsc, verify_static_client
+from droid_web_display.release_checks import find_local_tsc, verify_static_client
 
 
 def _tree_hash(root: Path) -> str:
@@ -43,11 +43,11 @@ def test_missing_compiler_does_not_delete_bundled_dist(tmp_path: Path, monkeypat
     )
     shutil.copytree(root / "packages/scrcpy-protocol/dist", protocol_target / "dist")
 
-    monkeypatch.delenv("GPT_BRIDGE_TSC", raising=False)
+    monkeypatch.delenv("DROID_WEB_DISPLAY_TSC", raising=False)
     assert find_local_tsc(isolated) is None
     before = _tree_hash(web_target / "dist")
     env = os.environ.copy()
-    env.pop("GPT_BRIDGE_TSC", None)
+    env.pop("DROID_WEB_DISPLAY_TSC", None)
     result = subprocess.run(
         [node, "tools/build.mjs"],
         cwd=web_target,

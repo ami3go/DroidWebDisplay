@@ -13,7 +13,7 @@ These are deliberately supplied to the builder rather than silently fetched duri
 Windows build example:
 
 ```powershell
-python tools\build_release.py --target windows --output dist\GptBridge-win64 `
+python tools\build_release.py --target windows --output dist\DroidWebDisplay-win64 `
   --scrcpy-server C:\artifacts\scrcpy-server-v4.1 `
   --adb-directory C:\artifacts\platform-tools `
   --python-runtime C:\artifacts\python-runtime `
@@ -23,7 +23,7 @@ python tools\build_release.py --target windows --output dist\GptBridge-win64 `
 Linux build example:
 
 ```sh
-python tools/build_release.py --target linux --output dist/GptBridge-linux-x86_64 \
+python tools/build_release.py --target linux --output dist/DroidWebDisplay-linux-x86_64 \
   --scrcpy-server /opt/artifacts/scrcpy-server-v4.1 \
   --adb-directory /opt/artifacts/platform-tools \
   --python-runtime /opt/artifacts/python-runtime \

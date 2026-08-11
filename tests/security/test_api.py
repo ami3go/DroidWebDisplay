@@ -6,12 +6,12 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from gpt_bridge.api.app import create_app
-from gpt_bridge.auth import AuthService
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.models import AndroidDevice
-from gpt_bridge.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
-from gpt_bridge.transfers.manager import TransferManager
+from droid_web_display.api.app import create_app
+from droid_web_display.auth import AuthService
+from droid_web_display.config import BridgeConfig
+from droid_web_display.models import AndroidDevice
+from droid_web_display.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
+from droid_web_display.transfers.manager import TransferManager
 
 
 class FakeAdb:
@@ -92,7 +92,7 @@ def test_untrusted_api_and_websocket_are_rejected_then_cookie_auth_works(tmp_pat
         assert denied.value.code == 4401
 
         status = setup_client(client)
-        cookie = client.cookies.get("gpt_bridge_id")
+        cookie = client.cookies.get("droid_web_display_id")
         assert cookie
         set_cookie = client.post  # retain client reference for type checkers
         del set_cookie
@@ -120,10 +120,10 @@ def test_cookie_flags_csrf_custom_duration_and_revocation(tmp_path: Path) -> Non
         csrf = setup_response.json()["csrfToken"]
 
         assert client.post("/api/v1/auto-download/reset").status_code == 403
-        assert client.post("/api/v1/auto-download/reset", headers={"x-gpt-bridge-csrf": csrf}).status_code == 200
+        assert client.post("/api/v1/auto-download/reset", headers={"x-droidwebdisplay-csrf": csrf}).status_code == 200
         assert client.post(
             "/api/v1/auto-download/reset",
-            headers={"x-gpt-bridge-csrf": csrf, "origin": "http://evil.example"},
+            headers={"x-droidwebdisplay-csrf": csrf, "origin": "http://evil.example"},
         ).status_code == 403
 
         invalid_custom = client.post("/api/v1/auth/login", json={
@@ -145,14 +145,14 @@ def test_cookie_flags_csrf_custom_duration_and_revocation(tmp_path: Path) -> Non
         old = next(item for item in sessions if not item["current"])
         revoked = client.delete(
             f"/api/v1/auth/sessions/{old['sessionId']}",
-            headers={"x-gpt-bridge-csrf": csrf},
+            headers={"x-droidwebdisplay-csrf": csrf},
         )
         assert revoked.json()["revoked"] is True
 
         global_result = client.post(
             "/api/v1/auth/sessions/revoke-all",
             json={"pin": "123456"},
-            headers={"x-gpt-bridge-csrf": csrf},
+            headers={"x-droidwebdisplay-csrf": csrf},
         )
         assert global_result.status_code == 200
         assert global_result.json()["revoked"] >= 1
@@ -160,7 +160,7 @@ def test_cookie_flags_csrf_custom_duration_and_revocation(tmp_path: Path) -> Non
 
         audit_text = (tmp_path / "data" / "auth.json").read_text(encoding="utf-8").lower()
         assert "123456" not in audit_text
-        assert client.cookies.get("gpt_bridge_id") is None
+        assert client.cookies.get("droid_web_display_id") is None
 
 
 def test_openapi_declares_pc_local_cookie_security(tmp_path: Path) -> None:
@@ -169,7 +169,7 @@ def test_openapi_declares_pc_local_cookie_security(tmp_path: Path) -> None:
     scheme = schema["components"]["securitySchemes"]["pcLocalSession"]
     assert scheme["type"] == "apiKey"
     assert scheme["in"] == "cookie"
-    assert scheme["name"] == "gpt_bridge_id"
+    assert scheme["name"] == "droid_web_display_id"
     assert schema["paths"]["/api/v1/devices"]["get"]["security"] == [{"pcLocalSession": []}]
     assert "security" not in schema["paths"]["/api/v1/auth/login"]["post"]
     assert schema["info"]["x-trust-model"].startswith("PC-local")

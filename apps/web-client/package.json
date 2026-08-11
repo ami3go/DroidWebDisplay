@@ -1,5 +1,5 @@
 {
-  "name": "@gpt-bridge/web-client",
+  "name": "@droid-web-display/web-client",
   "version": "0.10.1",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "npm run build && node tools/run-tests.mjs"
   },
   "dependencies": {
-    "@gpt-bridge/scrcpy-protocol": "file:../../packages/scrcpy-protocol"
+    "@droid-web-display/scrcpy-protocol": "file:../../packages/scrcpy-protocol"
   },
   "devDependencies": {
     "typescript": "5.8.3"

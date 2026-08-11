@@ -24,7 +24,7 @@ async function exists(path) {
 
 async function resolveCompiler() {
   const candidates = [
-    process.env.GPT_BRIDGE_TSC,
+    process.env.DROID_WEB_DISPLAY_TSC,
     resolve(root, "node_modules/typescript/bin/tsc"),
     resolve(protocolRoot, "node_modules/typescript/bin/tsc"),
   ].filter(Boolean);

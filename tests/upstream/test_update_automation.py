@@ -6,12 +6,12 @@ import shutil
 
 import pytest
 
-from gpt_bridge.upstream_update.compatibility import PromotionError, promote_adapter, register_experimental_adapter
-from gpt_bridge.upstream_update.git import ensure_clean, run_git
-from gpt_bridge.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
-from gpt_bridge.upstream_update.patches import PatchApplicationError, apply_patch_series
-from gpt_bridge.upstream_update.scaffold import AdapterScaffoldError, scaffold_adapter
-from gpt_bridge.upstream_update.selftest import run_self_test
+from droid_web_display.upstream_update.compatibility import PromotionError, promote_adapter, register_experimental_adapter
+from droid_web_display.upstream_update.git import ensure_clean, run_git
+from droid_web_display.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
+from droid_web_display.upstream_update.patches import PatchApplicationError, apply_patch_series
+from droid_web_display.upstream_update.scaffold import AdapterScaffoldError, scaffold_adapter
+from droid_web_display.upstream_update.selftest import run_self_test
 
 
 def _init_repo(path: Path) -> None:

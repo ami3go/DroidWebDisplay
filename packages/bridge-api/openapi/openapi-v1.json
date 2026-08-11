@@ -241,7 +241,7 @@
       "Body_transfer_upload_api_v1_transfers_upload_post": {
         "properties": {
           "destinationPath": {
-            "default": "/sdcard/Download/GptBridgeInbox",
+            "default": "/sdcard/Download/DroidWebDisplayInbox",
             "title": "Destinationpath",
             "type": "string"
           },
@@ -705,13 +705,13 @@
       "pcLocalSession": {
         "description": "Opaque PC-local trusted-session cookie. PINs and raw tokens are never logged.",
         "in": "cookie",
-        "name": "gpt_bridge_id",
+        "name": "droid_web_display_id",
         "type": "apiKey"
       }
     }
   },
   "info": {
-    "title": "Gpt-Bridge Local Service",
+    "title": "DroidWebDisplay Local Service",
     "version": "0.11.2",
     "x-trust-model": "PC-local by default; optional authenticated private-LAN HTTPS; the Android phone is not the trust authority"
   },

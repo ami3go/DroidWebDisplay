@@ -5,10 +5,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 import pytest
 
-from gpt_bridge.api.app import create_app
-from gpt_bridge.auth import AuthService
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.network_access import (
+from droid_web_display.api.app import create_app
+from droid_web_display.auth import AuthService
+from droid_web_display.config import BridgeConfig
+from droid_web_display.network_access import (
     FirewallManager,
     LAN_HTTPS,
     NetworkAccessConfig,
@@ -20,7 +20,7 @@ from gpt_bridge.network_access import (
     validate_certificate_pair,
 )
 from tests.security.test_api import FakeAdb, FakeSessionManager, FakeSync
-from gpt_bridge.transfers.manager import TransferManager
+from droid_web_display.transfers.manager import TransferManager
 
 
 def test_local_only_is_default_and_public_or_wildcard_bind_is_rejected(tmp_path: Path) -> None:
@@ -124,11 +124,11 @@ def test_network_api_requires_pin_validates_and_persists_lan_config(tmp_path: Pa
             "manageFirewall": False,
             "currentPin": "123456",
         }
-        denied = client.post("/api/v1/network/validate", json={**payload, "currentPin": "0000"}, headers={"x-gpt-bridge-csrf": csrf})
+        denied = client.post("/api/v1/network/validate", json={**payload, "currentPin": "0000"}, headers={"x-droidwebdisplay-csrf": csrf})
         assert denied.status_code == 401
-        valid = client.post("/api/v1/network/validate", json=payload, headers={"x-gpt-bridge-csrf": csrf})
+        valid = client.post("/api/v1/network/validate", json=payload, headers={"x-droidwebdisplay-csrf": csrf})
         assert valid.status_code == 200, valid.text
-        applied = client.post("/api/v1/network/apply", json=payload, headers={"x-gpt-bridge-csrf": csrf})
+        applied = client.post("/api/v1/network/apply", json=payload, headers={"x-droidwebdisplay-csrf": csrf})
         assert applied.status_code == 200, applied.text
         assert applied.json()["url"] == "https://bridge-pc:8765"
         saved = NetworkConfigStore(tmp_path / "data" / "network-access.json").load()

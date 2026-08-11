@@ -2,7 +2,7 @@
 set -euo pipefail
 PARENT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ -f "$PARENT/VERSION.json" ]]; then SOURCE="$PARENT"; else SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"; fi
-INSTALL_ROOT="${GPT_BRIDGE_INSTALL_ROOT:-$HOME/.local/share/gpt-bridge}"
+INSTALL_ROOT="${DROID_WEB_DISPLAY_INSTALL_ROOT:-$HOME/.local/share/droidwebdisplay}"
 BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
@@ -15,7 +15,7 @@ if [[ "$SOURCE_REAL" == "$INSTALL_REAL" ]]; then
   exit 2
 fi
 
-systemctl --user stop gpt-bridge.service >/dev/null 2>&1 || true
+systemctl --user stop droidwebdisplay.service >/dev/null 2>&1 || true
 for candidate in "$INSTALL_ROOT/runtime/python/bin/python3" "$INSTALL_ROOT/runtime/python/python3" "$INSTALL_ROOT/.venv/bin/python3" "$INSTALL_ROOT/.venv/bin/python"; do
   if [[ -x "$candidate" && -f "$INSTALL_ROOT/tools/stop_bridge_service.py" ]]; then
     "$candidate" "$INSTALL_ROOT/tools/stop_bridge_service.py" --pid-file "$INSTALL_ROOT/data/service.pid" >/dev/null 2>&1 || true
@@ -69,21 +69,21 @@ PY
   if [[ -x "$INSTALL_ROOT/.venv/bin/python3" ]]; then RUNTIME="$INSTALL_ROOT/.venv/bin/python3"; else RUNTIME="$INSTALL_ROOT/.venv/bin/python"; fi
   if [[ -d "$INSTALL_ROOT/wheelhouse" ]] && compgen -G "$INSTALL_ROOT/wheelhouse/*" >/dev/null; then
     "$RUNTIME" -m pip install --disable-pip-version-check --no-index --find-links "$INSTALL_ROOT/wheelhouse" -e "$INSTALL_ROOT"
-  elif [[ "${GPT_BRIDGE_ALLOW_ONLINE_DEPENDENCIES:-0}" == "1" ]]; then
+  elif [[ "${DROID_WEB_DISPLAY_ALLOW_ONLINE_DEPENDENCIES:-0}" == "1" ]]; then
     "$RUNTIME" -m pip install --disable-pip-version-check -e "$INSTALL_ROOT"
   else
     echo "ERROR: offline wheelhouse is not present." >&2
-    echo "Use a complete offline release or set GPT_BRIDGE_ALLOW_ONLINE_DEPENDENCIES=1 on an Internet-connected machine." >&2
+    echo "Use a complete offline release or set DROID_WEB_DISPLAY_ALLOW_ONLINE_DEPENDENCIES=1 on an Internet-connected machine." >&2
     exit 2
   fi
 fi
 
-cat > "$BIN_DIR/gpt-bridge" <<EOF2
+cat > "$BIN_DIR/droidwebdisplay" <<EOF2
 #!/usr/bin/env bash
-exec "$INSTALL_ROOT/GptBridge.sh" "\$@"
+exec "$INSTALL_ROOT/DroidWebDisplay.sh" "\$@"
 EOF2
-chmod +x "$BIN_DIR/gpt-bridge"
-cat > "$BIN_DIR/gpt-bridge-stop" <<EOF2
+chmod +x "$BIN_DIR/droidwebdisplay"
+cat > "$BIN_DIR/droidwebdisplay-stop" <<EOF2
 #!/usr/bin/env bash
 for candidate in "$INSTALL_ROOT/runtime/python/bin/python3" "$INSTALL_ROOT/runtime/python/python3" "$INSTALL_ROOT/.venv/bin/python3" "$INSTALL_ROOT/.venv/bin/python"; do
   if [[ -x "\$candidate" ]]; then exec "\$candidate" "$INSTALL_ROOT/tools/stop_bridge_service.py" --pid-file "$INSTALL_ROOT/data/service.pid" "\$@"; fi
@@ -91,11 +91,11 @@ done
 echo "Installed Python runtime not found." >&2
 exit 2
 EOF2
-chmod +x "$BIN_DIR/gpt-bridge-stop"
+chmod +x "$BIN_DIR/droidwebdisplay-stop"
 
-sed "s|@INSTALL_ROOT@|$INSTALL_ROOT|g" "$INSTALL_ROOT/packaging/linux/gpt-bridge.service.in" > "$SYSTEMD_DIR/gpt-bridge.service"
-sed "s|@LAUNCHER@|$BIN_DIR/gpt-bridge|g" "$INSTALL_ROOT/packaging/linux/gpt-bridge.desktop.in" > "$DESKTOP_DIR/gpt-bridge.desktop"
+sed "s|@INSTALL_ROOT@|$INSTALL_ROOT|g" "$INSTALL_ROOT/packaging/linux/droidwebdisplay.service.in" > "$SYSTEMD_DIR/droidwebdisplay.service"
+sed "s|@LAUNCHER@|$BIN_DIR/droidwebdisplay|g" "$INSTALL_ROOT/packaging/linux/droidwebdisplay.desktop.in" > "$DESKTOP_DIR/droidwebdisplay.desktop"
 systemctl --user daemon-reload >/dev/null 2>&1 || true
-printf 'Installed Gpt-Bridge to %s\n' "$INSTALL_ROOT"
-printf 'Start now: systemctl --user start gpt-bridge.service\n'
-printf 'Enable at login: systemctl --user enable gpt-bridge.service\n'
+printf 'Installed DroidWebDisplay to %s\n' "$INSTALL_ROOT"
+printf 'Start now: systemctl --user start droidwebdisplay.service\n'
+printf 'Enable at login: systemctl --user enable droidwebdisplay.service\n'

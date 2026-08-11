@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.errors import DeviceNotReadyError, MultipleDevicesError
-from gpt_bridge.models import AndroidDevice
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
-from gpt_bridge.scrcpy.session import SessionManager
+from droid_web_display.errors import DeviceNotReadyError, MultipleDevicesError
+from droid_web_display.models import AndroidDevice
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.scrcpy.session import SessionManager
 from tests.regression.session.fakes import FakeAdb
 
 

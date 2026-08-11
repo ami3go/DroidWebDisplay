@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.models import AndroidDevice, DisplayMode, SessionOptions, VirtualDisplayOptions
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
-from gpt_bridge.scrcpy.session import SessionManager
+from droid_web_display.models import AndroidDevice, DisplayMode, SessionOptions, VirtualDisplayOptions
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.scrcpy.session import SessionManager
 from tests.regression.session.fakes import FakeAdb, FakeProcess
 
 

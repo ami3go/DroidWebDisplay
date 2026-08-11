@@ -27,7 +27,7 @@ export class AutoDownloadController {
   readonly #api = new BridgeApi();
   #timer: number | null = null;
   #snapshot: AutoDownloadSnapshotDto | null = null;
-  #lastNotificationTimestamp = Number(localStorage.getItem("gpt-bridge-auto-download-notification-ts") ?? "0");
+  #lastNotificationTimestamp = Number(localStorage.getItem("droidwebdisplay-auto-download-notification-ts") ?? "0");
 
   public constructor(private readonly elements: AutoDownloadElements) {
     this.bindEvents();
@@ -130,7 +130,7 @@ export class AutoDownloadController {
       this.elements.includeExisting.checked = config.includeExisting;
       this.elements.includeExistingPc.checked = config.includeExistingPc;
       this.elements.deleteAfterVerified.checked = config.deleteAfterVerified;
-      this.elements.notifications.checked = localStorage.getItem("gpt-bridge-auto-download-notifications") === "true";
+      this.elements.notifications.checked = localStorage.getItem("droidwebdisplay-auto-download-notifications") === "true";
     }
     this.elements.status.textContent = runtime.state;
     this.elements.status.classList.toggle("error-text", runtime.state === "error");
@@ -172,22 +172,22 @@ export class AutoDownloadController {
   }
 
   private async configureNotifications(): Promise<void> {
-    localStorage.setItem("gpt-bridge-auto-download-notifications", String(this.elements.notifications.checked));
+    localStorage.setItem("droidwebdisplay-auto-download-notifications", String(this.elements.notifications.checked));
     if (!this.elements.notifications.checked || !("Notification" in globalThis)) return;
     if (Notification.permission === "default") await Notification.requestPermission();
     if (Notification.permission !== "granted") this.elements.notifications.checked = false;
-    localStorage.setItem("gpt-bridge-auto-download-notifications", String(this.elements.notifications.checked));
+    localStorage.setItem("droidwebdisplay-auto-download-notifications", String(this.elements.notifications.checked));
   }
 
   private notifyNewEvents(snapshot: AutoDownloadSnapshotDto): void {
     const notifications = snapshot.runtime.notifications.filter((item) => item.timestamp > this.#lastNotificationTimestamp);
     if (!notifications.length) return;
     this.#lastNotificationTimestamp = Math.max(...notifications.map((item) => item.timestamp));
-    localStorage.setItem("gpt-bridge-auto-download-notification-ts", String(this.#lastNotificationTimestamp));
+    localStorage.setItem("droidwebdisplay-auto-download-notification-ts", String(this.#lastNotificationTimestamp));
     if (!this.elements.notifications.checked || !("Notification" in globalThis) || Notification.permission !== "granted") return;
     for (const item of notifications) {
       if (!["download-completed", "upload-completed", "monitor-error", "download-failed", "upload-failed"].includes(item.event)) continue;
-      new Notification("Gpt-Bridge", { body: item.message, tag: `gpt-bridge-${item.event}-${item.transferId ?? item.timestamp}` });
+      new Notification("DroidWebDisplay", { body: item.message, tag: `droidwebdisplay-${item.event}-${item.transferId ?? item.timestamp}` });
     }
   }
 

@@ -2,11 +2,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from gpt_bridge.api import create_app
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.models import AndroidDevice
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
-from gpt_bridge.scrcpy.session import SessionManager
+from droid_web_display.api import create_app
+from droid_web_display.config import BridgeConfig
+from droid_web_display.models import AndroidDevice
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.scrcpy.session import SessionManager
 from tests.regression.session.fakes import FakeAdb
 
 
@@ -27,5 +27,5 @@ def test_phase4_api_and_static_client(tmp_path: Path) -> None:
         assert support.json()["softwareDecoderFallback"] is False
         page = client.get("/")
         assert page.status_code == 200
-        assert "Gpt-Bridge" in page.text
+        assert "DroidWebDisplay" in page.text
         assert "/assets/main.js" in page.text

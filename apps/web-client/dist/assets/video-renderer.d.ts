@@ -1,4 +1,4 @@
-import { type ScrcpyV41Session } from "@gpt-bridge/scrcpy-protocol";
+import { type ScrcpyV41Session } from "@droid-web-display/scrcpy-protocol";
 export interface VideoStatistics {
     readonly framesDecoded: number;
     readonly framesDropped: number;

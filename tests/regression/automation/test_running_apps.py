@@ -4,12 +4,12 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from gpt_bridge.adb.running_apps import RunningGuiApp, parse_running_gui_apps, validate_component_name
-from gpt_bridge.api.app import create_app
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.models import AndroidDevice, DisplayMode, SessionOptions, SessionState, VirtualDisplayOptions
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
-from gpt_bridge.scrcpy.session import ScrcpySession, SessionManager
+from droid_web_display.adb.running_apps import RunningGuiApp, parse_running_gui_apps, validate_component_name
+from droid_web_display.api.app import create_app
+from droid_web_display.config import BridgeConfig
+from droid_web_display.models import AndroidDevice, DisplayMode, SessionOptions, SessionState, VirtualDisplayOptions
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.scrcpy.session import ScrcpySession, SessionManager
 from tests.regression.virtual_display.test_api import VirtualDisplayFakeAdb
 
 

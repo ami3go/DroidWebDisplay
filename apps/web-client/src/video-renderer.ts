@@ -3,7 +3,7 @@ import {
   type MediaPacket,
   type ScrcpyV41Session,
   type VideoSessionMeta,
-} from "@gpt-bridge/scrcpy-protocol";
+} from "@droid-web-display/scrcpy-protocol";
 
 export interface VideoStatistics {
   readonly framesDecoded: number;

@@ -49,7 +49,7 @@ On failure, inspect `details.classification`, `details.serverArguments`, `detail
 
 Some Samsung Android builds have an `app_process` compatibility defect that may abort when the scrcpy server is launched with an unnecessarily long argument vector.
 
-Gpt-Bridge v0.6.2 follows the native scrcpy v4.1 client and omits options that equal server defaults. For the recommended Samsung profile this reduces the server list from 14 entries to 9 while preserving the requested 1600×900/240 display, bitrate, frame rate, tunnel, and keep-active behavior.
+DroidWebDisplay v0.6.2 follows the native scrcpy v4.1 client and omits options that equal server defaults. For the recommended Samsung profile this reduces the server list from 14 entries to 9 while preserving the requested 1600×900/240 display, bitrate, frame rate, tunnel, and keep-active behavior.
 
 Evidence classification:
 

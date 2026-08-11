@@ -4,23 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Gpt-Bridge</title>
+  <title>DroidWebDisplay</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="importmap">
   {
     "imports": {
-      "@gpt-bridge/scrcpy-protocol": "/vendor/scrcpy-protocol/src/index.js"
+      "@droid-web-display/scrcpy-protocol": "/vendor/scrcpy-protocol/src/index.js"
     }
   }
   </script>
-  <!-- GptBridge Main Single Drawer UI v1.0.0 -->
-  <link rel="stylesheet" href="./gptbridge-main-drawer.css" data-gb-main-drawer="css">
+  <!-- DroidWebDisplay Main Single Drawer UI v1.0.0 -->
+  <link rel="stylesheet" href="./droidwebdisplay-main-drawer.css" data-gb-main-drawer="css">
 </head>
 <body>
-  <section id="auth-gate" class="auth-gate" aria-label="Gpt-Bridge authentication">
+  <section id="auth-gate" class="auth-gate" aria-label="DroidWebDisplay authentication">
     <form id="auth-form" class="auth-dialog" autocomplete="off">
       <p class="eyebrow">PC-LOCAL ACCESS</p>
-      <h1 id="auth-title">Unlock Gpt-Bridge</h1>
+      <h1 id="auth-title">Unlock DroidWebDisplay</h1>
       <p id="auth-explanation">Enter the PIN configured on this PC.</p>
       <label>PIN
         <input id="auth-pin" type="password" inputmode="numeric" pattern="[0-9]{4,12}" minlength="4" maxlength="12" autocomplete="current-password" required>
@@ -56,7 +56,7 @@
   <main id="app" class="shell" hidden>
     <header class="topbar">
       <div class="topbar-brand">
-        <h1>Gpt-Bridge</h1>
+        <h1>DroidWebDisplay</h1>
         <span class="eyebrow">LOCAL USB BRIDGE</span>
       </div>
       <div class="connection-row">
@@ -223,8 +223,8 @@
               </select>
             </label>
             <div id="network-existing-certificate" hidden>
-              <label>Certificate path<input id="network-certificate-path" placeholder="C:\certs\gpt-bridge-cert.pem"></label>
-              <label>Private-key path<input id="network-private-key-path" type="password" placeholder="C:\certs\gpt-bridge-key.pem"></label>
+              <label>Certificate path<input id="network-certificate-path" placeholder="C:\certs\droidwebdisplay-cert.pem"></label>
+              <label>Private-key path<input id="network-private-key-path" type="password" placeholder="C:\certs\droidwebdisplay-key.pem"></label>
             </div>
             <label id="network-validity-row">Generated certificate validity
               <select id="network-certificate-validity"><option value="90">90 days</option><option value="365" selected>1 year</option><option value="730">2 years</option></select>
@@ -303,7 +303,7 @@
           <input id="context-upload-file" type="file" multiple hidden>
           <label>Android destination
             <select id="upload-directory">
-              <option value="/sdcard/Download/GptBridgeInbox">GptBridgeInbox</option>
+              <option value="/sdcard/Download/DroidWebDisplayInbox">DroidWebDisplayInbox</option>
               <option value="/sdcard/Download">Internal storage · Download</option>
               <option value="/sdcard/Documents">Internal storage · Documents</option>
               <option value="/sdcard/Pictures">Internal storage · Pictures</option>
@@ -409,6 +409,6 @@
     </section>
   </main>
   <script type="module" src="/assets/main.js"></script>
-  <script defer src="./gptbridge-main-drawer.js" data-gb-main-drawer="js"></script>
+  <script defer src="./droidwebdisplay-main-drawer.js" data-gb-main-drawer="js"></script>
 </body>
 </html>

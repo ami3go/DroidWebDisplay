@@ -16,13 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge import __version__
-from gpt_bridge.auth import AuthService, TRUST_DURATIONS
-from gpt_bridge.release_checks import find_local_tsc, verify_static_client
-from gpt_bridge.evidence import validate_ux_browser_evidence
-from gpt_bridge.upstream_update.selftest import run_self_test as upstream_update_self_test
-from gpt_bridge.release_packaging import ReleaseInputs, build_release_tree, migrate_runtime_state, validate_release_tree
-from gpt_bridge.network_access import (
+from droid_web_display import __version__
+from droid_web_display.auth import AuthService, TRUST_DURATIONS
+from droid_web_display.release_checks import find_local_tsc, verify_static_client
+from droid_web_display.evidence import validate_ux_browser_evidence
+from droid_web_display.upstream_update.selftest import run_self_test as upstream_update_self_test
+from droid_web_display.release_packaging import ReleaseInputs, build_release_tree, migrate_runtime_state, validate_release_tree
+from droid_web_display.network_access import (
     LAN_HTTPS,
     FirewallManager,
     NetworkAccessConfig,
@@ -65,7 +65,7 @@ def auth_self_test() -> dict[str, Any]:
             return self.value
 
     clock = Clock()
-    with tempfile.TemporaryDirectory(prefix="gpt-bridge-auth-") as temp:
+    with tempfile.TemporaryDirectory(prefix="droidwebdisplay-auth-") as temp:
         path = Path(temp) / "auth.json"
         service = AuthService(path, clock=clock)
         first = service.setup("123456", duration="1-hour", custom_seconds=None, user_agent="Gate 8")
@@ -96,7 +96,7 @@ def auth_self_test() -> dict[str, Any]:
 
 
 def network_access_self_test() -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="gpt-bridge-network-") as temp:
+    with tempfile.TemporaryDirectory(prefix="droidwebdisplay-network-") as temp:
         root = Path(temp)
         cert = root / "cert.pem"
         key = root / "key.pem"
@@ -127,9 +127,9 @@ def network_access_self_test() -> dict[str, Any]:
 
 
 def packaging_self_test(root: Path) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="gpt-bridge-package-") as temp:
+    with tempfile.TemporaryDirectory(prefix="droidwebdisplay-package-") as temp:
         temp_root = Path(temp)
-        release = temp_root / "GptBridge"
+        release = temp_root / "DroidWebDisplay"
         result = build_release_tree(
             root,
             release,
@@ -142,11 +142,11 @@ def packaging_self_test(root: Path) -> dict[str, Any]:
         (previous / "data/network-access.json").write_text("{}", encoding="utf-8")
         (previous / "data/tls/cert.pem").write_text("cert", encoding="utf-8")
         migration = migrate_runtime_state(previous, release)
-        required_launchers = all((release / name).is_file() for name in ("GptBridge.cmd", "GptBridge.ps1", "GptBridge.sh"))
+        required_launchers = all((release / name).is_file() for name in ("DroidWebDisplay.cmd", "DroidWebDisplay.ps1", "DroidWebDisplay.sh"))
         checks = {
             "releaseTree": validation.get("status") == "PASS",
             "versionManifest": (release / "VERSION.json").is_file(),
-            "licenses": all((release / "licenses" / name).is_file() for name in ("GptBridge-LICENSE.txt", "scrcpy-LICENSE.txt", "THIRD_PARTY_NOTICES.txt")),
+            "licenses": all((release / "licenses" / name).is_file() for name in ("DroidWebDisplay-LICENSE.txt", "scrcpy-LICENSE.txt", "THIRD_PARTY_NOTICES.txt")),
             "launchers": required_launchers,
             "runtimeStateExcluded": not (release / "data/auto-download-monitor.json").exists(),
             "migration": set(migration["copied"]) >= {"auth.json", "network-access.json", "tls/cert.pem"},
@@ -160,7 +160,7 @@ def packaging_self_test(root: Path) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the current Gpt-Bridge release gate")
+    parser = argparse.ArgumentParser(description="Run the current DroidWebDisplay release gate")
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--node", default="node")
@@ -188,7 +188,7 @@ def main() -> int:
         compiler = find_local_tsc(root)
         if compiler:
             env = dict(os.environ)
-            env["GPT_BRIDGE_TSC"] = str(compiler)
+            env["DROID_WEB_DISPLAY_TSC"] = str(compiler)
             checks["webClientBuild"] = run([node, "tools/build.mjs"], cwd=root / "apps/web-client", env=env)
             checks["webClientBuild"]["compiler"] = str(compiler)
         elif args.require_web_client_build:
@@ -199,10 +199,10 @@ def main() -> int:
         for name in ("node", "protocolTests", "webClientTests", "webClientBuild"):
             checks[name] = {"status": "FAIL", "error": "Node.js not found"}
 
-    auth_source = (root / "gpt_bridge/auth.py").read_text(encoding="utf-8")
-    api_source = (root / "gpt_bridge/api/app.py").read_text(encoding="utf-8")
+    auth_source = (root / "droid_web_display/auth.py").read_text(encoding="utf-8")
+    api_source = (root / "droid_web_display/api/app.py").read_text(encoding="utf-8")
     html_source = (root / "apps/web-client/static/index.html").read_text(encoding="utf-8")
-    config_source = (root / "gpt_bridge/config.py").read_text(encoding="utf-8")
+    config_source = (root / "droid_web_display/config.py").read_text(encoding="utf-8")
     openapi = json.loads((root / "packages/bridge-api/openapi/openapi-v1.json").read_text(encoding="utf-8"))
     required_durations = {"browser-session", "1-hour", "1-day", "1-week", "1-month", "1-year", "forever"}
     checks["trustDurations"] = {
@@ -236,7 +236,7 @@ def main() -> int:
     }
     scheme = openapi.get("components", {}).get("securitySchemes", {}).get("pcLocalSession", {})
     checks["openapiSecurity"] = {
-        "status": "PASS" if scheme.get("in") == "cookie" and scheme.get("name") == "gpt_bridge_id" else "FAIL",
+        "status": "PASS" if scheme.get("in") == "cookie" and scheme.get("name") == "droid_web_display_id" else "FAIL",
         "scheme": scheme,
     }
     checks["auditRedaction"] = {
@@ -256,13 +256,13 @@ def main() -> int:
 
     controller_source = (root / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")
     main_source = (root / "apps/web-client/src/main.ts").read_text(encoding="utf-8")
-    monitor_source = (root / "gpt_bridge/transfers/monitor.py").read_text(encoding="utf-8")
-    manager_source = (root / "gpt_bridge/transfers/manager.py").read_text(encoding="utf-8")
+    monitor_source = (root / "droid_web_display/transfers/monitor.py").read_text(encoding="utf-8")
+    manager_source = (root / "droid_web_display/transfers/manager.py").read_text(encoding="utf-8")
     audio_source = (root / "apps/web-client/src/audio-player.ts").read_text(encoding="utf-8")
     adapter_source = (root / "packages/scrcpy-protocol/src/versions/v4_1/adapter.ts").read_text(encoding="utf-8")
-    command_source = (root / "gpt_bridge/scrcpy/command.py").read_text(encoding="utf-8")
-    path_source = (root / "gpt_bridge/transfers/paths.py").read_text(encoding="utf-8")
-    adb_source = (root / "gpt_bridge/adb/client.py").read_text(encoding="utf-8")
+    command_source = (root / "droid_web_display/scrcpy/command.py").read_text(encoding="utf-8")
+    path_source = (root / "droid_web_display/transfers/paths.py").read_text(encoding="utf-8")
+    adb_source = (root / "droid_web_display/adb/client.py").read_text(encoding="utf-8")
     css_source = (root / "apps/web-client/static/styles.css").read_text(encoding="utf-8")
 
     checks["optionalAudioPipeline"] = {
@@ -319,7 +319,7 @@ def main() -> int:
     }
     checks["settingsRoundTrip"] = {
         "status": "PASS" if all(token in controller_source + html_source for token in (
-            "exportSettings", "importSettings", "gpt-bridge-settings-v1", 'id="settings-export"', 'id="settings-import"',
+            "exportSettings", "importSettings", "droidwebdisplay-settings-v1", 'id="settings-export"', 'id="settings-import"',
         )) else "FAIL",
         "schemaVersion": 1,
     }
@@ -393,7 +393,7 @@ def main() -> int:
     }
 
 
-    network_source = (root / "gpt_bridge/network_access.py").read_text(encoding="utf-8")
+    network_source = (root / "droid_web_display/network_access.py").read_text(encoding="utf-8")
     launcher_source = (root / "tools/run_bridge_service.py").read_text(encoding="utf-8")
     network_ui_source = (root / "apps/web-client/src/network-controller.ts").read_text(encoding="utf-8")
     reset_source = (root / "tools/reset_network_access.py").read_text(encoding="utf-8")
@@ -431,9 +431,9 @@ def main() -> int:
     stable_adapter = compatibility_manifest.get("defaultAdapter")
     stable_entry = compatibility_manifest.get("supportedVersions", {}).get(stable_adapter, {})
     update_source = (root / "tools/update_scrcpy.py").read_text(encoding="utf-8")
-    promotion_source = (root / "gpt_bridge/upstream_update/compatibility.py").read_text(encoding="utf-8")
-    patch_source = (root / "gpt_bridge/upstream_update/patches.py").read_text(encoding="utf-8")
-    inspection_source = (root / "gpt_bridge/upstream_update/inspection.py").read_text(encoding="utf-8")
+    promotion_source = (root / "droid_web_display/upstream_update/compatibility.py").read_text(encoding="utf-8")
+    patch_source = (root / "droid_web_display/upstream_update/patches.py").read_text(encoding="utf-8")
+    inspection_source = (root / "droid_web_display/upstream_update/inspection.py").read_text(encoding="utf-8")
     checks["upstreamUpdateAutomation"] = {
         "status": "PASS" if all((root / item).is_file() for item in update_tool_files)
         and stable_adapter == "scrcpy-4.1"
@@ -451,7 +451,7 @@ def main() -> int:
         "toolFiles": list(update_tool_files),
     }
 
-    packaging_source = (root / "gpt_bridge/release_packaging.py").read_text(encoding="utf-8")
+    packaging_source = (root / "droid_web_display/release_packaging.py").read_text(encoding="utf-8")
     packaging_doc = (root / "packaging/README.md").read_text(encoding="utf-8")
     windows_installer = (root / "packaging/windows/install.ps1").read_text(encoding="utf-8")
     linux_installer = (root / "packaging/linux/install.sh").read_text(encoding="utf-8")
@@ -461,8 +461,8 @@ def main() -> int:
     checks["phase11Packaging"] = {
         "status": "PASS" if all(token in packaging_all for token in (
             "VERSION.json", "scrcpy-server.manifest.json", "officialReleaseServerSha256",
-            "requirements-runtime.txt", "wheelhouse", "GptBridge.ps1", "GptBridge.sh",
-            "migrate_runtime_state", "GptBridge-LICENSE.txt", "scrcpy-LICENSE.txt",
+            "requirements-runtime.txt", "wheelhouse", "DroidWebDisplay.ps1", "DroidWebDisplay.sh",
+            "migrate_runtime_state", "DroidWebDisplay-LICENSE.txt", "scrcpy-LICENSE.txt",
             "PurgeData", "--purge-data", "Android Platform-Tools",
         )) else "FAIL",
         "targets": ["windows", "linux", "source"],

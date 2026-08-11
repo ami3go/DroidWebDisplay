@@ -32,8 +32,8 @@ export class TransferController {
         const currentUpload = this.elements.uploadDirectory.value;
         this.elements.uploadDirectory.replaceChildren();
         const inbox = document.createElement("option");
-        inbox.value = "/sdcard/Download/GptBridgeInbox";
-        inbox.textContent = "Internal storage · Download · GptBridgeInbox";
+        inbox.value = "/sdcard/Download/DroidWebDisplayInbox";
+        inbox.textContent = "Internal storage · Download · DroidWebDisplayInbox";
         this.elements.uploadDirectory.append(inbox);
         for (const root of roots.roots) {
             const rootOption = document.createElement("option");
@@ -146,8 +146,8 @@ export class TransferController {
         const currentUpload = this.elements.uploadDirectory.value;
         this.elements.uploadDirectory.replaceChildren();
         const inbox = document.createElement("option");
-        inbox.value = "/sdcard/Download/GptBridgeInbox";
-        inbox.textContent = "Internal storage · Download · GptBridgeInbox";
+        inbox.value = "/sdcard/Download/DroidWebDisplayInbox";
+        inbox.textContent = "Internal storage · Download · DroidWebDisplayInbox";
         this.elements.uploadDirectory.append(inbox);
         for (const root of roots.roots) {
             const option = document.createElement("option");

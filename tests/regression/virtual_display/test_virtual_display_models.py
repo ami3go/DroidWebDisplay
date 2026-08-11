@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from gpt_bridge.models import (
+from droid_web_display.models import (
     DisplayImePolicy,
     DisplayMode,
     SessionOptions,
@@ -10,14 +10,14 @@ from gpt_bridge.models import (
     VirtualDisplaySizeMode,
     VIRTUAL_DISPLAY_PROFILES,
 )
-from gpt_bridge.scrcpy.command import build_server_arguments
-from gpt_bridge.scrcpy.virtual_display import (
+from droid_web_display.scrcpy.command import build_server_arguments
+from droid_web_display.scrcpy.virtual_display import (
     apply_device_virtual_display_compatibility,
     classify_virtual_display_failure,
     parse_new_display_line,
     virtual_display_capabilities,
 )
-from gpt_bridge.models import AndroidDevice
+from droid_web_display.models import AndroidDevice
 
 
 def test_recommended_profile_and_server_mapping() -> None:

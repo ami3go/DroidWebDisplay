@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
-from gpt_bridge.transfers.manager import TransferManager
-from gpt_bridge.transfers.models import TransferState
-from gpt_bridge.transfers.monitor import AutoDownloadConfig, AutoDownloadMonitor
+from droid_web_display.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
+from droid_web_display.transfers.manager import TransferManager
+from droid_web_display.transfers.models import TransferState
+from droid_web_display.transfers.monitor import AutoDownloadConfig, AutoDownloadMonitor
 
 
 class FakeAdb:
@@ -80,7 +80,7 @@ async def wait_completed(manager: TransferManager) -> None:
 @pytest.mark.asyncio
 async def test_new_stable_file_downloads_once_and_persists(tmp_path: Path, monkeypatch) -> None:
     clock = [100.0]
-    monkeypatch.setattr("gpt_bridge.transfers.monitor.time.time", lambda: clock[0])
+    monkeypatch.setattr("droid_web_display.transfers.monitor.time.time", lambda: clock[0])
     sync = FakeSync()
     sync.put("/sdcard/Download/existing.txt", b"existing", 1)
     adb = FakeAdb(sync)
@@ -128,7 +128,7 @@ async def test_new_stable_file_downloads_once_and_persists(tmp_path: Path, monke
 @pytest.mark.asyncio
 async def test_changing_and_partial_files_are_not_pulled_prematurely(tmp_path: Path, monkeypatch) -> None:
     clock = [10.0]
-    monkeypatch.setattr("gpt_bridge.transfers.monitor.time.time", lambda: clock[0])
+    monkeypatch.setattr("droid_web_display.transfers.monitor.time.time", lambda: clock[0])
     sync = FakeSync()
     adb = FakeAdb(sync)
     manager = TransferManager(adb, sync, data_directory=tmp_path / "data", destination_profiles={"default-downloads": tmp_path / "downloads"})  # type: ignore[arg-type]
@@ -154,7 +154,7 @@ async def test_changing_and_partial_files_are_not_pulled_prematurely(tmp_path: P
 @pytest.mark.asyncio
 async def test_delete_after_verified_success_only(tmp_path: Path, monkeypatch) -> None:
     clock = [50.0]
-    monkeypatch.setattr("gpt_bridge.transfers.monitor.time.time", lambda: clock[0])
+    monkeypatch.setattr("droid_web_display.transfers.monitor.time.time", lambda: clock[0])
     sync = FakeSync()
     sync.put("/sdcard/Download/delete-me.txt", b"verified", 5)
     adb = FakeAdb(sync)
@@ -181,7 +181,7 @@ async def test_delete_after_verified_success_only(tmp_path: Path, monkeypatch) -
 @pytest.mark.asyncio
 async def test_pc_to_android_uploads_stable_files_and_prevents_bounce(tmp_path: Path, monkeypatch) -> None:
     clock = [200.0]
-    monkeypatch.setattr("gpt_bridge.transfers.monitor.time.time", lambda: clock[0])
+    monkeypatch.setattr("droid_web_display.transfers.monitor.time.time", lambda: clock[0])
     sync = FakeSync()
     adb = FakeAdb(sync)
     downloads = tmp_path / "downloads"

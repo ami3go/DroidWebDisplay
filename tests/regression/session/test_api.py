@@ -2,12 +2,12 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from gpt_bridge.adb.client import AdbClient
-from gpt_bridge.api import create_app
-from gpt_bridge.config import BridgeConfig
-from gpt_bridge.models import AndroidDevice
-from gpt_bridge.scrcpy.artifact import ScrcpyArtifact
-from gpt_bridge.scrcpy.session import SessionManager
+from droid_web_display.adb.client import AdbClient
+from droid_web_display.api import create_app
+from droid_web_display.config import BridgeConfig
+from droid_web_display.models import AndroidDevice
+from droid_web_display.scrcpy.artifact import ScrcpyArtifact
+from droid_web_display.scrcpy.session import SessionManager
 from tests.regression.session.fakes import FakeAdb
 
 
@@ -46,4 +46,4 @@ def test_health_and_device_api(tmp_path: Path) -> None:
 def test_api_creation_is_lazy_when_server_artifact_is_missing(tmp_path: Path) -> None:
     config = BridgeConfig(repo_root=tmp_path, authentication_required=False)
     app = create_app(config=config, adb=AdbClient("missing-adb-for-test"))
-    assert app.title == "Gpt-Bridge Local Service"
+    assert app.title == "DroidWebDisplay Local Service"

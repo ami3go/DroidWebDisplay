@@ -3,7 +3,7 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gpt-bridge-scrcpy"
+name = "droid-web-display"
 version = "0.11.2"
 description = "Browser Android bridge with PC-local PIN authentication and trusted sessions"
 requires-python = ">=3.11"
@@ -27,7 +27,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["gpt_bridge*"]
+include = ["droid_web_display*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

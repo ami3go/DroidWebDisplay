@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from gpt_bridge.evidence import validate_virtual_display_browser_evidence
+from droid_web_display.evidence import validate_virtual_display_browser_evidence
 
 
 def _valid_evidence() -> dict:

@@ -1,5 +1,5 @@
 import { inspectBrowserCapabilities } from "./browser-support.js";
-import { GptBridgeController } from "./controller.js";
+import { DroidWebDisplayController } from "./controller.js";
 import { AutoDownloadController } from "./auto-download-controller.js";
 import { TransferController } from "./transfer-controller.js";
 import { RunningAppController } from "./running-app-controller.js";
@@ -128,7 +128,7 @@ async function bootstrap(): Promise<void> {
       audioToggle.disabled = true;
       audioStatus.textContent = `Audio unsupported by this browser. Missing: ${capabilities.missingAudio.join(", ")}.`;
     }
-    const controller = new GptBridgeController({
+    const controller = new DroidWebDisplayController({
       device: required<HTMLSelectElement>("#device"),
       refresh: required<HTMLButtonElement>("#refresh"),
       connect: required<HTMLButtonElement>("#connect"),

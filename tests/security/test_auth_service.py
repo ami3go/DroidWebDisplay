@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.auth import AuthError, AuthService, TRUST_DURATIONS
+from droid_web_display.auth import AuthError, AuthService, TRUST_DURATIONS
 
 
 class MutableClock:

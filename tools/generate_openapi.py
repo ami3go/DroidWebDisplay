@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.api import create_app
-from gpt_bridge.config import BridgeConfig
+from droid_web_display.api import create_app
+from droid_web_display.config import BridgeConfig
 
 
 def render(repo_root: Path) -> str:
@@ -24,7 +24,7 @@ def render(repo_root: Path) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate or verify the Gpt-Bridge OpenAPI document")
+    parser = argparse.ArgumentParser(description="Generate or verify the DroidWebDisplay OpenAPI document")
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")

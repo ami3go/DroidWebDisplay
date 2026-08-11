@@ -1,4 +1,4 @@
-import type { ControlMessage, Position } from "@gpt-bridge/scrcpy-protocol";
+import type { ControlMessage, Position } from "@droid-web-display/scrcpy-protocol";
 
 const ControlMessageType = {
   InjectKeycode: 0,

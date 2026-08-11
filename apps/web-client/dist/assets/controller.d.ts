@@ -57,7 +57,7 @@ interface Elements {
     readonly capability: HTMLElement;
     readonly restoreProfile: HTMLButtonElement;
 }
-export declare class GptBridgeController {
+export declare class DroidWebDisplayController {
     #private;
     private readonly elements;
     constructor(elements: Elements);

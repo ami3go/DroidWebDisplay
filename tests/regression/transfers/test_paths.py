@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.errors import TransferValidationError
-from gpt_bridge.transfers.models import DuplicatePolicy
-from gpt_bridge.transfers.paths import join_android_path, normalize_android_path, resolve_duplicate, sanitize_filename
+from droid_web_display.errors import TransferValidationError
+from droid_web_display.transfers.models import DuplicatePolicy
+from droid_web_display.transfers.paths import join_android_path, normalize_android_path, resolve_duplicate, sanitize_filename
 
 
 def test_android_paths_are_restricted_to_shared_storage() -> None:

@@ -1,4 +1,4 @@
-import { extractH264DecoderConfiguration, } from "@gpt-bridge/scrcpy-protocol";
+import { extractH264DecoderConfiguration, } from "@droid-web-display/scrcpy-protocol";
 export class WebCodecsVideoRenderer {
     canvas;
     onStatistics;

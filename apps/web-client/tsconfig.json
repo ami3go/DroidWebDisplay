@@ -19,7 +19,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@gpt-bridge/scrcpy-protocol": [
+      "@droid-web-display/scrcpy-protocol": [
         "../../packages/scrcpy-protocol/dist/src/index.d.ts"
       ]
     }

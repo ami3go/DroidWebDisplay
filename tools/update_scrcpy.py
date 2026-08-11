@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gpt_bridge.upstream_update.build import build_matching_server
-from gpt_bridge.upstream_update.compatibility import generate_compatibility_report, register_experimental_adapter
-from gpt_bridge.upstream_update.git import (
+from droid_web_display.upstream_update.build import build_matching_server
+from droid_web_display.upstream_update.compatibility import generate_compatibility_report, register_experimental_adapter
+from droid_web_display.upstream_update.git import (
     checkout_clean_revision,
     clone_repository,
     current_commit,
@@ -26,9 +26,9 @@ from gpt_bridge.upstream_update.git import (
     is_repository,
     resolve_commit,
 )
-from gpt_bridge.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
-from gpt_bridge.upstream_update.patches import discover_patch_series
-from gpt_bridge.upstream_update.scaffold import scaffold_adapter
+from droid_web_display.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
+from droid_web_display.upstream_update.patches import discover_patch_series
+from droid_web_display.upstream_update.scaffold import scaffold_adapter
 
 
 def _load_manifest(root: Path) -> dict[str, Any]:

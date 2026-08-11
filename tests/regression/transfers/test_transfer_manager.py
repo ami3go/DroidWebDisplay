@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from gpt_bridge.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
-from gpt_bridge.transfers.manager import TransferManager
-from gpt_bridge.transfers.models import DuplicatePolicy, TransferState
+from droid_web_display.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
+from droid_web_display.transfers.manager import TransferManager
+from droid_web_display.transfers.models import DuplicatePolicy, TransferState
 
 
 class FakeAdb:

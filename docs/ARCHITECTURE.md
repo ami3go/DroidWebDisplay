@@ -70,7 +70,7 @@ POST /api/v1/auth/setup
 POST /api/v1/auth/login
 ```
 
-All other `/api/v1/*` endpoints require a valid trusted-session cookie. State-changing requests also require the session-specific `X-Gpt-Bridge-CSRF` header. Browser Origin is checked when supplied.
+All other `/api/v1/*` endpoints require a valid trusted-session cookie. State-changing requests also require the session-specific `X-DroidWebDisplay-CSRF` header. Browser Origin is checked when supplied.
 
 ## WebSocket protection
 

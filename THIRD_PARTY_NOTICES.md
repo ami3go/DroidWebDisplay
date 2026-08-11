@@ -50,7 +50,7 @@ FastAPI multipart form parsing for browser uploads. Licensed under Apache-2.0.
 ## Android SDK Platform-Tools (optional release component)
 
 - Provider: Google LLC
-- Component used by Gpt-Bridge: `adb`
+- Component used by DroidWebDisplay: `adb`
 - Distribution: Android SDK Platform-Tools
 - License: Android Software Development Kit License Agreement
 

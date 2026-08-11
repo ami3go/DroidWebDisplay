@@ -1,11 +1,11 @@
-import { ControlMessageType, DeviceMessageType, ScrcpyV41Adapter, } from "@gpt-bridge/scrcpy-protocol";
+import { ControlMessageType, DeviceMessageType, ScrcpyV41Adapter, } from "@droid-web-display/scrcpy-protocol";
 import { BridgeApi } from "./api.js";
 import { alignedFlexSize, buildSessionRequest, validateDisplayForm, VIRTUAL_DISPLAY_PROFILES, } from "./display-config.js";
 import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
-export class GptBridgeController {
+export class DroidWebDisplayController {
     elements;
     #api = new BridgeApi();
     #adapter = new ScrcpyV41Adapter();
@@ -879,17 +879,17 @@ export class GptBridgeController {
         };
     }
     saveBrowserSettings() {
-        localStorage.setItem("gpt-bridge-settings-v1", JSON.stringify(this.browserSettings()));
+        localStorage.setItem("droidwebdisplay-settings-v1", JSON.stringify(this.browserSettings()));
     }
     restoreBrowserSettings() {
         try {
-            const raw = localStorage.getItem("gpt-bridge-settings-v1");
+            const raw = localStorage.getItem("droidwebdisplay-settings-v1");
             if (!raw)
                 return;
             this.applyImportedSettings(JSON.parse(raw));
         }
         catch {
-            localStorage.removeItem("gpt-bridge-settings-v1");
+            localStorage.removeItem("droidwebdisplay-settings-v1");
         }
     }
     applyImportedSettings(value) {
@@ -929,7 +929,7 @@ export class GptBridgeController {
         this.applyWorkspaceLayout();
     }
     exportSettings() {
-        this.downloadJson("gpt-bridge-settings.json", this.browserSettings());
+        this.downloadJson("droidwebdisplay-settings.json", this.browserSettings());
         this.elements.settingsStatus.textContent = "Settings exported.";
     }
     async importSettings() {
