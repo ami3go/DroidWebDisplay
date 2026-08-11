@@ -32,6 +32,10 @@ jobs:
         working-directory: packages/scrcpy-protocol
       - run: npm ci
         working-directory: apps/web-client
+      - name: Build repaired web distribution
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/native-droidwebdisplay-ui'
+        run: npm run build
+        working-directory: apps/web-client
       - name: Run release gate
         run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
       - name: Verify native served distribution
