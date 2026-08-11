@@ -28,8 +28,19 @@ jobs:
             packages/scrcpy-protocol/package-lock.json
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Apply native UI migration
-        run: python tools/native_ui_migration.py
+      - name: Fix clipboard migration boundary and apply native UI migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/native_ui_migration.py')
+          text = path.read_text(encoding='utf-8')
+          old = '    clipboard = card(html, \'<div class="help-card clipboard-card">\', "</div>")\n'
+          new = '''    clipboard_start = html.index('<div class="help-card clipboard-card">')\n    clipboard_end = html.index('<section class="help-card transfer-section">', clipboard_start)\n    clipboard = html[clipboard_start:clipboard_end].strip()\n'''
+          if old not in text:
+              raise SystemExit('clipboard migration anchor not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          python tools/native_ui_migration.py
       - name: Sync locked Python environment
         run: $HOME/.local/bin/uv sync --locked --extra dev
       - name: Install protocol dependencies
@@ -50,8 +61,12 @@ jobs:
         run: |
           test -f apps/web-client/dist/index.html
           grep -q 'droidwebdisplay-native-single-drawer-v1' apps/web-client/dist/index.html
+          grep -q 'id="clipboard-auto-sync"' apps/web-client/dist/index.html
+          grep -q 'id="clipboard-max-kib"' apps/web-client/dist/index.html
           ! grep -Eqi 'GptBridge|GPT Bridge|Gpt-Bridge|gpt_bridge|gpt-bridge|gptBridge' apps/web-client/dist/index.html
           ! grep -q 'id="workspace-layout"' apps/web-client/dist/index.html
+          ! grep -q '<aside class="sidepanel">' apps/web-client/dist/index.html
+          ! grep -q '<aside class="transfer-panel"' apps/web-client/dist/index.html
       - name: Commit migrated source and generated dist
         run: |
           git config user.name 'github-actions[bot]'
