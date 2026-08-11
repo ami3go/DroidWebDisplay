@@ -1,0 +1,197 @@
+name: One-time DroidWebDisplay rename
+
+on:
+  push:
+    branches: [bootstrap-publish]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Rename project throughout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Remove generated/editor/history artifacts that should never have been published.
+          git rm -r --ignore-unmatch .gptbridge-main-ui-backup .idea gpt_bridge_scrcpy.egg-info
+          git rm --ignore-unmatch .gptbridge-main-ui-integration.json
+
+          # Rename actual source/package namespaces and user-facing asset/installer filenames.
+          if [ -d gpt_bridge ]; then git mv gpt_bridge droid_web_display; fi
+          for root in apps/web-client/static apps/web-client/dist; do
+            if [ -f "$root/gptbridge-main-drawer.css" ]; then git mv "$root/gptbridge-main-drawer.css" "$root/droidwebdisplay-main-drawer.css"; fi
+            if [ -f "$root/gptbridge-main-drawer.js" ]; then git mv "$root/gptbridge-main-drawer.js" "$root/droidwebdisplay-main-drawer.js"; fi
+          done
+          if [ -f packaging/linux/51-gpt-bridge-samsung.rules ]; then git mv packaging/linux/51-gpt-bridge-samsung.rules packaging/linux/51-droidwebdisplay-samsung.rules; fi
+          if [ -f packaging/linux/gpt-bridge.desktop.in ]; then git mv packaging/linux/gpt-bridge.desktop.in packaging/linux/droidwebdisplay.desktop.in; fi
+          if [ -f packaging/linux/gpt-bridge.service.in ]; then git mv packaging/linux/gpt-bridge.service.in packaging/linux/droidwebdisplay.service.in; fi
+          if [ -f packaging/windows/GptBridgeLauncher.cs ]; then git mv packaging/windows/GptBridgeLauncher.cs packaging/windows/DroidWebDisplayLauncher.cs; fi
+
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          replacements = [
+              ("GptBridgeScrcpy", "DroidWebDisplay"),
+              ("Gpt-Bridge", "DroidWebDisplay"),
+              ("GptBridge", "DroidWebDisplay"),
+              ("GPT_BRIDGE", "DROID_WEB_DISPLAY"),
+              ("gpt_bridge_scrcpy", "droid_web_display"),
+              ("gpt-bridge-scrcpy", "droid-web-display"),
+              ("@gpt-bridge", "@droid-web-display"),
+              ("gpt_bridge", "droid_web_display"),
+              ("gptbridge", "droidwebdisplay"),
+              ("gpt-bridge", "droidwebdisplay"),
+          ]
+          binary_suffixes = {
+              ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".gz", ".xz",
+              ".jar", ".exe", ".dll", ".so", ".pyd", ".woff", ".woff2", ".ttf", ".bin", ".b64",
+          }
+          paths = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          changed = 0
+          for raw in paths:
+              if not raw or raw == ".github/workflows/brand-migration.yml":
+                  continue
+              path = Path(raw)
+              if path.suffix.lower() in binary_suffixes or not path.is_file():
+                  continue
+              try:
+                  original = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+              updated = original
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if updated != original:
+                  path.write_text(updated, encoding="utf-8")
+                  changed += 1
+          print(f"Renamed branding/namespace in {changed} tracked text files")
+
+          # Make the README's primary setup path uv-native.
+          readme = Path("README.md")
+          if readme.is_file():
+              text = readme.read_text(encoding="utf-8")
+              text = text.replace(
+                  'python -m venv .venv\n.\\.venv\\Scripts\\Activate.ps1\npython -m pip install -e ".[dev]"',
+                  'uv python install 3.11\nuv sync --locked --extra dev'
+              )
+              text = text.replace('python tools\\download_server.py', 'uv run python tools\\download_server.py')
+              text = text.replace('python tools\\release_gate.py', 'uv run python tools\\release_gate.py')
+              text = text.replace('python tools\\reset_auth.py', 'uv run python tools\\reset_auth.py')
+              text = text.replace('python tools\\reset_network_access.py', 'uv run python tools\\reset_network_access.py')
+              text = text.replace('python tools\\update_scrcpy.py', 'uv run python tools\\update_scrcpy.py')
+              readme.write_text(text, encoding="utf-8")
+
+          # Use uv in CI as the dependency/environment source of truth.
+          Path(".github/workflows/ci.yml").write_text('''name: DroidWebDisplay Release Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+      - run: npm ci
+        working-directory: packages/scrcpy-protocol
+      - run: npm ci
+        working-directory: apps/web-client
+      - name: Run release gate
+        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
+''', encoding="utf-8")
+
+          migration = Path("docs/BRAND_MIGRATION.md")
+          migration.write_text('''# DroidWebDisplay brand migration
+
+The project was renamed from its pre-v0.11.2 Gpt-Bridge/GptBridgeScrcpy identity to **DroidWebDisplay**.
+
+The repository now uses:
+
+- product name: `DroidWebDisplay`
+- Python distribution: `droid-web-display`
+- Python package: `droid_web_display`
+- npm scope: `@droid-web-display`
+- Linux service/desktop prefix: `droidwebdisplay`
+- Windows launcher: `DroidWebDisplay`
+- browser UI assets: `droidwebdisplay-main-drawer.*`
+- Android inbox: `/sdcard/Download/DroidWebDisplayInbox`
+- environment-variable prefix: `DROID_WEB_DISPLAY_`
+
+This is a repository-wide namespace migration. Existing browser trust cookies, browser-local UI preferences, environment-variable names, external Python imports, and automation that used the previous identifiers may need to be recreated or updated after upgrading. Runtime data directories and supported configuration migration remain handled by the existing release migration tooling.
+
+Historical Git commits are intentionally not rewritten; the former name therefore remains visible only in Git history and in this migration note.
+''', encoding="utf-8")
+          PY
+
+          # Refresh the Python lockfile after the distribution/namespace rename.
+          uv lock
+          uv sync --locked --extra dev
+
+          # Rebuild generated protocol/web artifacts and checksums after namespace/asset renames.
+          npm ci --prefix packages/scrcpy-protocol
+          npm run build --prefix packages/scrcpy-protocol
+          npm ci --prefix apps/web-client
+          npm run build --prefix apps/web-client
+
+          # Regenerate OpenAPI from the renamed service metadata and identifiers.
+          uv run python tools/generate_openapi.py
+
+          # Basic source validation before publishing the migration commit.
+          uv run python -m compileall -q droid_web_display tools tests
+          npm run test --prefix packages/scrcpy-protocol
+          npm run test --prefix apps/web-client
+
+          # Remove this one-time workflow from the final repository state.
+          git rm .github/workflows/brand-migration.yml
+
+          # No stale project identifiers may remain except the explicit migration note.
+          if git grep -n -E 'Gpt-Bridge|GptBridge|gpt-bridge|gptbridge|gpt_bridge|GPT_BRIDGE' -- . ':!docs/BRAND_MIGRATION.md' ':!CHANGELOG.md'; then
+            echo 'Stale pre-DroidWebDisplay identifier remains in tracked files.' >&2
+            exit 1
+          fi
+
+          git add -A
+          git status --short
+
+      - name: Commit repository-wide rename
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Rename project to DroidWebDisplay"
+          git push origin HEAD:bootstrap-publish
