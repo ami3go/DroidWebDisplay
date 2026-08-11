@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+node_modules/
+server/scrcpy-server-v4.1
+server/scrcpy-server.manifest.json
+data/
+downloads/
+evidence/release/*.json
+!evidence/release/.gitkeep
+apps/web-client/.dist-stage-*/
+apps/web-client/.dist-backup-*/

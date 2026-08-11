@@ -1,0 +1,27 @@
+name: Current Release Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - run: python -m pip install -e ".[dev]"
+      - run: npm ci
+        working-directory: packages/scrcpy-protocol
+      - run: npm ci
+        working-directory: apps/web-client
+      - run: python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json

@@ -1,0 +1,15 @@
+export declare function concatBytes(...parts: readonly Uint8Array[]): Uint8Array;
+export declare function u16be(value: number): Uint8Array;
+export declare function i16be(value: number): Uint8Array;
+export declare function u32be(value: number): Uint8Array;
+export declare function i32be(value: number): Uint8Array;
+export declare function u64be(value: bigint): Uint8Array;
+export declare function readU16be(data: Uint8Array, offset?: number): number;
+export declare function readI16be(data: Uint8Array, offset?: number): number;
+export declare function readU32be(data: Uint8Array, offset?: number): number;
+export declare function readI32be(data: Uint8Array, offset?: number): number;
+export declare function readU64be(data: Uint8Array, offset?: number): bigint;
+export declare function encodeUtf8Truncated(text: string, maxBytes: number): Uint8Array;
+export declare function encodeLengthPrefixedUtf8(text: string, maxBytes: number, sizeBytes: 1 | 2 | 4): Uint8Array;
+export declare function floatToU16Fixed(value: number): number;
+export declare function floatToI16Fixed(value: number): number;

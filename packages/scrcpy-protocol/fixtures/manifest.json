@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "scrcpyVersion": "4.1",
+  "upstreamCommit": "2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0",
+  "fixtures": [
+    {
+      "file": "truncated-video-header.bin",
+      "sha256": "0b791ed62dfa284b827387f74eb77fb808266f7bae6fb437d5bd64083db3770a",
+      "bytes": 70
+    },
+    {
+      "file": "video-startup-h264.bin",
+      "sha256": "75ddcaae1b908830a16be7e36b326941a60ee897d3e0cfe61e8c9b377c67f871",
+      "bytes": 128
+    },
+    {
+      "file": "zero-packet.bin",
+      "sha256": "5dbab33b6aa644d979ea846a6800bc6cea2e62fbb7a0969d906314d6dee95748",
+      "bytes": 93
+    }
+  ]
+}

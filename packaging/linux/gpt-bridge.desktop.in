@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Gpt-Bridge
+Comment=Open the local Gpt-Bridge browser interface
+Exec=@LAUNCHER@
+Terminal=false
+Categories=Development;Utility;

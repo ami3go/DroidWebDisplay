@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Gpt-Bridge</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "@gpt-bridge/scrcpy-protocol": "/vendor/scrcpy-protocol/src/index.js"
+    }
+  }
+  </script>
+  <!-- GptBridge Main Single Drawer UI v1.0.0 -->
+  <link rel="stylesheet" href="./gptbridge-main-drawer.css" data-gb-main-drawer="css">
+</head>
+<body>
+  <section id="auth-gate" class="auth-gate" aria-label="Gpt-Bridge authentication">
+    <form id="auth-form" class="auth-dialog" autocomplete="off">
+      <p class="eyebrow">PC-LOCAL ACCESS</p>
+      <h1 id="auth-title">Unlock Gpt-Bridge</h1>
+      <p id="auth-explanation">Enter the PIN configured on this PC.</p>
+      <label>PIN
+        <input id="auth-pin" type="password" inputmode="numeric" pattern="[0-9]{4,12}" minlength="4" maxlength="12" autocomplete="current-password" required>
+      </label>
+      <label id="auth-confirm-row" hidden>Confirm PIN
+        <input id="auth-confirm-pin" type="password" inputmode="numeric" pattern="[0-9]{4,12}" minlength="4" maxlength="12" autocomplete="new-password">
+      </label>
+      <label>Trust this browser
+        <select id="auth-duration">
+          <option value="browser-session">Only this browser session</option>
+          <option value="1-hour">1 hour</option>
+          <option value="1-day">1 day</option>
+          <option value="1-week">1 week</option>
+          <option value="1-month">1 month</option>
+          <option value="1-year">1 year</option>
+          <option value="forever">Forever, until revoked</option>
+          <option value="custom">Custom duration</option>
+        </select>
+      </label>
+      <div id="auth-custom-row" class="auth-custom-row" hidden>
+        <label>Duration<input id="auth-custom-value" type="number" min="5" max="3650" value="8"></label>
+        <label>Unit<select id="auth-custom-unit"><option value="minutes">Minutes</option><option value="hours" selected>Hours</option><option value="days">Days</option></select></label>
+      </div>
+      <label>Browser label, optional
+        <input id="auth-label" maxlength="80" placeholder="Workshop PC">
+      </label>
+      <p id="auth-error" class="auth-error" role="alert"></p>
+      <button id="auth-submit" type="submit">Unlock</button>
+      <p class="auth-trust-note">Trust is stored by this local PC service. The Android phone does not remember or authorize this browser.</p>
+    </form>
+  </section>
+  <div id="unsupported" class="unsupported" hidden></div>
+  <main id="app" class="shell" hidden>
+    <header class="topbar">
+      <div class="topbar-brand">
+        <h1>Gpt-Bridge</h1>
+        <span class="eyebrow">LOCAL USB BRIDGE</span>
+      </div>
+      <div class="connection-row">
+        <select id="device" aria-label="Android device"></select>
+        <button id="refresh" class="secondary compact">Refresh</button>
+        <button id="connect" class="compact">Connect</button>
+        <button id="disconnect" class="danger compact" disabled>Disconnect</button>
+        <div id="connection-status" class="connection-status" data-state="disconnected" aria-live="polite" title="Checking browser capabilities…">
+          <span id="status-icon" class="connection-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <circle class="status-ring-track" cx="12" cy="12" r="8.5"></circle>
+              <circle class="status-ring-progress" cx="12" cy="12" r="8.5"></circle>
+              <path class="status-check" d="M8.1 12.1l2.5 2.5 5.4-5.5"></path>
+              <path class="status-offline" d="M9 12h6"></path>
+            </svg>
+          </span>
+          <strong id="status">Starting</strong>
+          <span id="details" class="visually-hidden">Checking browser capabilities…</span>
+        </div>
+        <div class="android-control-row" aria-label="Android controls">
+          <button id="back" class="secondary compact" disabled>Back</button>
+          <button id="home" class="secondary compact" disabled>Home</button>
+          <button id="recent" class="secondary compact" disabled>Recent</button>
+          <button id="rotate" class="secondary compact" disabled>Rotate</button>
+          <button id="power" class="secondary compact" disabled>Screen off</button>
+          <button id="fullscreen" class="secondary compact" disabled>Fullscreen</button>
+          <label class="toolbar-layout-control">
+            <span class="visually-hidden">Workspace layout</span>
+            <select id="workspace-layout" aria-label="Workspace layout" title="Workspace layout">
+              <option value="auto">Automatic</option>
+              <option value="screen">Screen focus</option>
+              <option value="compact">Compact panels</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <aside class="sidepanel">
+        <section class="help-card display-mode-card">
+          <h2>Display mode</h2>
+          <label>Mode
+            <select id="display-mode">
+              <option value="physical">Phone screen</option>
+              <option value="virtual">Virtual secondary display</option>
+            </select>
+          </label>
+          <p id="display-summary">Mirrors Android display 0. This remains the default compatibility mode.</p>
+          <div id="virtual-display-settings" class="virtual-display-settings" hidden>
+            <label>Profile
+              <select id="display-profile"></select>
+            </label>
+            <button id="restore-profile" type="button" class="secondary">Restore profile settings</button>
+            <div class="three-field-row">
+              <label>Width<input id="virtual-width" type="number" min="640" max="3840" step="16" value="1600"></label>
+              <label>Height<input id="virtual-height" type="number" min="480" max="2160" step="16" value="900"></label>
+              <label>DPI<input id="virtual-dpi" type="number" min="120" max="640" value="240"></label>
+            </div>
+            <label>Sizing
+              <select id="virtual-size-mode">
+                <option value="fixed">Fixed</option>
+                <option value="flex">Flexible with browser window</option>
+              </select>
+            </label>
+            <label>Installed application
+              <select id="virtual-app"><option value="">Manual package / no app</option></select>
+            </label>
+            <label>Application package
+              <input id="virtual-app-package" value="com.openai.chatgpt" spellcheck="false">
+            </label>
+            <div class="two-field-row">
+              <label>Bitrate, Mbps<input id="virtual-bitrate" type="number" min="2" max="50" step="1" value="12"></label>
+              <label>Maximum FPS<input id="virtual-max-fps" type="number" min="15" max="120" step="1" value="60"></label>
+            </div>
+            <label>IME policy
+              <select id="virtual-ime-policy">
+                <option value="local">Local virtual-display keyboard</option>
+                <option value="default">Android default</option>
+                <option value="fallback">Fallback physical display</option>
+              </select>
+            </label>
+            <div class="checkbox-stack">
+              <label><input id="virtual-hide-keyboard" type="checkbox"> Hide Android on-screen keyboard on virtual display</label>
+              <p class="virtual-keyboard-note">Virtual display only. Phone screen mode keeps the normal Android keyboard behavior.</p>
+              <label><input id="virtual-keep-active" type="checkbox" checked> Keep virtual display active</label>
+              <label><input id="virtual-system-decorations" type="checkbox" checked> Show system decorations</label>
+              <label><input id="virtual-destroy-content" type="checkbox" checked> Destroy content on close</label>
+              <label><input id="virtual-preserve-aspect" type="checkbox" checked> Preserve aspect ratio in flex mode</label>
+              <label><input id="virtual-force-stop" type="checkbox"> Force-stop application before launch</label>
+            </div>
+            <p id="virtual-capability" class="capability-text">Select an authorized device to probe virtual-display support.</p>
+          </div>
+        </section>
+
+        <section class="help-card phase9-session-card" aria-label="Audio and reconnect settings">
+          <div class="section-heading"><h2>Audio</h2></div>
+          <label class="toggle-row"><input id="audio-enabled" type="checkbox"> Enable Android audio</label>
+          <p class="audio-note">Browser audio may have interruptions or delay. Video and control remain active.</p>
+          <div class="audio-controls">
+            <button id="audio-mute" type="button" class="secondary" disabled>Mute</button>
+            <label>Volume<input id="audio-volume" type="range" min="0" max="100" value="100" disabled></label>
+          </div>
+          <p id="audio-status" class="running-app-status">Audio disabled.</p>
+          <label class="toggle-row"><input id="auto-reconnect" type="checkbox" checked> Reconnect after temporary disconnect</label>
+          <label>Maximum reconnect attempts
+            <select id="reconnect-attempts"><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select>
+          </label>
+          <button id="reconnect" type="button" class="secondary" disabled>Reconnect</button>
+          <p id="session-channels" class="running-app-status">No active channels.</p>
+        </section>
+
+        <section id="security-card" class="help-card security-card" hidden>
+          <div class="section-heading">
+            <h2>PC-local access</h2>
+            <button id="auth-refresh-sessions" type="button" class="secondary compact">Refresh</button>
+          </div>
+          <p id="auth-session-summary">Authenticated session</p>
+          <p class="auth-trust-note">These trusted sessions belong to this PC-local bridge. They are not stored or approved by the Android phone.</p>
+          <div id="auth-session-list" class="trusted-session-list"></div>
+          <button id="auth-logout" type="button" class="secondary">Forget this browser</button>
+          <details>
+            <summary>Change PIN</summary>
+            <div class="security-form">
+              <label>Current PIN<input id="auth-current-pin" type="password" inputmode="numeric" maxlength="12"></label>
+              <label>New PIN<input id="auth-new-pin" type="password" inputmode="numeric" maxlength="12"></label>
+              <label>Confirm new PIN<input id="auth-confirm-new-pin" type="password" inputmode="numeric" maxlength="12"></label>
+              <button id="auth-change-pin" type="button">Change PIN and revoke all sessions</button>
+            </div>
+          </details>
+          <details>
+            <summary>Revoke all trusted sessions</summary>
+            <div class="security-form">
+              <label>Current PIN<input id="auth-revoke-all-pin" type="password" inputmode="numeric" maxlength="12"></label>
+              <button id="auth-revoke-all" type="button" class="danger">Revoke all sessions</button>
+            </div>
+          </details>
+          <p id="auth-security-status" class="running-app-status">Session protection active.</p>
+        </section>
+
+        <section id="network-card" class="help-card network-access-card" hidden aria-label="Network access settings">
+          <div class="section-heading">
+            <h2>Network access</h2>
+            <span id="network-mode-badge" class="network-mode-badge">Local only</span>
+          </div>
+          <p id="network-warning" class="network-warning" hidden>LAN access exposes Android video, controls and configured file transfers to approved devices on your private network. HTTPS and PIN authentication are mandatory.</p>
+          <label>Access mode
+            <select id="network-mode">
+              <option value="local-only">Local PC only</option>
+              <option value="lan-https">Private LAN with HTTPS</option>
+            </select>
+          </label>
+          <div id="network-lan-fields" class="network-lan-fields" hidden>
+            <label>Network interface
+              <select id="network-interface"><option value="">Select an active private interface</option></select>
+            </label>
+            <label>Bind address<input id="network-bind-address" readonly></label>
+            <label>Allowed clients<input id="network-allowed-networks" placeholder="192.168.1.0/24"></label>
+            <label>Hostname, optional<input id="network-hostname" placeholder="workshop-pc"></label>
+            <label>TLS certificate
+              <select id="network-certificate-source">
+                <option value="generated">Generate automatically</option>
+                <option value="existing">Use existing certificate</option>
+              </select>
+            </label>
+            <div id="network-existing-certificate" hidden>
+              <label>Certificate path<input id="network-certificate-path" placeholder="C:\certs\gpt-bridge-cert.pem"></label>
+              <label>Private-key path<input id="network-private-key-path" type="password" placeholder="C:\certs\gpt-bridge-key.pem"></label>
+            </div>
+            <label id="network-validity-row">Generated certificate validity
+              <select id="network-certificate-validity"><option value="90">90 days</option><option value="365" selected>1 year</option><option value="730">2 years</option></select>
+            </label>
+            <label class="toggle-row"><input id="network-manage-firewall" type="checkbox"> Manage a private-profile Windows Firewall rule</label>
+          </div>
+          <label>Port<input id="network-port" type="number" min="1" max="65535" value="8765"></label>
+          <label>Current PIN<input id="network-current-pin" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password"></label>
+          <div class="network-actions">
+            <button id="network-validate" type="button" class="secondary">Validate</button>
+            <button id="network-apply" type="button">Apply and restart</button>
+            <button id="network-disable" type="button" class="danger">Disable LAN</button>
+          </div>
+          <div class="network-secondary-actions">
+            <button id="network-copy-url" type="button" class="secondary compact">Copy LAN URL</button>
+            <a id="network-download-certificate" class="button-link secondary compact" href="/api/v1/network/certificate/public" download>Download certificate</a>
+          </div>
+          <p id="network-url" class="network-url">http://127.0.0.1:8765</p>
+          <p id="network-status" class="running-app-status">Local-only access is active.</p>
+          <p class="network-recovery-note">Recovery: <code>python tools\reset_network_access.py --local-only</code></p>
+        </section>
+
+        <section class="help-card running-app-card" aria-label="Running Android applications">
+          <div class="section-heading running-app-heading">
+            <h2>Running apps</h2>
+            <button id="running-app-refresh" type="button" class="secondary compact">Refresh</button>
+          </div>
+          <p>Choose a running Android application with a graphical activity and bring it onto the active virtual display.</p>
+          <label>Application
+            <select id="running-app-select">
+              <option value="">No GUI applications detected</option>
+            </select>
+          </label>
+          <button id="running-app-move" type="button" disabled>Move to virtual display</button>
+          <p id="running-app-status" class="running-app-status">Start a virtual display to enable task relocation.</p>
+        </section>
+
+<section class="help-card settings-card">
+          <h2>Settings</h2>
+          <p>Export or restore browser-side display, audio, clipboard, reconnect and layout preferences.</p>
+          <input id="settings-file" type="file" accept="application/json,.json" hidden>
+          <div class="two-button-row uniform-buttons"><button id="settings-export" type="button" class="secondary">Export</button><button id="settings-import" type="button" class="secondary">Import</button></div>
+          <p id="settings-status" class="running-app-status">Settings are stored in this browser.</p>
+        </section>
+        <section class="help-card statistics-card">
+          <h2>Statistics</h2>
+          <div id="statistics" class="statistics">No video statistics</div>
+        </section>
+      </aside>
+
+      <section id="stage" class="stage" aria-label="Android display">
+        <canvas id="screen" tabindex="0" aria-label="Mirrored Android screen"></canvas>
+        <div class="stage-hint">Connect an authorized Android phone over USB</div>
+      </section>
+
+      <aside class="transfer-panel" aria-label="File transfer">
+        <div class="help-card clipboard-card">
+          <h2>Clipboard and text</h2>
+          <p>First click the text field inside the mirrored Android screen. The primary button reads the PC clipboard. If browser permission is blocked, paste text into the box below.</p>
+          <textarea id="clipboard-text" rows="4" placeholder="Clipboard text" disabled></textarea>
+          <div class="clipboard-actions">
+            <button id="clipboard" aria-label="Paste PC clipboard to Android" title="Paste PC clipboard" disabled>Paste</button>
+            <button id="clipboard-text-paste" class="secondary" aria-label="Type text into Android" title="Type text into Android" disabled>Type</button>
+            <button id="clipboard-copy-android" class="secondary" aria-label="Copy Android clipboard to PC" title="Copy Android clipboard" disabled>Copy</button>
+          </div>
+          <label class="toggle-row"><input id="clipboard-auto-sync" type="checkbox"> Automatic clipboard synchronization</label>
+          <p class="clipboard-sync-note">Automatic sync mirrors clipboard content only; it never pastes into the focused Android field.</p>
+          <label>Maximum clipboard size, KiB<input id="clipboard-max-kib" type="number" min="1" max="256" value="256"></label>
+          <p>With the Android screen focused, Ctrl+V pastes and Ctrl+C copies the Android selection. Clipboard text is never written to diagnostics.</p>
+        </div>
+
+        <section class="help-card transfer-section">
+          <h2>Upload to Android</h2>
+          <p>Files are transferred through structured ADB Sync. The PC does not need Internet access.</p>
+          <input id="upload-file" type="file" multiple>
+          <input id="context-upload-file" type="file" multiple hidden>
+          <label>Android destination
+            <select id="upload-directory">
+              <option value="/sdcard/Download/GptBridgeInbox">GptBridgeInbox</option>
+              <option value="/sdcard/Download">Internal storage · Download</option>
+              <option value="/sdcard/Documents">Internal storage · Documents</option>
+              <option value="/sdcard/Pictures">Internal storage · Pictures</option>
+            </select>
+          </label>
+          <label>Duplicate handling
+            <select id="duplicate-policy">
+              <option value="rename">Rename safely</option>
+              <option value="overwrite">Overwrite</option>
+              <option value="fail">Fail</option>
+            </select>
+          </label>
+          <div class="two-button-row uniform-buttons"><button id="upload-file-button">Upload</button><button id="open-upload-folder" class="secondary">Browse</button></div>
+        </section>
+
+        <section class="help-card transfer-section storage-browser">
+          <div class="section-heading">
+            <h2>Android File Explorer</h2>
+            <span>Double-click to open · Right-click for actions</span>
+          </div>
+          <div class="explorer-toolbar">
+            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
+            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
+            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
+          </div>
+          <label>Storage location
+            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
+          </label>
+          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
+          <div class="explorer-options">
+            <label>PC destination
+              <select id="destination-profile"></select>
+            </label>
+            <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>
+          </div>
+          <div class="explorer-frame" role="table" aria-label="Android files">
+            <div class="explorer-header" role="row">
+              <div class="explorer-cell select-cell"><input id="storage-select-all" type="checkbox" aria-label="Select all files"></div>
+              <button type="button" class="explorer-header-button name-cell" data-storage-sort="name" data-label="Name" aria-sort="ascending">Name ▲</button>
+              <button type="button" class="explorer-header-button size-cell" data-storage-sort="size" data-label="Size" aria-sort="none">Size</button>
+              <button type="button" class="explorer-header-button modified-cell" data-storage-sort="modified" data-label="Modified" aria-sort="none">Modified</button>
+              <div class="explorer-cell menu-cell" aria-hidden="true"></div>
+            </div>
+            <div id="storage-body" class="storage-list explorer-body" role="rowgroup"><p class="empty-state">Select a device.</p></div>
+          </div>
+          <p class="explorer-help">Right-click a file to download it. Right-click a folder or empty space to upload files into that Android folder.</p>
+        </section>
+
+        <div id="storage-context-menu" class="context-menu" role="menu" tabindex="-1" hidden>
+          <button id="context-open" type="button" role="menuitem">Open folder</button>
+          <button id="context-download" type="button" role="menuitem">Download</button>
+          <button id="context-upload" type="button" role="menuitem">Upload to current folder</button>
+          <div class="context-separator" role="separator"></div>
+          <button id="context-refresh" type="button" role="menuitem">Refresh</button>
+        </div>
+
+        <section class="help-card transfer-section auto-download-card">
+          <div class="section-heading"><h2>Automatic two-way folder sync</h2><span id="auto-download-status">Disabled</span></div>
+          <p>Watch one Android folder and one PC folder. Stable Android files can download to the PC, and stable PC files can upload to Android. Monitoring is non-recursive and both directions are disabled by default.</p>
+          <div class="checkbox-stack sync-direction-options">
+            <label><input id="auto-download-enabled" type="checkbox"> Android → PC automatic download</label>
+            <label><input id="auto-upload-enabled" type="checkbox"> PC → Android automatic upload</label>
+          </div>
+          <label>Android folder
+            <select id="auto-download-source"><option value="/sdcard/Download">Internal storage · Download</option></select>
+          </label>
+          <label>PC watched folder
+            <select id="auto-download-destination"></select>
+          </label>
+          <label>PC → Android duplicate handling
+            <select id="auto-upload-duplicate">
+              <option value="overwrite" selected>Overwrite same-name file</option>
+              <option value="rename">Rename safely</option>
+              <option value="fail">Fail</option>
+            </select>
+          </label>
+          <div class="three-field-row">
+            <label>Scan, sec<input id="auto-download-scan" type="number" min="1" max="60" step="1" value="2"></label>
+            <label>Stable, sec<input id="auto-download-stability" type="number" min="1" max="300" step="1" value="3"></label>
+            <label>Checks<input id="auto-download-observations" type="number" min="2" max="20" step="1" value="3"></label>
+          </div>
+          <div class="checkbox-stack">
+            <label><input id="auto-download-existing" type="checkbox"> Download existing Android files on first scan</label>
+            <label><input id="auto-upload-existing" type="checkbox"> Upload existing PC files on first scan</label>
+            <label><input id="auto-download-delete" type="checkbox"> Delete Android source only after verified PC download</label>
+            <label><input id="auto-download-notifications" type="checkbox"> Show browser notifications</label>
+          </div>
+          <p class="sync-safety-note">Files created by one sync direction are fingerprinted so they are not immediately sent back by the other direction.</p>
+          <div class="three-button-row uniform-buttons">
+            <button id="auto-download-save">Save</button>
+            <button id="auto-download-scan-now" class="secondary">Scan now</button>
+            <button id="auto-download-reset" class="secondary">Reset</button>
+          </div>
+          <div id="auto-download-summary" class="monitor-summary">No sync activity.</div>
+          <div id="auto-download-events" class="monitor-events"><p class="empty-state">No automatic transfers yet.</p></div>
+        </section>
+
+        <section class="help-card transfer-section">
+          <div class="section-heading"><h2>Transfer queue</h2><span id="transfer-status">Ready</span></div>
+          <div id="transfer-list" class="transfer-list"><p class="empty-state">No transfers yet.</p></div>
+        </section>
+</aside>
+    </section>
+  </main>
+  <script type="module" src="/assets/main.js"></script>
+  <script defer src="./gptbridge-main-drawer.js" data-gb-main-drawer="js"></script>
+</body>
+</html>

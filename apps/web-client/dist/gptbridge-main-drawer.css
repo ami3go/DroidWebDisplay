@@ -1,0 +1,191 @@
+/* GptBridge Main Single Drawer UI v1.0.0 */
+:root {
+  --gb-rail-w: 56px;
+  --gb-drawer-w: clamp(300px, 25vw, 390px);
+  --gb-ui-bg: color-mix(in srgb, Canvas 94%, transparent);
+  --gb-ui-fg: CanvasText;
+  --gb-ui-border: color-mix(in srgb, CanvasText 18%, transparent);
+  --gb-ui-hover: color-mix(in srgb, CanvasText 9%, transparent);
+  --gb-ui-active: color-mix(in srgb, CanvasText 15%, transparent);
+  --gb-ui-subtle: color-mix(in srgb, CanvasText 62%, transparent);
+  --gb-ui-shadow: 0 12px 38px rgba(0,0,0,.24);
+}
+
+#gb-single-drawer-root {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--gb-rail-w);
+  z-index: 2147483000;
+  pointer-events: none;
+  color: var(--gb-ui-fg);
+  font: 13px/1.25 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#gb-single-drawer-root *, #gb-single-drawer-root *::before, #gb-single-drawer-root *::after { box-sizing: border-box; }
+
+.gb-rail {
+  width: var(--gb-rail-w);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 7px 5px;
+  background: var(--gb-ui-bg);
+  border-right: 1px solid var(--gb-ui-border);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+
+.gb-rail-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-height: 48px;
+  border-radius: 10px;
+  display: grid;
+  grid-template-rows: 22px 14px;
+  place-items: center;
+  padding: 4px 2px;
+  cursor: pointer;
+  opacity: 1;
+}
+.gb-rail-button:hover { background: var(--gb-ui-hover); }
+.gb-rail-button[aria-selected="true"] { background: var(--gb-ui-active); }
+.gb-rail-button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+.gb-rail-icon { font-size: 19px; line-height: 1; }
+.gb-rail-label { font-size: 9px; white-space: nowrap; overflow: hidden; max-width: 48px; }
+.gb-rail-spacer { flex: 1; }
+
+.gb-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--gb-rail-w);
+  width: var(--gb-drawer-w);
+  background: var(--gb-ui-bg);
+  border-right: 1px solid var(--gb-ui-border);
+  box-shadow: var(--gb-ui-shadow);
+  backdrop-filter: blur(14px);
+  transform: translateX(calc(-100% - var(--gb-rail-w)));
+  transition: transform .16s ease-out;
+  pointer-events: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr) auto;
+}
+.gb-drawer.gb-open { transform: translateX(0); }
+
+.gb-drawer-header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 10px 10px 12px;
+  border-bottom: 1px solid var(--gb-ui-border);
+}
+.gb-drawer-title { font-size: 15px; font-weight: 650; flex: 1; }
+.gb-drawer-close, .gb-drawer-action, .gb-drawer-pin {
+  appearance: none;
+  border: 1px solid var(--gb-ui-border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  min-height: 32px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.gb-drawer-close { width: 34px; padding-inline: 0; font-size: 18px; }
+.gb-drawer-pin { display: inline-flex; align-items: center; gap: 5px; }
+.gb-drawer-pin[aria-pressed="true"] { background: var(--gb-ui-active); }
+.gb-drawer-close:hover, .gb-drawer-action:hover, .gb-drawer-pin:hover { background: var(--gb-ui-hover); }
+
+.gb-drawer-body { overflow: auto; padding: 10px; }
+.gb-drawer-slot { display: none; min-width: 0; }
+.gb-drawer-slot.gb-active { display: block; }
+.gb-drawer-slot > * { width: 100% !important; max-width: none !important; margin-inline: 0 !important; }
+.gb-drawer-slot > * + * { margin-top: 10px !important; }
+
+.gb-accordion {
+  width: 100%;
+  margin: 0 !important;
+  border: 1px solid var(--gb-ui-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, Canvas 97%, transparent);
+  overflow: clip;
+}
+.gb-accordion + .gb-accordion { margin-top: 8px !important; }
+.gb-accordion-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+}
+.gb-accordion-summary::-webkit-details-marker { display: none; }
+.gb-accordion-summary:hover { background: var(--gb-ui-hover); }
+.gb-accordion-triangle {
+  display: inline-block;
+  width: 12px;
+  transition: transform .12s ease-out;
+}
+.gb-accordion[open] > .gb-accordion-summary .gb-accordion-triangle { transform: rotate(90deg); }
+.gb-accordion-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gb-accordion > :not(summary) { padding: 0 10px 10px; }
+.gb-accordion > :not(summary).gb-drawer-empty { margin-top: 0 !important; }
+
+.gb-drawer-empty {
+  display: grid;
+  gap: 5px;
+  padding: 16px 12px;
+  border: 1px dashed var(--gb-ui-border);
+  border-radius: 10px;
+  color: var(--gb-ui-subtle);
+}
+.gb-drawer-empty strong { color: var(--gb-ui-fg); }
+.gb-drawer-empty.gb-hidden { display: none; }
+
+.gb-drawer-footer {
+  padding: 9px 10px;
+  border-top: 1px solid var(--gb-ui-border);
+  display: flex;
+  gap: 7px;
+}
+.gb-drawer-footer .gb-drawer-action { flex: 1; }
+
+/* When pinned, the drawer remains visible and the application workspace is
+   shifted instead of being covered by the drawer. */
+html.gb-single-drawer-pinned .gb-drawer { transform: translateX(0); box-shadow: none; }
+html.gb-single-drawer-pinned body {
+  padding-left: calc(var(--gb-rail-w) + var(--gb-drawer-w)) !important;
+}
+html.gb-single-drawer-pinned .gb-drawer-close,
+html.gb-single-drawer-pinned .gb-drawer-footer [data-action="close"] { display: none; }
+
+.gb-single-drawer-workspace { grid-template-columns: minmax(0, 1fr) !important; }
+.gb-empty-side-panel { display: none !important; }
+
+html.gb-single-drawer-enabled:not(.gb-single-drawer-pinned) body { padding-left: var(--gb-rail-w) !important; }
+
+
+@media (max-width: 900px) {
+  :root { --gb-rail-w: 50px; --gb-drawer-w: min(86vw, 360px); }
+  .gb-rail-label { display: none; }
+  .gb-rail-button { grid-template-rows: 1fr; min-height: 44px; }
+  .gb-pin-text { display: none; }
+  /* Pinning on very narrow windows would leave too little space for the
+     remote display, so pinned mode behaves as overlay mode there. */
+  html.gb-single-drawer-pinned body { padding-left: var(--gb-rail-w) !important; }
+  html.gb-single-drawer-pinned .gb-drawer { box-shadow: var(--gb-ui-shadow); }
+}
+
+@media (prefers-reduced-motion: reduce) { .gb-drawer { transition: none; } }
+
+/* Focus is now the only workspace layout. Any old Focus/Auto/Compact selector
+   is activated to Focus by the main drawer script and removed from presentation. */
+html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !important; }

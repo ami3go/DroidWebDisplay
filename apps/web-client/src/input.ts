@@ -1,0 +1,116 @@
+import type { ControlMessage, Position } from "@gpt-bridge/scrcpy-protocol";
+
+const ControlMessageType = {
+  InjectKeycode: 0,
+  InjectText: 1,
+  GetClipboard: 8,
+  SetClipboard: 9,
+} as const;
+
+export interface RectLike {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface ScreenSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+export function mapClientPoint(clientX: number, clientY: number, rect: RectLike, screen: ScreenSize): Position {
+  if (rect.width <= 0 || rect.height <= 0 || screen.width <= 0 || screen.height <= 0) {
+    throw new Error("screen and display dimensions must be positive");
+  }
+  const normalizedX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const normalizedY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+  return {
+    x: Math.min(screen.width - 1, Math.round(normalizedX * (screen.width - 1))),
+    y: Math.min(screen.height - 1, Math.round(normalizedY * (screen.height - 1))),
+    screenWidth: screen.width,
+    screenHeight: screen.height,
+  };
+}
+
+const KEYCODES: Readonly<Record<string, number>> = {
+  Backspace: 67,
+  Enter: 66,
+  Tab: 61,
+  ArrowUp: 19,
+  ArrowDown: 20,
+  ArrowLeft: 21,
+  ArrowRight: 22,
+  Delete: 112,
+  Insert: 124,
+  PageUp: 92,
+  PageDown: 93,
+  Escape: 4,
+};
+
+
+export type ClipboardShortcut = "copy" | "paste" | null;
+
+export function clipboardShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): ClipboardShortcut {
+  if (event.altKey || (!event.ctrlKey && !event.metaKey)) return null;
+  const key = event.key.toLowerCase();
+  if (key === "v") return "paste";
+  if (key === "c") return "copy";
+  return null;
+}
+
+export function androidClipboardCopyMessage(): ControlMessage {
+  return { type: ControlMessageType.GetClipboard, copyKey: 1 } as ControlMessage;
+}
+
+export function keyboardMessages(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "repeat">): ControlMessage[] {
+  if (event.ctrlKey || event.metaKey || event.altKey) return [];
+  if (event.key.length === 1) {
+    return [{ type: ControlMessageType.InjectText, text: event.key }];
+  }
+  const keycode = KEYCODES[event.key];
+  if (keycode === undefined) return [];
+  const metaState = event.shiftKey ? 0x00000001 : 0;
+  return [
+    { type: ControlMessageType.InjectKeycode, action: 0, keycode, repeat: event.repeat ? 1 : 0, metaState },
+    { type: ControlMessageType.InjectKeycode, action: 1, keycode, repeat: 0, metaState },
+  ];
+}
+
+
+export function clipboardMessage(text: string, sequence: bigint, paste: boolean): ControlMessage {
+  return { type: ControlMessageType.SetClipboard, sequence, paste, text };
+}
+
+export function androidKeyPress(keycode: number): ControlMessage[] {
+  return [
+    { type: ControlMessageType.InjectKeycode, action: 0, keycode, repeat: 0, metaState: 0 },
+    { type: ControlMessageType.InjectKeycode, action: 1, keycode, repeat: 0, metaState: 0 },
+  ];
+}
+
+
+export function textInjectionMessages(text: string, maximumUtf8Bytes = 300): ControlMessage[] {
+  if (!Number.isInteger(maximumUtf8Bytes) || maximumUtf8Bytes <= 0) {
+    throw new Error("maximumUtf8Bytes must be a positive integer");
+  }
+  const chunks: string[] = [];
+  let current = "";
+  let currentBytes = 0;
+  const encoder = new TextEncoder();
+  for (const symbol of text) {
+    const bytes = encoder.encode(symbol).byteLength;
+    if (bytes > maximumUtf8Bytes) {
+      throw new Error("A text symbol exceeds the scrcpy injection limit");
+    }
+    if (current && currentBytes + bytes > maximumUtf8Bytes) {
+      chunks.push(current);
+      current = "";
+      currentBytes = 0;
+    }
+    current += symbol;
+    currentBytes += bytes;
+  }
+  if (current) chunks.push(current);
+  return chunks.map((chunk) => ({ type: ControlMessageType.InjectText, text: chunk }));
+}
