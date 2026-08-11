@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from droid_web_display import RELEASE_PHASE
 from droid_web_display.api import create_app
 from droid_web_display.config import BridgeConfig
 from droid_web_display.models import AndroidDevice
@@ -21,7 +22,7 @@ def test_phase4_api_and_static_client(tmp_path: Path) -> None:
     with TestClient(app) as client:
         version = client.get("/api/v1/version")
         assert version.status_code == 200
-        assert version.json()["phase"] == 9
+        assert version.json()["phase"] == RELEASE_PHASE
         support = client.get("/api/v1/browser-support")
         assert support.json()["videoCodec"] == "h264"
         assert support.json()["softwareDecoderFallback"] is False

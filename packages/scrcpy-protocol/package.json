@@ -1,6 +1,6 @@
 {
   "name": "@droid-web-display/scrcpy-protocol",
-  "version": "0.10.1",
+  "version": "0.11.2",
   "private": true,
   "type": "module",
   "description": "Source-traceable scrcpy v4.1 browser protocol adapter",

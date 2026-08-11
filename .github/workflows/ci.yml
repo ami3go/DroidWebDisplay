@@ -27,5 +27,7 @@ jobs:
         working-directory: packages/scrcpy-protocol
       - run: npm ci
         working-directory: apps/web-client
+      - name: Ruff correctness checks
+        run: $HOME/.local/bin/uv run ruff check . --select E9,F63,F7,F82
       - name: Run release gate
         run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
