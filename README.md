@@ -1,4 +1,4 @@
-# DroidWebDisplay scrcpy
+# DroidWebDisplay
 
 Browser control of an Android phone with physical and virtual displays, structured file transfer, two-way watched-folder transfer, running-app relocation, and PIN-protected trusted browser sessions, with optional authenticated private-LAN HTTPS access.
 
@@ -13,12 +13,11 @@ Browser control of an Android phone with physical and virtual displays, structur
 
 ## Windows installation
 
-Copy the verified `scrcpy-server-v4.1` into `server\`, then run:
+Install [uv](https://docs.astral.sh/uv/), copy the verified `scrcpy-server-v4.1` into `server\`, then run:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+uv python install 3.11
+uv sync --locked --extra dev
 .\scripts\service.ps1
 ```
 
@@ -27,13 +26,22 @@ Open `http://127.0.0.1:8765/`.
 The official pinned server can also be downloaded and hash-verified with:
 
 ```powershell
-python tools\download_server.py
+uv run python tools\download_server.py
+```
+
+## Linux / Ubuntu development setup
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install 3.11
+uv sync --locked --extra dev
+./scripts/service.sh
 ```
 
 ## Release gate
 
 ```powershell
-python tools\release_gate.py --output .\evidence\release\gate.json
+uv run python tools\release_gate.py --output .\evidence\release\gate.json
 ```
 
 Or:
@@ -45,7 +53,7 @@ Or:
 Optional browser evidence:
 
 ```powershell
-python tools\release_gate.py `
+uv run python tools\release_gate.py `
   --require-browser-evidence `
   --browser-evidence .\evidence\release\browser.json `
   --output .\evidence\release\gate-complete.json
@@ -58,7 +66,7 @@ The local service provides first-run PIN setup, trusted-browser expiration, indi
 To reset a lost PIN, stop the service and run:
 
 ```powershell
-python tools\reset_auth.py --yes
+uv run python tools\reset_auth.py --yes
 ```
 
 ## Optional private-LAN access
@@ -68,7 +76,7 @@ LAN access is disabled by default. After local authentication, use the **Network
 Emergency recovery:
 
 ```powershell
-python tools\reset_network_access.py --local-only
+uv run python tools\reset_network_access.py --local-only
 ```
 
 See `docs/NETWORK_ACCESS.md`.
@@ -86,13 +94,12 @@ See `docs/NETWORK_ACCESS.md`.
 - `docs/UPSTREAM_UPDATE.md`
 - `docs/NETWORK_ACCESS.md`
 
-
 ## Controlled scrcpy updates
 
 Phase 10 adds an isolated update workflow that keeps the approved v4.1 adapter available while a target upstream revision is inspected, scaffolded, built and evidence-qualified. Start with:
 
 ```powershell
-python tools\update_scrcpy.py --target <tag-or-commit> --version <version> --clone-if-missing --fetch --scaffold-adapter --register
+uv run python tools\update_scrcpy.py --target <tag-or-commit> --version <version> --clone-if-missing --fetch --scaffold-adapter --register
 ```
 
 See `docs/UPSTREAM_UPDATE.md` for inspection, patch, build and promotion commands.
