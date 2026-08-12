@@ -5,6 +5,7 @@ import { TransferController } from "./transfer-controller.js";
 import { RunningAppController } from "./running-app-controller.js";
 import { AuthController } from "./auth-controller.js";
 import { NetworkAccessController } from "./network-controller.js";
+import { ConnectionProfileController } from "./connection-profile-controller.js";
 
 function required<T extends Element>(selector: string): T {
   const value = document.querySelector<T>(selector);
@@ -147,6 +148,7 @@ async function bootstrap(): Promise<void> {
       capability: required<HTMLElement>("#virtual-capability"),
       restoreProfile: required<HTMLButtonElement>("#restore-profile"),
     });
+    const profileController = new ConnectionProfileController();
     const runningAppController = new RunningAppController({
       device: required<HTMLSelectElement>("#device"),
       select: required<HTMLSelectElement>("#running-app-select"),
@@ -203,7 +205,10 @@ async function bootstrap(): Promise<void> {
     });
     window.addEventListener("beforeunload", () => { controller.stopOnUnload(); runningAppController.close(); });
     void controller.initialize()
-      .then(() => Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]))
+      .then(async () => {
+        await profileController.initialize();
+        return Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]);
+      })
       .catch((error: unknown) => {
       required<HTMLElement>("#status").textContent = "Initialization failed";
       required<HTMLElement>("#details").textContent = error instanceof Error ? error.message : String(error);
