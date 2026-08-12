@@ -5,6 +5,12 @@ export interface VirtualDisplayProfile extends VirtualDisplayConfigDto {
     readonly videoBitRate: number;
     readonly maxFps: number;
 }
+export declare const PHYSICAL_DISPLAY_DEFAULTS: Readonly<{
+    videoCodec: "h264";
+    maxSize: 1600;
+    videoBitRate: 10000000;
+    maxFps: 60;
+}>;
 export declare const VIRTUAL_DISPLAY_PROFILES: Readonly<Record<string, VirtualDisplayProfile>>;
 export interface DisplayFormValues {
     readonly displayMode: DisplayMode;

@@ -1,4 +1,28 @@
+export const PHYSICAL_DISPLAY_DEFAULTS = Object.freeze({
+    videoCodec: "h264",
+    maxSize: 1600,
+    videoBitRate: 10_000_000,
+    maxFps: 60,
+});
 export const VIRTUAL_DISPLAY_PROFILES = {
+    "low-latency": {
+        label: "Low Latency — Interactive",
+        profileId: "low-latency",
+        sizeMode: "fixed",
+        width: 1280,
+        height: 720,
+        dpi: 220,
+        startApp: "com.openai.chatgpt",
+        forceStopBeforeLaunch: false,
+        keepActive: true,
+        systemDecorations: true,
+        destroyContentOnClose: true,
+        imePolicy: "local",
+        preserveAspectRatio: true,
+        videoCodec: "h264",
+        videoBitRate: 10_000_000,
+        maxFps: 60,
+    },
     "chatgpt-desktop": {
         label: "ChatGPT Desktop — Recommended",
         profileId: "chatgpt-desktop",
@@ -104,10 +128,7 @@ export function buildSessionRequest(values, serial) {
             video: true,
             audio: false,
             control: true,
-            videoCodec: "h264",
-            maxSize: 1920,
-            videoBitRate: 8_000_000,
-            maxFps: 30,
+            ...PHYSICAL_DISPLAY_DEFAULTS,
         };
     }
     return {

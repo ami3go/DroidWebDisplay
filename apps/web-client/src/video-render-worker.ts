@@ -1,0 +1,105 @@
+type WorkerMessage =
+  | { readonly type: "init"; readonly canvas: OffscreenCanvas }
+  | { readonly type: "resize"; readonly width: number; readonly height: number }
+  | { readonly type: "frame"; readonly frame: VideoFrame }
+  | { readonly type: "clear" };
+
+const workerScope = self as unknown as {
+  postMessage(message: unknown, transfer?: OffscreenCanvas[]): void;
+};
+
+let canvas: OffscreenCanvas | null = null;
+let context: OffscreenCanvasRenderingContext2D | null = null;
+let pendingFrame: VideoFrame | null = null;
+let scheduled = false;
+let dropped = 0;
+
+function closePending(): void {
+  pendingFrame?.close();
+  pendingFrame = null;
+}
+
+function postFatal(error: unknown): void {
+  closePending();
+  scheduled = false;
+  const message = error instanceof Error ? error.message : String(error);
+  const transferable = canvas;
+  context = null;
+  canvas = null;
+  if (transferable) {
+    workerScope.postMessage({ type: "fatal", error: message, canvas: transferable }, [transferable]);
+  } else {
+    workerScope.postMessage({ type: "fatal", error: message });
+  }
+}
+
+function schedulePresent(): void {
+  if (scheduled) return;
+  scheduled = true;
+  setTimeout(presentLatest, 0);
+}
+
+function presentLatest(): void {
+  scheduled = false;
+  const frame = pendingFrame;
+  pendingFrame = null;
+  if (!frame || !canvas || !context) {
+    frame?.close();
+    return;
+  }
+  const startedAt = performance.now();
+  try {
+    context.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    workerScope.postMessage({
+      type: "presented",
+      timestamp: frame.timestamp,
+      presentedAt: performance.timeOrigin + performance.now(),
+      drawMilliseconds: Math.max(0, performance.now() - startedAt),
+      dropped,
+    });
+    dropped = 0;
+  } catch (error) {
+    postFatal(error);
+  } finally {
+    frame.close();
+  }
+  if (pendingFrame && canvas && context) schedulePresent();
+}
+
+self.addEventListener("message", (event: MessageEvent<WorkerMessage>) => {
+  const message = event.data;
+  try {
+    switch (message.type) {
+      case "init":
+        canvas = message.canvas;
+        context = canvas.getContext("2d", { alpha: false, desynchronized: true });
+        if (!context) throw new Error("OffscreenCanvas 2D context is unavailable");
+        workerScope.postMessage({ type: "ready" });
+        break;
+      case "resize":
+        if (!canvas) return;
+        canvas.width = message.width;
+        canvas.height = message.height;
+        break;
+      case "frame":
+        if (!canvas || !context) {
+          message.frame.close();
+          return;
+        }
+        if (pendingFrame) {
+          pendingFrame.close();
+          dropped += 1;
+        }
+        pendingFrame = message.frame;
+        schedulePresent();
+        break;
+      case "clear":
+        closePending();
+        dropped = 0;
+        break;
+    }
+  } catch (error) {
+    if (message.type === "frame") message.frame.close();
+    postFatal(error);
+  }
+});

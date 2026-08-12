@@ -18,6 +18,19 @@ def test_server_arguments_force_forward_and_keep_protocol_metadata() -> None:
     assert options.ordered_channels() == (ChannelName.VIDEO, ChannelName.CONTROL)
 
 
+def test_selected_video_encoder_is_forwarded_without_changing_codec_default() -> None:
+    options = SessionOptions(video_encoder="c2.exynos.avc.encoder", max_size=1280, max_fps=60)
+    args = build_server_arguments("4.1", 0x10203040, options)
+    assert "video_encoder=c2.exynos.avc.encoder" in args
+    assert "video_codec=h264" not in args
+    assert options.to_dict()["videoEncoder"] == "c2.exynos.avc.encoder"
+
+
+def test_invalid_video_encoder_name_is_rejected() -> None:
+    with pytest.raises(ValueError, match="video_encoder"):
+        SessionOptions(video_encoder="not a valid encoder name").validate()
+
+
 def test_invalid_empty_channel_set_is_rejected() -> None:
     with pytest.raises(ValueError, match="At least one"):
         build_server_arguments("4.1", 1, SessionOptions(video=False, audio=False, control=False))

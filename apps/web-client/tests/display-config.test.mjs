@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { alignedFlexSize, buildSessionRequest, validateDisplayForm, VIRTUAL_DISPLAY_PROFILES } from "../dist/assets/display-config.js";
+import {
+  alignedFlexSize,
+  buildSessionRequest,
+  PHYSICAL_DISPLAY_DEFAULTS,
+  validateDisplayForm,
+  VIRTUAL_DISPLAY_PROFILES,
+} from "../dist/assets/display-config.js";
 
 const base = {
   displayMode: "virtual",
@@ -28,6 +34,28 @@ test("recommended virtual-display profile is deterministic", () => {
   assert.equal(profile.startApp, "com.openai.chatgpt");
 });
 
+test("low-latency profile targets 720p at 60 fps", () => {
+  const profile = VIRTUAL_DISPLAY_PROFILES["low-latency"];
+  assert.equal(profile.width, 1280);
+  assert.equal(profile.height, 720);
+  assert.equal(profile.videoBitRate, 10_000_000);
+  assert.equal(profile.maxFps, 60);
+});
+
+test("physical mode uses the exported interactive defaults", () => {
+  assert.deepEqual(PHYSICAL_DISPLAY_DEFAULTS, {
+    videoCodec: "h264",
+    maxSize: 1600,
+    videoBitRate: 10_000_000,
+    maxFps: 60,
+  });
+  const request = buildSessionRequest({ ...base, displayMode: "physical" }, "PHONE");
+  assert.equal(request.videoCodec, PHYSICAL_DISPLAY_DEFAULTS.videoCodec);
+  assert.equal(request.maxSize, PHYSICAL_DISPLAY_DEFAULTS.maxSize);
+  assert.equal(request.videoBitRate, PHYSICAL_DISPLAY_DEFAULTS.videoBitRate);
+  assert.equal(request.maxFps, PHYSICAL_DISPLAY_DEFAULTS.maxFps);
+});
+
 test("virtual-display request maps typed values", () => {
   const request = buildSessionRequest(base, "PHONE");
   assert.equal(request.displayMode, "virtual");
@@ -38,7 +66,7 @@ test("virtual-display request maps typed values", () => {
 });
 
 test("invalid package and dimensions are rejected before API launch", () => {
-  const errors = validateDisplayForm({ ...base, width: 500, startApp: "bad package;rm" });
+  const errors = validateDisplayForm({ ...base, width: 500, startApp: "bad package" });
   assert.ok(errors.some((value) => value.includes("Width")));
   assert.ok(errors.some((value) => value.includes("package")));
 });

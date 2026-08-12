@@ -48,6 +48,8 @@ def build_server_arguments(version: str, scid: int, options: SessionOptions) -> 
 
     if options.video and options.video_codec != "h264":
         args.append(f"video_codec={options.video_codec}")
+    if options.video and options.video_encoder:
+        args.append(f"video_encoder={options.video_encoder}")
     if options.video and options.max_size:
         args.append(f"max_size={options.max_size}")
     if options.video and options.max_fps:

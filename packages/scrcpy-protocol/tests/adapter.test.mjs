@@ -96,3 +96,39 @@ test("audio configuration failure does not abort video or control", async () => 
   await assert.rejects(session.readAudioPacket(), /audio channel is disabled/);
   await session.close();
 });
+
+
+test("rapid touch moves are coalesced and flushed before an ordering barrier", async () => {
+  const written = [];
+  globalThis.__dwdLatencyMetrics = {};
+  const transport = {
+    sessionId: "low-latency-control",
+    openVideoChannel: async () => null,
+    openAudioChannel: async () => null,
+    openControlChannel: async () => ({
+      readable: streamFromChunks(new Uint8Array([0]), deviceName("control-only")),
+      writable: new WritableStream({ write(chunk) { written.push(chunk.slice()); } }),
+    }),
+    close: async () => {},
+  };
+  const session = await new ScrcpyV41Adapter().connect(transport, { video: false, audio: false, control: true });
+  const position = { x: 10, y: 10, screenWidth: 100, screenHeight: 100 };
+  await Promise.all(Array.from({ length: 20 }, (_, index) => session.sendControl({
+    type: ControlMessageType.InjectTouchEvent,
+    action: 2,
+    pointerId: 1n,
+    position: { ...position, x: index },
+    pressure: 1,
+    actionButton: 0,
+    buttons: 1,
+  })));
+  await session.sendControl({ type: ControlMessageType.RotateDevice });
+
+  assert.equal(written.length, 2);
+  assert.equal(written[0][0], ControlMessageType.InjectTouchEvent);
+  assert.equal(written[0][1], 2);
+  assert.equal(written[1][0], ControlMessageType.RotateDevice);
+  assert.ok(globalThis.__dwdLatencyMetrics.controlMovesCoalesced >= 19);
+  await session.close();
+  delete globalThis.__dwdLatencyMetrics;
+});
