@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import contextlib
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from droid_web_display.auth import AuthError, AuthService as _BaseAuthService
 from droid_web_display.errors import TransferValidationError
-from droid_web_display.models import ChannelName, SessionState
+from droid_web_display.models import ChannelName, SessionOptions, SessionState
+from droid_web_display.scrcpy.encoder_tuning import encoder_tuning_store
 from droid_web_display.scrcpy.session import SessionManager as _BaseSessionManager
 from droid_web_display.transfers.manager import TransferManager as _BaseTransferManager
 from droid_web_display.transfers.models import TransferDirection, TransferRecord
@@ -87,7 +89,23 @@ class HardenedTransferManager(_BaseTransferManager):
 
 
 class ResilientSessionManager(_BaseSessionManager):
-    """Keep video/control alive when the optional audio browser channel ends."""
+    """Keep optional channels isolated and apply the measured low-latency encoder."""
+
+    async def start_session(
+        self,
+        *,
+        serial: str | None = None,
+        options: SessionOptions | None = None,
+    ):
+        effective_serial = serial
+        if options is not None and options.video and options.video_encoder is None:
+            if effective_serial is None:
+                selected = await self.select_device(None)
+                effective_serial = selected.serial
+            recommended = encoder_tuning_store().recommended(effective_serial)
+            if recommended:
+                options = replace(options, video_encoder=recommended)
+        return await super().start_session(serial=effective_serial, options=options)
 
     async def stop_session(self, session_id: str, *, reason: str = "requested"):  # type: ignore[override]
         session = self._sessions.get(session_id)
