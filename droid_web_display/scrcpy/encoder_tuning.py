@@ -13,7 +13,7 @@ _CODEC_NAME_RE = re.compile(r"\b(?:OMX|c2)\.[A-Za-z0-9._-]+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
-class EncoderBenchmarkResult:
+class EncoderCompatibilityResult:
     encoder: str
     success: bool
     startup_ms: float | None = None
@@ -23,9 +23,16 @@ class EncoderBenchmarkResult:
         return {
             "encoder": self.encoder,
             "success": self.success,
+            # Retained as diagnostic evidence only. This is not an interactive
+            # latency score and is never used for automatic encoder ranking.
             "startupMs": round(self.startup_ms, 1) if self.startup_ms is not None else None,
             "error": self.error,
         }
+
+
+# Backward-compatible import name for callers created by the initial latency
+# experiment. New code should use EncoderCompatibilityResult.
+EncoderBenchmarkResult = EncoderCompatibilityResult
 
 
 def validate_encoder_name(value: str) -> str:
@@ -69,16 +76,18 @@ class EncoderTuningStore:
     selects an encoder.
     """
 
+    SCHEMA_VERSION = 3
+
     def __init__(self, path: Path | None = None) -> None:
         self.path = path
         self._lock = threading.RLock()
-        self._state: dict[str, Any] = {"schemaVersion": 2, "devices": {}}
+        self._state: dict[str, Any] = {"schemaVersion": self.SCHEMA_VERSION, "devices": {}}
         self._load()
 
     def configure(self, path: Path) -> None:
         with self._lock:
             self.path = path.resolve()
-            self._state = {"schemaVersion": 2, "devices": {}}
+            self._state = {"schemaVersion": self.SCHEMA_VERSION, "devices": {}}
             self._load()
 
     def bind_device(self, serial: str, fingerprint: str | None) -> bool:
@@ -99,7 +108,7 @@ class EncoderTuningStore:
                     "fingerprint": fingerprint,
                     "preference": None,
                     "encoders": [],
-                    "benchmarks": [],
+                    "compatibilityTests": [],
                     "lastInvalidation": "android-build-changed",
                     "invalidatedAt": time.time(),
                 }
@@ -173,17 +182,17 @@ class EncoderTuningStore:
             device["probedAt"] = time.time()
             self._save()
 
-    def benchmark_results(self, serial: str) -> list[EncoderBenchmarkResult]:
+    def compatibility_results(self, serial: str) -> list[EncoderCompatibilityResult]:
         with self._lock:
-            raw = self._device(serial).get("benchmarks", [])
-            results: list[EncoderBenchmarkResult] = []
+            raw = self._device(serial).get("compatibilityTests", [])
+            results: list[EncoderCompatibilityResult] = []
             if not isinstance(raw, list):
                 return results
             for item in raw:
                 if not isinstance(item, dict) or not isinstance(item.get("encoder"), str):
                     continue
                 results.append(
-                    EncoderBenchmarkResult(
+                    EncoderCompatibilityResult(
                         encoder=item["encoder"],
                         success=bool(item.get("success")),
                         startup_ms=float(item["startupMs"]) if item.get("startupMs") is not None else None,
@@ -192,15 +201,23 @@ class EncoderTuningStore:
                 )
             return results
 
-    def set_benchmark_results(self, serial: str, results: list[EncoderBenchmarkResult]) -> None:
+    def set_compatibility_results(self, serial: str, results: list[EncoderCompatibilityResult]) -> None:
         with self._lock:
             device = self._device(serial)
-            device["benchmarks"] = [result.to_dict() for result in results]
+            device["compatibilityTests"] = [result.to_dict() for result in results]
             device["compatibilityTestedAt"] = time.time()
             self._save()
 
+    # Compatibility method names retained for existing code/tests and persisted
+    # clients from the first optimization branch implementation.
+    def benchmark_results(self, serial: str) -> list[EncoderCompatibilityResult]:
+        return self.compatibility_results(serial)
+
+    def set_benchmark_results(self, serial: str, results: list[EncoderCompatibilityResult]) -> None:
+        self.set_compatibility_results(serial, results)
+
     def compatible_encoders(self, serial: str) -> list[str]:
-        return [result.encoder for result in self.benchmark_results(serial) if result.success]
+        return [result.encoder for result in self.compatibility_results(serial) if result.success]
 
     def recommended(self, serial: str) -> str | None:
         """Return only an explicit user preference.
@@ -235,14 +252,23 @@ class EncoderTuningStore:
             value = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return
-        if isinstance(value, dict) and isinstance(value.get("devices", {}), dict):
-            value["schemaVersion"] = 2
-            self._state = value
+        if not isinstance(value, dict) or not isinstance(value.get("devices", {}), dict):
+            return
+
+        devices = value.get("devices", {})
+        for device in devices.values():
+            if not isinstance(device, dict):
+                continue
+            if "compatibilityTests" not in device and isinstance(device.get("benchmarks"), list):
+                device["compatibilityTests"] = device.get("benchmarks", [])
+            device.pop("benchmarks", None)
+        value["schemaVersion"] = self.SCHEMA_VERSION
+        self._state = value
 
     def _save(self) -> None:
         if self.path is None:
             return
-        self._state["schemaVersion"] = 2
+        self._state["schemaVersion"] = self.SCHEMA_VERSION
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         temporary.write_text(json.dumps(self._state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
