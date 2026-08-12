@@ -49,9 +49,15 @@ interface AndroidDeviceDto {
   serial: string;
   model?: string | null;
   ready?: boolean;
+  state?: string;
 }
 
-const PROFILE_INPUT_IDS = [
+interface EncoderInfo {
+  encoders?: string[];
+  preference?: string | null;
+}
+
+const PROFILE_INPUT_IDS = new Set([
   "device",
   "display-mode",
   "display-profile",
@@ -76,7 +82,13 @@ const PROFILE_INPUT_IDS = [
   "auto-reconnect",
   "reconnect-attempts",
   "latency-video-encoder",
-] as const;
+]);
+
+class ProfileDeviceUnavailableError extends Error {
+  public constructor(public readonly profile: StoredConnectionProfile) {
+    super(`Saved Android device is not available: ${profile.device.model ?? profile.device.serial} · ${profile.device.serial}`);
+  }
+}
 
 function element<T extends HTMLElement>(id: string): T {
   const value = document.getElementById(id);
@@ -94,6 +106,23 @@ function errorMessage(error: unknown): string {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function dispatchChange(target: HTMLElement): void {
+  target.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function dispatchInput(target: HTMLElement): void {
+  target.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs: number, intervalMs = 75): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise(resolve => window.setTimeout(resolve, intervalMs));
+  }
+  return predicate();
 }
 
 async function csrfToken(): Promise<string> {
@@ -174,9 +203,7 @@ export class ConnectionProfileController {
 
   private bindUi(): void {
     element<HTMLSelectElement>("connection-profile-select").addEventListener("change", () => this.selectProfile());
-    element<HTMLButtonElement>("connection-profile-load").addEventListener("click", () => {
-      this.setStatus("Load & Connect will be enabled by the restore engine in the next phase.");
-    });
+    element<HTMLButtonElement>("connection-profile-load").addEventListener("click", () => void this.run(() => this.loadAndConnectSelected()));
     element<HTMLButtonElement>("connection-profile-save").addEventListener("click", () => void this.run(() => this.saveCurrent()));
     element<HTMLButtonElement>("connection-profile-update").addEventListener("click", () => void this.run(() => this.updateCurrent()));
     element<HTMLButtonElement>("connection-profile-rename").addEventListener("click", () => void this.run(() => this.renameSelected()));
@@ -185,11 +212,12 @@ export class ConnectionProfileController {
   }
 
   private bindDirtyTracking(): void {
-    for (const id of PROFILE_INPUT_IDS) {
-      const target = document.getElementById(id);
-      if (!target) continue;
-      for (const eventName of ["input", "change"]) target.addEventListener(eventName, () => this.markDirty());
-    }
+    const onEdit = (event: Event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.id && PROFILE_INPUT_IDS.has(target.id)) this.markDirty();
+    };
+    document.addEventListener("input", onEdit);
+    document.addEventListener("change", onEdit);
     optionalElement<HTMLButtonElement>("audio-mute")?.addEventListener("click", () => window.setTimeout(() => this.markDirty(), 0));
   }
 
@@ -309,6 +337,149 @@ export class ConnectionProfileController {
     };
   }
 
+  private async loadAndConnectSelected(): Promise<void> {
+    const profile = this.selectedProfile();
+    if (!profile) throw new Error("Select a connection profile first.");
+    await this.loadAndConnectProfile(profile);
+  }
+
+  private async loadAndConnectProfile(profile: StoredConnectionProfile): Promise<void> {
+    const disconnect = element<HTMLButtonElement>("disconnect");
+    if (!disconnect.disabled) {
+      this.setStatus("Disconnecting the current Android session before loading the profile…");
+      disconnect.click();
+      if (!await waitUntil(() => disconnect.disabled, 10_000)) throw new Error("Timed out while disconnecting the current Android session.");
+    }
+
+    this.#applying = true;
+    try {
+      this.applyProfileSettings(profile);
+      await this.selectExactDevice(profile);
+      const encoderWarning = await this.applyEncoderPreference(profile);
+      await this.waitForCapabilityAdjustment(profile);
+      this.#dirty = false;
+      this.renderSelectionState();
+      this.setMainStatus("Connecting profile", `${profile.name} · ${profile.device.model ?? profile.device.serial}`);
+      this.setStatus(`Connecting ${profile.name}…${encoderWarning ? ` ${encoderWarning}` : ""}`);
+      const connect = element<HTMLButtonElement>("connect");
+      if (connect.disabled) throw new Error("The restored profile is not currently connectable. Check device capability and display settings.");
+      connect.click();
+      const connected = await waitUntil(() => element<HTMLElement>("connection-status").dataset.state === "connected", 20_000, 100);
+      if (!connected) throw new Error(`Timed out connecting profile '${profile.name}'.`);
+      await requestJson<StoredConnectionProfile>(`/api/v1/profiles/${encodeURIComponent(profile.id)}/used`, { method: "POST" });
+      await this.refreshProfiles(profile.id);
+      this.setMainStatus("Profile connected", `${profile.name} · ${profile.device.model ?? profile.device.serial}`);
+      this.setStatus(`Profile connected: ${profile.name}.${encoderWarning ? ` ${encoderWarning}` : ""}`);
+    } finally {
+      this.#applying = false;
+    }
+  }
+
+  private applyProfileSettings(profile: StoredConnectionProfile): void {
+    const display = profile.display;
+    const displayMode = element<HTMLSelectElement>("display-mode");
+    displayMode.value = display.displayMode;
+    dispatchChange(displayMode);
+
+    const displayProfile = element<HTMLSelectElement>("display-profile");
+    const savedPresetExists = [...displayProfile.options].some(option => option.value === display.profileId);
+    displayProfile.value = savedPresetExists ? display.profileId : "custom";
+    element<HTMLSelectElement>("virtual-size-mode").value = display.sizeMode;
+    element<HTMLInputElement>("virtual-width").value = String(display.width);
+    element<HTMLInputElement>("virtual-height").value = String(display.height);
+    element<HTMLInputElement>("virtual-dpi").value = String(display.dpi);
+    element<HTMLInputElement>("virtual-app-package").value = display.startApp;
+    element<HTMLInputElement>("virtual-force-stop").checked = display.forceStopBeforeLaunch;
+    element<HTMLInputElement>("virtual-keep-active").checked = display.keepActive;
+    element<HTMLInputElement>("virtual-system-decorations").checked = display.systemDecorations;
+    element<HTMLInputElement>("virtual-destroy-content").checked = display.destroyContentOnClose;
+    element<HTMLInputElement>("virtual-hide-keyboard").checked = display.imePolicy === "hide";
+    element<HTMLSelectElement>("virtual-ime-policy").value = display.imePolicy === "hide" ? "default" : display.imePolicy;
+    element<HTMLInputElement>("virtual-preserve-aspect").checked = display.preserveAspectRatio;
+    element<HTMLInputElement>("virtual-bitrate").value = String(display.videoBitRateMbps);
+    element<HTMLInputElement>("virtual-max-fps").value = String(display.maxFps);
+    dispatchInput(element<HTMLInputElement>("virtual-width"));
+    displayProfile.value = savedPresetExists ? display.profileId : "custom";
+
+    const audioEnabled = element<HTMLInputElement>("audio-enabled");
+    audioEnabled.checked = profile.audio.enabled;
+    dispatchChange(audioEnabled);
+    element<HTMLInputElement>("audio-volume").value = String(profile.audio.volume);
+    element<HTMLButtonElement>("audio-mute").textContent = profile.audio.muted ? "Unmute" : "Mute";
+
+    const clipboard = element<HTMLInputElement>("clipboard-auto-sync");
+    clipboard.checked = profile.clipboard.automatic;
+    dispatchChange(clipboard);
+    element<HTMLInputElement>("clipboard-max-kib").value = String(profile.clipboard.maximumKiB);
+    dispatchChange(element<HTMLInputElement>("clipboard-max-kib"));
+
+    const reconnect = element<HTMLInputElement>("auto-reconnect");
+    reconnect.checked = profile.reconnect.enabled;
+    dispatchChange(reconnect);
+    const reconnectAttempts = element<HTMLSelectElement>("reconnect-attempts");
+    const attempts = String(profile.reconnect.attempts);
+    reconnectAttempts.value = [...reconnectAttempts.options].some(option => option.value === attempts) ? attempts : "5";
+    dispatchChange(reconnectAttempts);
+  }
+
+  private async selectExactDevice(profile: StoredConnectionProfile): Promise<void> {
+    const devices = await requestJson<{ devices: AndroidDeviceDto[] }>("/api/v1/devices");
+    const saved = devices.devices.find(device => device.serial === profile.device.serial);
+    if (!saved || saved.ready === false || (saved.state && saved.state !== "device")) throw new ProfileDeviceUnavailableError(profile);
+
+    element<HTMLButtonElement>("refresh").click();
+    const select = element<HTMLSelectElement>("device");
+    const appeared = await waitUntil(() => [...select.options].some(option => option.value === profile.device.serial && !option.disabled), 5_000);
+    if (!appeared) throw new ProfileDeviceUnavailableError(profile);
+    select.value = profile.device.serial;
+    dispatchChange(select);
+  }
+
+  private async applyEncoderPreference(profile: StoredConnectionProfile): Promise<string | null> {
+    const serial = encodeURIComponent(profile.device.serial);
+    if (profile.video.encoderMode === "auto" || !profile.video.encoder) {
+      await requestJson(`/api/v1/devices/${serial}/video-encoder`, { method: "PUT", body: JSON.stringify({ encoder: null }) });
+      const select = optionalElement<HTMLSelectElement>("latency-video-encoder");
+      if (select) select.value = "";
+      return null;
+    }
+
+    try {
+      const info = await requestJson<EncoderInfo>(`/api/v1/devices/${serial}/video-encoders`);
+      if (Array.isArray(info.encoders) && info.encoders.length > 0 && !info.encoders.includes(profile.video.encoder)) {
+        await requestJson(`/api/v1/devices/${serial}/video-encoder`, { method: "PUT", body: JSON.stringify({ encoder: null }) });
+        return `Saved encoder '${profile.video.encoder}' is no longer available; using Auto.`;
+      }
+      await requestJson(`/api/v1/devices/${serial}/video-encoder`, {
+        method: "PUT",
+        body: JSON.stringify({ encoder: profile.video.encoder }),
+      });
+      const select = optionalElement<HTMLSelectElement>("latency-video-encoder");
+      if (select && [...select.options].some(option => option.value === profile.video.encoder)) select.value = profile.video.encoder;
+      return null;
+    } catch {
+      await requestJson(`/api/v1/devices/${serial}/video-encoder`, { method: "PUT", body: JSON.stringify({ encoder: null }) });
+      return `Saved encoder '${profile.video.encoder}' could not be restored; using Auto.`;
+    }
+  }
+
+  private async waitForCapabilityAdjustment(profile: StoredConnectionProfile): Promise<void> {
+    if (profile.display.displayMode !== "virtual") return;
+    const capability = element<HTMLElement>("virtual-capability");
+    await waitUntil(
+      () => !capability.textContent?.startsWith("Select an authorized device") && !capability.textContent?.includes("probe virtual-display support"),
+      8_000,
+      100,
+    );
+    if (profile.display.imePolicy === "local" && element<HTMLSelectElement>("virtual-ime-policy").value !== "local") {
+      const accepted = window.confirm("This Android build does not support the saved Local IME policy. Use Android default IME for this connection?");
+      if (!accepted) throw new Error("Connection cancelled because the saved Local IME policy is unavailable.");
+      element<HTMLSelectElement>("virtual-ime-policy").value = "default";
+    }
+    const connect = element<HTMLButtonElement>("connect");
+    await waitUntil(() => !connect.disabled, 8_000, 100);
+  }
+
   private suggestedName(): string {
     const device = element<HTMLSelectElement>("device");
     const deviceName = device.selectedOptions[0]?.textContent?.split(" · ")[0]?.trim() || "Android";
@@ -379,6 +550,15 @@ export class ConnectionProfileController {
     this.setStatus(checked ? `${profile.name} will auto-load at startup.` : "Startup profile disabled.");
   }
 
+  private setMainStatus(title: string, details: string): void {
+    const status = optionalElement<HTMLElement>("status");
+    const detail = optionalElement<HTMLElement>("details");
+    const container = optionalElement<HTMLElement>("connection-status");
+    if (status) status.textContent = title;
+    if (detail) detail.textContent = details;
+    if (container) container.title = details;
+  }
+
   private setStatus(text: string, error = false): void {
     const status = element<HTMLElement>("connection-profile-status");
     status.textContent = text;
@@ -389,6 +569,9 @@ export class ConnectionProfileController {
     try {
       await action();
     } catch (error) {
+      if (error instanceof ProfileDeviceUnavailableError) {
+        this.setMainStatus("Profile device unavailable", error.message);
+      }
       this.setStatus(errorMessage(error), true);
     }
   }
