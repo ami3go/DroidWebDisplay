@@ -21,7 +21,7 @@ def test_h264_encoder_discovery_prefers_hardware_candidates() -> None:
     assert values[-1] in {"c2.android.avc.encoder", "OMX.google.h264.encoder"}
 
 
-def test_encoder_tuning_auto_uses_fastest_successful_benchmark(tmp_path: Path) -> None:
+def test_startup_compatibility_does_not_auto_select_encoder(tmp_path: Path) -> None:
     path = tmp_path / "video-encoder-tuning.json"
     store = EncoderTuningStore(path)
     store.set_benchmark_results(
@@ -32,11 +32,29 @@ def test_encoder_tuning_auto_uses_fastest_successful_benchmark(tmp_path: Path) -
             EncoderBenchmarkResult("encoder.fast", True, 72.5),
         ],
     )
-    assert store.recommended("PHONE") == "encoder.fast"
+
+    # Startup timing includes ADB/server/tunnel setup and is therefore only
+    # compatibility evidence, not an interactive latency ranking.
+    assert store.recommended("PHONE") is None
+    assert store.compatible_encoders("PHONE") == ["encoder.slow", "encoder.fast"]
 
     restored = EncoderTuningStore(path)
-    assert restored.recommended("PHONE") == "encoder.fast"
+    assert restored.recommended("PHONE") is None
     restored.set_preference("PHONE", "encoder.slow")
     assert restored.recommended("PHONE") == "encoder.slow"
     restored.set_preference("PHONE", None)
-    assert restored.recommended("PHONE") == "encoder.fast"
+    assert restored.recommended("PHONE") is None
+
+
+def test_android_build_change_invalidates_cached_tuning(tmp_path: Path) -> None:
+    store = EncoderTuningStore(tmp_path / "video-encoder-tuning.json")
+    assert store.bind_device("PHONE", "build/one") is False
+    store.set_discovered_encoders("PHONE", ["encoder.hw"])
+    store.set_preference("PHONE", "encoder.hw")
+    store.set_benchmark_results("PHONE", [EncoderBenchmarkResult("encoder.hw", True, 80.0)])
+
+    assert store.bind_device("PHONE", "build/two") is True
+    assert store.preference("PHONE") is None
+    assert store.cached_encoders("PHONE") == []
+    assert store.benchmark_results("PHONE") == []
+    assert store.last_invalidation("PHONE") == "android-build-changed"
