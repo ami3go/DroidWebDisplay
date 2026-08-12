@@ -27,7 +27,7 @@ interface ConnectionProfileInput {
   display: ConnectionProfileDisplay;
   audio: { enabled: boolean; muted: boolean; volume: number };
   clipboard: { automatic: boolean; maximumKiB: number };
-  reconnect: { enabled: boolean; attempts: number };
+  reconnect: { enabled: boolean; attempts: 3 | 5 | 10 };
   video: { encoderMode: "auto" | "selected"; encoder: string | null };
 }
 
@@ -55,6 +55,13 @@ interface AndroidDeviceDto {
 interface EncoderInfo {
   encoders?: string[];
   preference?: string | null;
+}
+
+interface VirtualDisplayCapabilitiesDto {
+  virtualDisplaySupported: boolean;
+  localImePolicySupported: boolean;
+  requestedAppInstalled: boolean | null;
+  warnings: string[];
 }
 
 const PROFILE_INPUT_IDS = new Set([
@@ -163,14 +170,22 @@ export class ConnectionProfileController {
   #dirty = false;
   #applying = false;
   #initialized = false;
+  #waitingProfileId: string | null = null;
+  #waitingGeneration = 0;
+  #waitingTimer: number | null = null;
 
   public async initialize(): Promise<void> {
     if (this.#initialized) return;
     this.installUi();
+    this.renameDisplayPresetUi();
     this.bindUi();
     this.bindDirtyTracking();
     await this.refreshProfiles();
     this.#initialized = true;
+    const startup = this.#defaultProfileId ? this.#profiles.find(profile => profile.id === this.#defaultProfileId) : null;
+    if (startup) {
+      window.setTimeout(() => void this.run(() => this.loadAndConnectProfile(startup, true)), 0);
+    }
   }
 
   private installUi(): void {
@@ -186,6 +201,7 @@ export class ConnectionProfileController {
         <select id="connection-profile-select"><option value="">No saved profiles</option></select>
       </label>
       <button id="connection-profile-load" type="button" disabled>Load &amp; Connect</button>
+      <button id="connection-profile-cancel-wait" type="button" class="secondary" hidden>Cancel waiting</button>
       <div class="two-button-row uniform-buttons">
         <button id="connection-profile-save" type="button" class="secondary">Save current</button>
         <button id="connection-profile-update" type="button" class="secondary" disabled>Update</button>
@@ -201,9 +217,18 @@ export class ConnectionProfileController {
     card.prepend(panel);
   }
 
+  private renameDisplayPresetUi(): void {
+    const select = optionalElement<HTMLSelectElement>("display-profile");
+    const label = select?.closest("label");
+    if (label?.firstChild?.nodeType === Node.TEXT_NODE) label.firstChild.textContent = "Display preset\n              ";
+    const restore = optionalElement<HTMLButtonElement>("restore-profile");
+    if (restore) restore.textContent = "Restore preset settings";
+  }
+
   private bindUi(): void {
     element<HTMLSelectElement>("connection-profile-select").addEventListener("change", () => this.selectProfile());
     element<HTMLButtonElement>("connection-profile-load").addEventListener("click", () => void this.run(() => this.loadAndConnectSelected()));
+    element<HTMLButtonElement>("connection-profile-cancel-wait").addEventListener("click", () => this.cancelWaiting(true));
     element<HTMLButtonElement>("connection-profile-save").addEventListener("click", () => void this.run(() => this.saveCurrent()));
     element<HTMLButtonElement>("connection-profile-update").addEventListener("click", () => void this.run(() => this.updateCurrent()));
     element<HTMLButtonElement>("connection-profile-rename").addEventListener("click", () => void this.run(() => this.renameSelected()));
@@ -269,7 +294,7 @@ export class ConnectionProfileController {
   private renderSelectionState(): void {
     const profile = this.selectedProfile();
     const hasProfile = profile !== null;
-    element<HTMLButtonElement>("connection-profile-load").disabled = !hasProfile;
+    element<HTMLButtonElement>("connection-profile-load").disabled = !hasProfile || this.#waitingProfileId !== null;
     element<HTMLButtonElement>("connection-profile-update").disabled = !hasProfile || !this.#dirty;
     element<HTMLButtonElement>("connection-profile-rename").disabled = !hasProfile;
     element<HTMLButtonElement>("connection-profile-delete").disabled = !hasProfile;
@@ -285,7 +310,8 @@ export class ConnectionProfileController {
     if (selectedOption) selectedOption.textContent = `${profile.name}${this.#dirty ? " *" : ""}`;
     const used = profile.lastUsedAt ? new Date(profile.lastUsedAt).toLocaleString() : "never";
     const defaultText = profile.id === this.#defaultProfileId ? " · startup default" : "";
-    meta.textContent = `${profile.device.model ?? profile.device.serial} · ${profile.device.serial} · last used ${used}${defaultText}${this.#dirty ? " · modified" : ""}`;
+    const waiting = profile.id === this.#waitingProfileId ? " · waiting for device" : "";
+    meta.textContent = `${profile.device.model ?? profile.device.serial} · ${profile.device.serial} · last used ${used}${defaultText}${waiting}${this.#dirty ? " · modified" : ""}`;
   }
 
   private async currentDevice(): Promise<ConnectionProfileDevice> {
@@ -294,6 +320,11 @@ export class ConnectionProfileController {
     const response = await requestJson<{ devices: AndroidDeviceDto[] }>("/api/v1/devices");
     const device = response.devices.find(item => item.serial === serial);
     return { serial, model: device?.model ?? null };
+  }
+
+  private reconnectAttempts(): 3 | 5 | 10 {
+    const value = Number(element<HTMLSelectElement>("reconnect-attempts").value);
+    return value === 3 || value === 10 ? value : 5;
   }
 
   private async captureCurrent(name: string): Promise<ConnectionProfileInput> {
@@ -329,10 +360,7 @@ export class ConnectionProfileController {
         automatic: element<HTMLInputElement>("clipboard-auto-sync").checked,
         maximumKiB: clamp(Number(element<HTMLInputElement>("clipboard-max-kib").value), 1, 256),
       },
-      reconnect: {
-        enabled: element<HTMLInputElement>("auto-reconnect").checked,
-        attempts: clamp(Number(element<HTMLSelectElement>("reconnect-attempts").value), 1, 20),
-      },
+      reconnect: { enabled: element<HTMLInputElement>("auto-reconnect").checked, attempts: this.reconnectAttempts() },
       video: encoder ? { encoderMode: "selected", encoder } : { encoderMode: "auto", encoder: null },
     };
   }
@@ -340,10 +368,11 @@ export class ConnectionProfileController {
   private async loadAndConnectSelected(): Promise<void> {
     const profile = this.selectedProfile();
     if (!profile) throw new Error("Select a connection profile first.");
-    await this.loadAndConnectProfile(profile);
+    await this.loadAndConnectProfile(profile, true);
   }
 
-  private async loadAndConnectProfile(profile: StoredConnectionProfile): Promise<void> {
+  private async loadAndConnectProfile(profile: StoredConnectionProfile, waitIfMissing: boolean): Promise<void> {
+    this.cancelWaiting(false);
     const disconnect = element<HTMLButtonElement>("disconnect");
     if (!disconnect.disabled) {
       this.setStatus("Disconnecting the current Android session before loading the profile…");
@@ -354,25 +383,39 @@ export class ConnectionProfileController {
     this.#applying = true;
     try {
       this.applyProfileSettings(profile);
-      await this.selectExactDevice(profile);
-      const encoderWarning = await this.applyEncoderPreference(profile);
-      await this.waitForCapabilityAdjustment(profile);
-      this.#dirty = false;
-      this.renderSelectionState();
-      this.setMainStatus("Connecting profile", `${profile.name} · ${profile.device.model ?? profile.device.serial}`);
-      this.setStatus(`Connecting ${profile.name}…${encoderWarning ? ` ${encoderWarning}` : ""}`);
-      const connect = element<HTMLButtonElement>("connect");
-      if (connect.disabled) throw new Error("The restored profile is not currently connectable. Check device capability and display settings.");
-      connect.click();
-      const connected = await waitUntil(() => element<HTMLElement>("connection-status").dataset.state === "connected", 20_000, 100);
-      if (!connected) throw new Error(`Timed out connecting profile '${profile.name}'.`);
-      await requestJson<StoredConnectionProfile>(`/api/v1/profiles/${encodeURIComponent(profile.id)}/used`, { method: "POST" });
-      await this.refreshProfiles(profile.id);
-      this.setMainStatus("Profile connected", `${profile.name} · ${profile.device.model ?? profile.device.serial}`);
-      this.setStatus(`Profile connected: ${profile.name}.${encoderWarning ? ` ${encoderWarning}` : ""}`);
+      try {
+        await this.selectExactDevice(profile);
+      } catch (error) {
+        if (waitIfMissing && error instanceof ProfileDeviceUnavailableError) {
+          this.beginWaiting(profile);
+          return;
+        }
+        throw error;
+      }
+      await this.finishProfileConnection(profile);
     } finally {
       this.#applying = false;
     }
+  }
+
+  private async finishProfileConnection(profile: StoredConnectionProfile): Promise<void> {
+    const encoderWarning = await this.applyEncoderPreference(profile);
+    await this.validateVirtualCapability(profile);
+    this.#dirty = false;
+    this.renderSelectionState();
+    this.setMainStatus("Connecting profile", `${profile.name} · ${profile.device.model ?? profile.device.serial}`);
+    this.setStatus(`Connecting ${profile.name}…${encoderWarning ? ` ${encoderWarning}` : ""}`);
+    const connect = element<HTMLButtonElement>("connect");
+    if (!await waitUntil(() => !connect.disabled, 8_000, 100)) {
+      throw new Error("The restored profile is not currently connectable. Check device capability and display settings.");
+    }
+    connect.click();
+    const connected = await waitUntil(() => element<HTMLElement>("connection-status").dataset.state === "connected", 20_000, 100);
+    if (!connected) throw new Error(`Timed out connecting profile '${profile.name}'.`);
+    await requestJson<StoredConnectionProfile>(`/api/v1/profiles/${encodeURIComponent(profile.id)}/used`, { method: "POST" });
+    await this.refreshProfiles(profile.id);
+    this.setMainStatus("Profile connected", `${profile.name} · ${profile.device.model ?? profile.device.serial}`);
+    this.setStatus(`Profile connected: ${profile.name}.${encoderWarning ? ` ${encoderWarning}` : ""}`);
   }
 
   private applyProfileSettings(profile: StoredConnectionProfile): void {
@@ -417,8 +460,7 @@ export class ConnectionProfileController {
     reconnect.checked = profile.reconnect.enabled;
     dispatchChange(reconnect);
     const reconnectAttempts = element<HTMLSelectElement>("reconnect-attempts");
-    const attempts = String(profile.reconnect.attempts);
-    reconnectAttempts.value = [...reconnectAttempts.options].some(option => option.value === attempts) ? attempts : "5";
+    reconnectAttempts.value = String(profile.reconnect.attempts);
     dispatchChange(reconnectAttempts);
   }
 
@@ -432,6 +474,7 @@ export class ConnectionProfileController {
     const appeared = await waitUntil(() => [...select.options].some(option => option.value === profile.device.serial && !option.disabled), 5_000);
     if (!appeared) throw new ProfileDeviceUnavailableError(profile);
     select.value = profile.device.serial;
+    if (profile.display.displayMode === "virtual") element<HTMLElement>("virtual-capability").textContent = "Checking saved profile device capabilities…";
     dispatchChange(select);
   }
 
@@ -450,10 +493,7 @@ export class ConnectionProfileController {
         await requestJson(`/api/v1/devices/${serial}/video-encoder`, { method: "PUT", body: JSON.stringify({ encoder: null }) });
         return `Saved encoder '${profile.video.encoder}' is no longer available; using Auto.`;
       }
-      await requestJson(`/api/v1/devices/${serial}/video-encoder`, {
-        method: "PUT",
-        body: JSON.stringify({ encoder: profile.video.encoder }),
-      });
+      await requestJson(`/api/v1/devices/${serial}/video-encoder`, { method: "PUT", body: JSON.stringify({ encoder: profile.video.encoder }) });
       const select = optionalElement<HTMLSelectElement>("latency-video-encoder");
       if (select && [...select.options].some(option => option.value === profile.video.encoder)) select.value = profile.video.encoder;
       return null;
@@ -463,21 +503,80 @@ export class ConnectionProfileController {
     }
   }
 
-  private async waitForCapabilityAdjustment(profile: StoredConnectionProfile): Promise<void> {
+  private async validateVirtualCapability(profile: StoredConnectionProfile): Promise<void> {
     if (profile.display.displayMode !== "virtual") return;
-    const capability = element<HTMLElement>("virtual-capability");
-    await waitUntil(
-      () => !capability.textContent?.startsWith("Select an authorized device") && !capability.textContent?.includes("probe virtual-display support"),
-      8_000,
-      100,
-    );
-    if (profile.display.imePolicy === "local" && element<HTMLSelectElement>("virtual-ime-policy").value !== "local") {
+    const serial = encodeURIComponent(profile.device.serial);
+    const query = new URLSearchParams({ startApp: profile.display.startApp });
+    const capabilities = await requestJson<VirtualDisplayCapabilitiesDto>(`/api/v1/devices/${serial}/virtual-display-capabilities?${query.toString()}`);
+    if (!capabilities.virtualDisplaySupported) {
+      throw new Error(capabilities.warnings.join(" ") || "The saved device no longer supports virtual display mode.");
+    }
+    if (profile.display.startApp && capabilities.requestedAppInstalled === false) {
+      if (!profile.display.systemDecorations) throw new Error(`Saved application '${profile.display.startApp}' is no longer installed and system decorations are disabled.`);
+      const accepted = window.confirm(`Saved application '${profile.display.startApp}' is no longer installed. Connect without launching it?`);
+      if (!accepted) throw new Error("Connection cancelled because the saved application is unavailable.");
+      element<HTMLInputElement>("virtual-app-package").value = "";
+      dispatchInput(element<HTMLInputElement>("virtual-app-package"));
+    }
+    if (profile.display.imePolicy === "local" && !capabilities.localImePolicySupported) {
       const accepted = window.confirm("This Android build does not support the saved Local IME policy. Use Android default IME for this connection?");
       if (!accepted) throw new Error("Connection cancelled because the saved Local IME policy is unavailable.");
       element<HTMLSelectElement>("virtual-ime-policy").value = "default";
+      dispatchChange(element<HTMLSelectElement>("virtual-ime-policy"));
     }
-    const connect = element<HTMLButtonElement>("connect");
-    await waitUntil(() => !connect.disabled, 8_000, 100);
+    const capability = element<HTMLElement>("virtual-capability");
+    await waitUntil(() => capability.textContent !== "Checking saved profile device capabilities…", 8_000, 100);
+  }
+
+  private beginWaiting(profile: StoredConnectionProfile): void {
+    this.cancelWaiting(false);
+    this.#waitingProfileId = profile.id;
+    this.#waitingGeneration += 1;
+    const generation = this.#waitingGeneration;
+    element<HTMLButtonElement>("connection-profile-cancel-wait").hidden = false;
+    this.setMainStatus("Waiting for profile device", `${profile.name} · ${profile.device.model ?? profile.device.serial} · ${profile.device.serial}`);
+    this.setStatus(`Waiting for exact saved device: ${profile.device.model ?? profile.device.serial} · ${profile.device.serial}.`);
+    this.renderSelectionState();
+    this.#waitingTimer = window.setTimeout(() => void this.pollWaitingProfile(profile, generation), 1000);
+  }
+
+  private async pollWaitingProfile(profile: StoredConnectionProfile, generation: number): Promise<void> {
+    if (this.#waitingProfileId !== profile.id || generation !== this.#waitingGeneration) return;
+    try {
+      const devices = await requestJson<{ devices: AndroidDeviceDto[] }>("/api/v1/devices");
+      const saved = devices.devices.find(device => device.serial === profile.device.serial && device.ready !== false && (!device.state || device.state === "device"));
+      if (saved) {
+        this.cancelWaiting(false);
+        this.#applying = true;
+        try {
+          await this.selectExactDevice(profile);
+          await this.finishProfileConnection(profile);
+        } finally {
+          this.#applying = false;
+        }
+        return;
+      }
+    } catch (error) {
+      this.setStatus(`Waiting for ${profile.device.serial}; last device check failed: ${errorMessage(error)}`, true);
+    }
+    if (this.#waitingProfileId === profile.id && generation === this.#waitingGeneration) {
+      this.#waitingTimer = window.setTimeout(() => void this.pollWaitingProfile(profile, generation), 2000);
+    }
+  }
+
+  private cancelWaiting(userRequested: boolean): void {
+    if (this.#waitingTimer !== null) window.clearTimeout(this.#waitingTimer);
+    this.#waitingTimer = null;
+    this.#waitingGeneration += 1;
+    const wasWaiting = this.#waitingProfileId !== null;
+    this.#waitingProfileId = null;
+    const cancel = optionalElement<HTMLButtonElement>("connection-profile-cancel-wait");
+    if (cancel) cancel.hidden = true;
+    if (userRequested && wasWaiting) {
+      this.setMainStatus("Profile waiting cancelled", "No automatic profile connection is pending.");
+      this.setStatus("Waiting for the saved profile device was cancelled.");
+    }
+    if (document.getElementById("connection-profile-select")) this.renderSelectionState();
   }
 
   private suggestedName(): string {
@@ -492,10 +591,7 @@ export class ConnectionProfileController {
   private async saveCurrent(): Promise<void> {
     const name = window.prompt("Connection profile name", this.suggestedName())?.trim();
     if (!name) return;
-    const created = await requestJson<StoredConnectionProfile>("/api/v1/profiles", {
-      method: "POST",
-      body: JSON.stringify(await this.captureCurrent(name)),
-    });
+    const created = await requestJson<StoredConnectionProfile>("/api/v1/profiles", { method: "POST", body: JSON.stringify(await this.captureCurrent(name)) });
     await this.refreshProfiles(created.id);
     this.setStatus(`Saved connection profile: ${created.name}.`);
   }
@@ -518,10 +614,7 @@ export class ConnectionProfileController {
     if (!name || name === profile.name) return;
     const input = profileInput(profile);
     input.name = name;
-    const updated = await requestJson<StoredConnectionProfile>(`/api/v1/profiles/${encodeURIComponent(profile.id)}`, {
-      method: "PUT",
-      body: JSON.stringify(input),
-    });
+    const updated = await requestJson<StoredConnectionProfile>(`/api/v1/profiles/${encodeURIComponent(profile.id)}`, { method: "PUT", body: JSON.stringify(input) });
     await this.refreshProfiles(updated.id);
     this.setStatus(`Renamed connection profile to ${updated.name}.`);
   }
@@ -530,6 +623,7 @@ export class ConnectionProfileController {
     const profile = this.selectedProfile();
     if (!profile) throw new Error("Select a connection profile first.");
     if (!window.confirm(`Delete connection profile “${profile.name}”?`)) return;
+    if (this.#waitingProfileId === profile.id) this.cancelWaiting(false);
     await requestJson<Record<string, never>>(`/api/v1/profiles/${encodeURIComponent(profile.id)}`, { method: "DELETE" });
     await this.refreshProfiles(null);
     this.setStatus(`Deleted connection profile: ${profile.name}.`);
@@ -569,9 +663,7 @@ export class ConnectionProfileController {
     try {
       await action();
     } catch (error) {
-      if (error instanceof ProfileDeviceUnavailableError) {
-        this.setMainStatus("Profile device unavailable", error.message);
-      }
+      if (error instanceof ProfileDeviceUnavailableError) this.setMainStatus("Profile device unavailable", error.message);
       this.setStatus(errorMessage(error), true);
     }
   }
