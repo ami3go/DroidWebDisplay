@@ -1,10 +1,100 @@
 import { AsyncByteReader } from "../../common/async-byte-reader.js";
 import { InvalidProtocolValueError, StreamDisabledError, VersionMismatchError } from "../../common/errors.js";
 import { ADAPTER_ID, SCRCPY_VERSION } from "./constants.js";
-import { serializeControlMessage } from "./control.js";
+import { ControlMessageType, serializeControlMessage } from "./control.js";
 import { DeviceMessageParser } from "./device.js";
 import { readDeviceInfo, readDummyByte } from "./handshake.js";
 import { ScrcpyMediaStreamParser } from "./media.js";
+const TOUCH_MOVE_ACTION = 2;
+const TOUCH_MOVE_INTERVAL_MS = 8;
+function metrics() {
+    const root = globalThis;
+    return root.__dwdLatencyMetrics ??= {};
+}
+function monotonicNow() {
+    return globalThis.performance?.now?.() ?? Date.now();
+}
+function isTouchMove(message) {
+    return message.type === ControlMessageType.InjectTouchEvent && message.action === TOUCH_MOVE_ACTION;
+}
+class LowLatencyControlScheduler {
+    writer;
+    #pendingMove = null;
+    #moveTimer = null;
+    #tail = Promise.resolve();
+    #closed = false;
+    constructor(writer) {
+        this.writer = writer;
+    }
+    send(message) {
+        if (this.#closed)
+            return Promise.reject(new Error("control scheduler is closed"));
+        if (isTouchMove(message)) {
+            const current = metrics();
+            if (this.#pendingMove)
+                current.controlMovesCoalesced = Number(current.controlMovesCoalesced ?? 0) + 1;
+            this.#pendingMove = message;
+            this.scheduleMove();
+            return Promise.resolve();
+        }
+        this.flushPendingMove();
+        return this.enqueue(message);
+    }
+    async close() {
+        if (this.#closed)
+            return;
+        this.#closed = true;
+        if (this.#moveTimer !== null) {
+            clearTimeout(this.#moveTimer);
+            this.#moveTimer = null;
+        }
+        this.flushPendingMove();
+        await this.#tail;
+    }
+    scheduleMove() {
+        if (this.#moveTimer !== null)
+            return;
+        this.#moveTimer = setTimeout(() => {
+            this.#moveTimer = null;
+            const move = this.#pendingMove;
+            this.#pendingMove = null;
+            if (!move || this.#closed)
+                return;
+            void this.enqueue(move).catch((error) => {
+                metrics().controlLastError = error instanceof Error ? error.message : String(error);
+            });
+        }, TOUCH_MOVE_INTERVAL_MS);
+    }
+    flushPendingMove() {
+        if (this.#moveTimer !== null) {
+            clearTimeout(this.#moveTimer);
+            this.#moveTimer = null;
+        }
+        const move = this.#pendingMove;
+        this.#pendingMove = null;
+        if (!move)
+            return;
+        void this.enqueue(move).catch((error) => {
+            metrics().controlLastError = error instanceof Error ? error.message : String(error);
+        });
+    }
+    enqueue(message) {
+        const current = metrics();
+        current.controlPendingWrites = Number(current.controlPendingWrites ?? 0) + 1;
+        const queuedAt = monotonicNow();
+        const write = this.#tail.then(async () => {
+            const startedAt = monotonicNow();
+            current.controlQueueDelayMs = Math.max(0, startedAt - queuedAt);
+            await this.writer.write(serializeControlMessage(message));
+            current.controlLastWriteMs = Math.max(0, monotonicNow() - startedAt);
+            current.controlMessagesSent = Number(current.controlMessagesSent ?? 0) + 1;
+        });
+        this.#tail = write.catch(() => undefined);
+        return write.finally(() => {
+            current.controlPendingWrites = Math.max(0, Number(current.controlPendingWrites ?? 1) - 1);
+        });
+    }
+}
 export class ScrcpyV41Adapter {
     adapterId = ADAPTER_ID;
     scrcpyVersion = SCRCPY_VERSION;
@@ -53,6 +143,7 @@ export class ScrcpyV41Adapter {
             : null;
         const deviceParser = controlReader ? new DeviceMessageParser(controlReader) : null;
         const controlWriter = controlPair?.writable.getWriter() ?? null;
+        const controlScheduler = controlWriter ? new LowLatencyControlScheduler(controlWriter) : null;
         const videoHeader = videoParser ? await videoParser.readHeader() : null;
         let audioHeader = null;
         if (audioParser) {
@@ -61,8 +152,6 @@ export class ScrcpyV41Adapter {
             }
             catch (error) {
                 if (error instanceof StreamDisabledError) {
-                    // Audio is optional. A capture or encoder configuration failure must
-                    // not terminate video/control; the UI reports audio as unavailable.
                     audioParser = null;
                 }
                 else {
@@ -90,12 +179,13 @@ export class ScrcpyV41Adapter {
                 return deviceParser.read();
             },
             sendControl: async (message) => {
-                if (!controlWriter)
+                if (!controlScheduler)
                     throw new VersionMismatchError("control channel is disabled");
-                await controlWriter.write(serializeControlMessage(message));
+                await controlScheduler.send(message);
             },
             close: async () => {
                 try {
+                    await controlScheduler?.close();
                     await controlWriter?.close();
                 }
                 finally {
@@ -105,4 +195,3 @@ export class ScrcpyV41Adapter {
         };
     }
 }
-//# sourceMappingURL=adapter.js.map
