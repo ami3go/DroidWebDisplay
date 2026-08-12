@@ -32,56 +32,55 @@ jobs:
           path = Path('apps/web-client/src/connection-profile-controller.ts')
           text = path.read_text(encoding='utf-8')
 
-          old_select = '''  private selectProfile(): void {
-              const value = element<HTMLSelectElement>("connection-profile-select").value;
-              this.#selectedProfileId = value || null;
-              this.#dirty = false;
-              this.renderSelectionState();
-            }
-          '''
-          new_select = '''  private selectProfile(): void {
-              const value = element<HTMLSelectElement>("connection-profile-select").value;
-              if (this.#waitingProfileId && value !== this.#waitingProfileId) {
-                this.cancelWaiting(false);
-                this.setStatus("Waiting cancelled because another connection profile was selected.");
-              }
-              this.#selectedProfileId = value || null;
-              this.#dirty = false;
-              this.renderSelectionState();
-            }
-          '''
-          if old_select not in text:
-              raise SystemExit('Expected selectProfile source pattern not found; refusing unsafe patch')
-          text = text.replace(old_select, new_select, 1)
+          # Patch only inside selectProfile(), and assert the insertion point is unique.
+          select_start = text.index('  private selectProfile(): void {')
+          select_end = text.index('\n  private selectedProfile()', select_start)
+          select_block = text[select_start:select_end]
+          select_needle = '    const value = element<HTMLSelectElement>("connection-profile-select").value;\n'
+          if select_block.count(select_needle) != 1:
+              raise SystemExit('Unexpected selectProfile structure; refusing unsafe patch')
+          if 'Waiting cancelled because another connection profile was selected.' not in select_block:
+              select_block = select_block.replace(
+                  select_needle,
+                  select_needle
+                  + '    if (this.#waitingProfileId && value !== this.#waitingProfileId) {\n'
+                  + '      this.cancelWaiting(false);\n'
+                  + '      this.setStatus("Waiting cancelled because another connection profile was selected.");\n'
+                  + '    }\n',
+                  1,
+              )
+              text = text[:select_start] + select_block + text[select_end:]
 
-          old_wait = '''      if (saved) {
-                this.cancelWaiting(false); this.#applying = true;
-                try {
-                  await this.selectExactDevice(profile); await this.finishProfileConnection(profile);
-                } catch (error) {
-                  this.setMainStatus("Profile connection failed", `${profile.name} · ${errorMessage(error)}`);
-                  this.setStatus(`Saved device appeared, but the profile connection failed: ${errorMessage(error)}`, true);
-                } finally { this.#applying = false; }
-                return;
-              }
-          '''
-          new_wait = '''      if (saved) {
-                this.cancelWaiting(false);
-                try {
-                  // Re-enter the complete profile load path. This safely disconnects any
-                  // session the user may have opened while waiting before selecting the
-                  // exact saved serial and restoring the profile.
-                  await this.loadAndConnectProfile(profile, false);
-                } catch (error) {
-                  this.setMainStatus("Profile connection failed", `${profile.name} · ${errorMessage(error)}`);
-                  this.setStatus(`Saved device appeared, but the profile connection failed: ${errorMessage(error)}`, true);
-                }
-                return;
-              }
-          '''
-          if old_wait not in text:
-              raise SystemExit('Expected waiting lifecycle source pattern not found; refusing unsafe patch')
-          path.write_text(text.replace(old_wait, new_wait, 1), encoding='utf-8')
+          # Patch only inside pollWaitingProfile(). The exact three statements below are
+          # the lifecycle behavior under review, so every replacement is count-checked.
+          wait_start = text.index('  private async pollWaitingProfile(')
+          wait_end = text.index('\n  private cancelWaiting(', wait_start)
+          wait_block = text[wait_start:wait_end]
+          expected = {
+              'this.cancelWaiting(false); this.#applying = true;': 1,
+              'await this.selectExactDevice(profile); await this.finishProfileConnection(profile);': 1,
+              '} finally { this.#applying = false; }': 1,
+          }
+          for needle, count in expected.items():
+              if wait_block.count(needle) != count:
+                  raise SystemExit(f'Unexpected waiting lifecycle structure for {needle!r}; refusing unsafe patch')
+          wait_block = wait_block.replace(
+              'this.cancelWaiting(false); this.#applying = true;',
+              'this.cancelWaiting(false);',
+              1,
+          )
+          wait_block = wait_block.replace(
+              'await this.selectExactDevice(profile); await this.finishProfileConnection(profile);',
+              '// Re-enter the complete profile load path. This safely disconnects any\n'
+              '          // session the user may have opened while waiting before selecting the\n'
+              '          // exact saved serial and restoring the profile.\n'
+              '          await this.loadAndConnectProfile(profile, false);',
+              1,
+          )
+          wait_block = wait_block.replace('} finally { this.#applying = false; }', '}', 1)
+          text = text[:wait_start] + wait_block + text[wait_end:]
+
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
