@@ -4,14 +4,16 @@ from typing import Any
 
 from .app import create_app as _create_app
 from .latency import install_latency_api
+from .profiles import install_profiles_api
 from .release_metadata import install_release_metadata
 
 
 def create_app(*args: Any, **kwargs: Any):
-    """Create the public DroidWebDisplay API with release and latency extensions."""
+    """Create the public DroidWebDisplay API with release, latency and profile extensions."""
 
     app = _create_app(*args, **kwargs)
     install_latency_api(app)
+    install_profiles_api(app)
     return install_release_metadata(app)
 
 
