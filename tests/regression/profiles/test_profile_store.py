@@ -104,3 +104,16 @@ def test_selected_encoder_requires_name_and_auto_forbids_name() -> None:
     payload["video"] = {"encoderMode": "auto", "encoder": "c2.exynos.avc.encoder"}
     with pytest.raises(ValidationError):
         ConnectionProfileInput.model_validate(payload)
+
+
+def test_reconnect_attempts_match_the_production_selector() -> None:
+    for value in (3, 5, 10):
+        payload = profile_input().model_dump(by_alias=True, mode="json")
+        payload["reconnect"]["attempts"] = value
+        assert ConnectionProfileInput.model_validate(payload).reconnect.attempts == value
+
+    for invalid in (1, 4, 20):
+        payload = profile_input().model_dump(by_alias=True, mode="json")
+        payload["reconnect"]["attempts"] = invalid
+        with pytest.raises(ValidationError):
+            ConnectionProfileInput.model_validate(payload)
