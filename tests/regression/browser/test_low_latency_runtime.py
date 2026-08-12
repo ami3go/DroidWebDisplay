@@ -47,16 +47,23 @@ def test_optimized_response_time_runtime_contract() -> None:
     # timing must never silently become an automatic latency recommendation.
     assert "probe: bool = False" in latency_api
     assert '"automaticSelection": "scrcpy"' in latency_api
-    assert '"benchmarkKind": "startup-compatibility"' in latency_api
+    assert '"compatibilityKind": "startup-compatibility"' in latency_api
+    assert 'video-encoders/compatibility' in latency_api
+    assert 'video-encoders/benchmark", include_in_schema=False' in latency_api
+    assert "EncoderCompatibilityResult" in tuning
+    assert '"compatibilityTests"' in tuning
     assert "return self.preference(serial)" in tuning
     assert "preferred-encoder-start-failed" in hardening
 
     assert '"low-latency"' in display
+    assert "PHYSICAL_DISPLAY_DEFAULTS" in display
     assert "maxSize: 1600" in display
     assert "maxFps: 60" in display
     assert "latency-hud" in drawer
     assert "parser→draw" in drawer
+    assert "browserPipelineMs" not in drawer
     assert "WS queue" in drawer
     assert "Compatibility test" in drawer
+    assert "video-encoders/compatibility" in drawer
     assert drawer == dist_drawer
     assert (root / "apps/web-client/dist/assets/video-render-worker.js").is_file()
