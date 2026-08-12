@@ -16,6 +16,9 @@ jobs:
         with:
           ref: optimized-reponce-time
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -23,6 +26,27 @@ jobs:
           cache-dependency-path: |
             apps/web-client/package-lock.json
             packages/scrcpy-protocol/package-lock.json
+      - name: Normalize worker timestamps onto the Window performance timeline
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          worker = Path('apps/web-client/src/video-render-worker.ts')
+          text = worker.read_text(encoding='utf-8')
+          old = 'presentedAt: performance.now(),'
+          new = 'presentedAt: performance.timeOrigin + performance.now(),'
+          if old in text:
+              worker.write_text(text.replace(old, new), encoding='utf-8')
+          renderer = Path('apps/web-client/src/video-renderer.ts')
+          text = renderer.read_text(encoding='utf-8')
+          old = 'this.recordPresentation(message.timestamp, message.presentedAt, message.drawMilliseconds ?? 0);'
+          new = 'this.recordPresentation(message.timestamp, message.presentedAt - performance.timeOrigin, message.drawMilliseconds ?? 0);'
+          if old in text:
+              renderer.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - run: $HOME/.local/bin/uv sync --locked --extra dev
+      - run: $HOME/.local/bin/uv run python tools/generate_openapi.py
       - run: npm ci
         working-directory: packages/scrcpy-protocol
       - run: npm run clean && npm run build
@@ -35,6 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web-client/src/video-render-worker.ts apps/web-client/src/video-renderer.ts packages/bridge-api/openapi/openapi-v1.json
           git add -f packages/scrcpy-protocol/dist apps/web-client/dist apps/web-client/dist-manifest.json
           if git diff --cached --quiet; then
             echo "Generated runtime already current."
