@@ -1,4 +1,4 @@
-/* DroidWebDisplay native single-drawer controller v1.1.1 */
+/* DroidWebDisplay native single-drawer controller v1.2.0 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
@@ -8,6 +8,7 @@
   const GROUPS = ['display','clipboard','files','apps','audio','access','network','diagnostics','settings'];
   let activeGroup = null;
   let pinned = false;
+  let latencyTimer = null;
   const root = () => document.getElementById(ROOT_ID);
   const drawer = () => root()?.querySelector('.gb-drawer');
   function get(key, fallback = null) { try { return localStorage.getItem(key) ?? fallback; } catch (_) { return fallback; } }
@@ -44,6 +45,7 @@
     const label = root().querySelector(`[data-group="${group}"] .gb-rail-label`)?.textContent || 'Tools';
     const title = root().querySelector('.gb-drawer-title'); if (title) title.textContent = label;
     drawer()?.classList.add('gb-open'); drawer()?.setAttribute('aria-hidden', 'false');
+    if (group === 'display') void refreshEncoderUi();
   }
   function closeDrawer() {
     if (pinned || !root()) return;
@@ -60,6 +62,147 @@
       details.addEventListener('toggle', () => { const current = loadAccordionState(); current[key] = details.open; set(ACCORDION_KEY, JSON.stringify(current)); });
     });
   }
+  async function csrfToken() {
+    const response = await fetch('/api/v1/auth/status', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Authentication status failed (${response.status})`);
+    const value = await response.json();
+    if (!value.csrfToken) throw new Error('Authenticated CSRF token is unavailable');
+    return value.csrfToken;
+  }
+  async function requestJson(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (options.body !== undefined) headers.set('Content-Type', 'application/json');
+    const method = String(options.method || 'GET').toUpperCase();
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) headers.set('X-DroidWebDisplay-CSRF', await csrfToken());
+    const response = await fetch(url, { ...options, headers, cache: 'no-store' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || payload?.error?.message || `Request failed (${response.status})`);
+    return payload;
+  }
+  function selectedSerial() { return document.getElementById('device')?.value || ''; }
+  function setEncoderStatus(text, error = false) {
+    const status = document.getElementById('latency-encoder-status');
+    if (!status) return;
+    status.textContent = text;
+    status.classList.toggle('error-text', error);
+  }
+  function installLatencyControls() {
+    const card = root()?.querySelector('.gb-drawer-slot[data-slot="display"] .display-mode-card');
+    if (!card || document.getElementById('latency-video-encoder')) return;
+    const panel = document.createElement('div');
+    panel.className = 'latency-tuning-panel';
+    panel.innerHTML = `
+      <hr>
+      <h3>Responsiveness</h3>
+      <label>Video encoder
+        <select id="latency-video-encoder"><option value="">Auto (scrcpy / benchmark recommendation)</option></select>
+      </label>
+      <div class="two-button-row uniform-buttons">
+        <button id="latency-encoder-refresh" type="button" class="secondary">Probe encoders</button>
+        <button id="latency-encoder-benchmark" type="button" class="secondary">Benchmark</button>
+      </div>
+      <p id="latency-encoder-status" class="running-app-status">Encoder selection is automatic until a device is probed.</p>
+      <p class="virtual-keyboard-note">Benchmarking briefly starts each candidate H.264 encoder. Disconnect the active display first.</p>`;
+    card.append(panel);
+    document.getElementById('latency-encoder-refresh')?.addEventListener('click', () => void refreshEncoderUi(true));
+    document.getElementById('latency-encoder-benchmark')?.addEventListener('click', () => void benchmarkEncoders());
+    document.getElementById('latency-video-encoder')?.addEventListener('change', () => void saveEncoderPreference());
+    document.getElementById('device')?.addEventListener('change', () => {
+      if (activeGroup === 'display') void refreshEncoderUi();
+    });
+  }
+  async function refreshEncoderUi(showProgress = false) {
+    const serial = selectedSerial();
+    const select = document.getElementById('latency-video-encoder');
+    if (!select) return;
+    if (!serial) {
+      select.innerHTML = '<option value="">Auto (scrcpy / benchmark recommendation)</option>';
+      setEncoderStatus('Select an authorized Android device to probe video encoders.');
+      return;
+    }
+    if (showProgress) setEncoderStatus('Probing Android H.264 encoders…');
+    try {
+      const data = await requestJson(`/api/v1/devices/${encodeURIComponent(serial)}/video-encoders`);
+      const previous = data.preference || '';
+      select.replaceChildren();
+      const auto = document.createElement('option'); auto.value = ''; auto.textContent = 'Auto (scrcpy / benchmark recommendation)'; select.append(auto);
+      for (const encoder of data.encoders || []) {
+        const option = document.createElement('option'); option.value = encoder; option.textContent = encoder; select.append(option);
+      }
+      if (previous && ![...select.options].some(option => option.value === previous)) {
+        const option = document.createElement('option'); option.value = previous; option.textContent = `${previous} (saved)`; select.append(option);
+      }
+      select.value = previous;
+      const successful = (data.benchmarks || []).filter(item => item.success);
+      const benchmarkText = successful.length ? ` · ${successful.length} benchmarked` : '';
+      setEncoderStatus(`Mode: ${data.mode || 'auto'} · recommended: ${data.recommended || 'scrcpy auto'}${benchmarkText}`);
+    } catch (error) {
+      setEncoderStatus(`Encoder probe failed: ${error instanceof Error ? error.message : String(error)}`, true);
+    }
+  }
+  async function saveEncoderPreference() {
+    const serial = selectedSerial();
+    const select = document.getElementById('latency-video-encoder');
+    if (!serial || !select) return;
+    setEncoderStatus('Saving encoder preference…');
+    try {
+      const data = await requestJson(`/api/v1/devices/${encodeURIComponent(serial)}/video-encoder`, {
+        method: 'PUT', body: JSON.stringify({ encoder: select.value || null }),
+      });
+      setEncoderStatus(`Saved · recommended: ${data.recommended || 'scrcpy auto'}`);
+    } catch (error) {
+      setEncoderStatus(`Unable to save encoder: ${error instanceof Error ? error.message : String(error)}`, true);
+    }
+  }
+  async function benchmarkEncoders() {
+    const serial = selectedSerial();
+    if (!serial) { setEncoderStatus('Select an Android device first.', true); return; }
+    const disconnect = document.getElementById('disconnect');
+    if (disconnect && !disconnect.disabled) { setEncoderStatus('Disconnect the active display before benchmarking.', true); return; }
+    const button = document.getElementById('latency-encoder-benchmark');
+    if (button) button.disabled = true;
+    setEncoderStatus('Benchmarking H.264 encoders… this may take several seconds.');
+    try {
+      const data = await requestJson(`/api/v1/devices/${encodeURIComponent(serial)}/video-encoders/benchmark`, {
+        method: 'POST', body: JSON.stringify({ encoders: [] }),
+      });
+      const details = (data.benchmarks || []).map(item => item.success ? `${item.encoder} ${Math.round(item.startupMs)}ms` : `${item.encoder} failed`).join(' · ');
+      setEncoderStatus(`Recommended: ${data.recommended || 'scrcpy auto'}${details ? ` · ${details}` : ''}`);
+      await refreshEncoderUi();
+    } catch (error) {
+      setEncoderStatus(`Benchmark failed: ${error instanceof Error ? error.message : String(error)}`, true);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+  function installLatencyHud() {
+    const statistics = document.getElementById('statistics');
+    if (!statistics || document.getElementById('latency-hud')) return;
+    const hud = document.createElement('div');
+    hud.id = 'latency-hud';
+    hud.className = 'statistics latency-hud';
+    hud.textContent = 'Latency metrics waiting for an active video session.';
+    statistics.insertAdjacentElement('afterend', hud);
+    let previous = '';
+    const update = () => {
+      const m = window.__dwdLatencyMetrics || {};
+      if (!Object.keys(m).length) return;
+      const fps = Number(m.videoFps || 0).toFixed(1);
+      const pipeline = Number(m.browserPipelineMs || 0).toFixed(1);
+      const decode = Number(m.decodeLatencyMs || 0).toFixed(1);
+      const present = Number(m.presentationLatencyMs || 0).toFixed(1);
+      const queue = Number(m.decoderQueue || 0);
+      const pending = Number(m.controlPendingWrites || 0);
+      const buffered = (Number(m.controlSocketBufferedBytes || 0) / 1024).toFixed(1);
+      const coalesced = Number(m.controlMovesCoalesced || 0);
+      const recoveries = Number(m.decoderRecoveries || 0);
+      const backend = m.rendererBackend || 'canvas2d';
+      const text = `Low latency · ${fps} fps · browser pipeline ${pipeline} ms · decode ${decode} ms · present ${present} ms · decoder q ${queue} · control pending ${pending} · WS ${buffered} KiB · moves coalesced ${coalesced} · recoveries ${recoveries} · ${backend}`;
+      if (text !== previous) { hud.textContent = text; previous = text; }
+    };
+    if (latencyTimer !== null) window.clearInterval(latencyTimer);
+    latencyTimer = window.setInterval(update, 250);
+  }
   function boot() {
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
@@ -67,7 +210,10 @@
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));
     ui.querySelector('.gb-drawer-pin')?.addEventListener('click', () => applyPinned(!pinned));
     ui.querySelectorAll('[data-action="close"], .gb-drawer-close').forEach(button => button.addEventListener('click', closeDrawer));
-    bindAccordions(); applyPinned(storedPinned(), false); if (pinned) openGroup(storedGroup());
+    bindAccordions();
+    installLatencyControls();
+    installLatencyHud();
+    applyPinned(storedPinned(), false); if (pinned) openGroup(storedGroup());
   }
   window.DroidWebDisplayDrawer = { openGroup, closeDrawer, setPinned: value => applyPinned(Boolean(value)) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true }); else boot();
