@@ -8,6 +8,24 @@ export interface VirtualDisplayProfile extends VirtualDisplayConfigDto {
 }
 
 export const VIRTUAL_DISPLAY_PROFILES: Readonly<Record<string, VirtualDisplayProfile>> = {
+  "low-latency": {
+    label: "Low Latency — Interactive",
+    profileId: "low-latency",
+    sizeMode: "fixed",
+    width: 1280,
+    height: 720,
+    dpi: 220,
+    startApp: "com.openai.chatgpt",
+    forceStopBeforeLaunch: false,
+    keepActive: true,
+    systemDecorations: true,
+    destroyContentOnClose: true,
+    imePolicy: "local",
+    preserveAspectRatio: true,
+    videoCodec: "h264",
+    videoBitRate: 10_000_000,
+    maxFps: 60,
+  },
   "chatgpt-desktop": {
     label: "ChatGPT Desktop — Recommended",
     profileId: "chatgpt-desktop",
@@ -126,9 +144,9 @@ export function buildSessionRequest(values: DisplayFormValues, serial: string): 
       audio: false,
       control: true,
       videoCodec: "h264",
-      maxSize: 1920,
-      videoBitRate: 8_000_000,
-      maxFps: 30,
+      maxSize: 1600,
+      videoBitRate: 10_000_000,
+      maxFps: 60,
     };
   }
   return {
