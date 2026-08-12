@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import threading
 from typing import Literal
 from uuid import uuid4
@@ -63,7 +64,7 @@ class ProfileDisplay(ProfileModel):
 
     @model_validator(mode="after")
     def validate_virtual_application(self) -> "ProfileDisplay":
-        if self.start_app and not __import__("re").fullmatch(_PACKAGE_PATTERN, self.start_app):
+        if self.start_app and not re.fullmatch(_PACKAGE_PATTERN, self.start_app):
             raise ValueError("startApp must be an exact Android package name")
         if self.display_mode == "virtual" and not self.start_app and not self.system_decorations:
             raise ValueError("startApp is required when virtual system decorations are disabled")
@@ -83,7 +84,7 @@ class ProfileClipboard(ProfileModel):
 
 class ProfileReconnect(ProfileModel):
     enabled: bool = True
-    attempts: int = Field(default=5, ge=1, le=20)
+    attempts: Literal[3, 5, 10] = 5
 
 
 class ProfileVideo(ProfileModel):
@@ -154,7 +155,6 @@ class ConnectionProfileStore:
         if len(ids) != len(set(ids)):
             raise ProfileStoreError("Connection profile store contains duplicate IDs")
         if document.default_profile_id and document.default_profile_id not in ids:
-            # Recover safely from a deleted/hand-edited default pointer without losing profiles.
             document.default_profile_id = None
         return document
 
