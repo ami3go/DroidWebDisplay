@@ -89,7 +89,7 @@ class HardenedTransferManager(_BaseTransferManager):
 
 
 class ResilientSessionManager(_BaseSessionManager):
-    """Keep optional channels isolated and apply the measured low-latency encoder."""
+    """Keep optional channels isolated and safely apply explicit encoder tuning."""
 
     async def start_session(
         self,
@@ -98,14 +98,41 @@ class ResilientSessionManager(_BaseSessionManager):
         options: SessionOptions | None = None,
     ):
         effective_serial = serial
-        if options is not None and options.video and options.video_encoder is None:
+        selected_options = options or SessionOptions()
+        injected_preference: str | None = None
+
+        if selected_options.video and selected_options.video_encoder is None:
             if effective_serial is None:
                 selected = await self.select_device(None)
                 effective_serial = selected.serial
-            recommended = encoder_tuning_store().recommended(effective_serial)
-            if recommended:
-                options = replace(options, video_encoder=recommended)
-        return await super().start_session(serial=effective_serial, options=options)
+            injected_preference = encoder_tuning_store().preference(effective_serial)
+            if injected_preference:
+                selected_options = replace(selected_options, video_encoder=injected_preference)
+
+        try:
+            return await super().start_session(serial=effective_serial, options=selected_options)
+        except Exception as preferred_error:
+            if not injected_preference or effective_serial is None:
+                raise
+
+            # A persisted manual encoder can become invalid after an Android/ROM
+            # update even when the device serial remains unchanged. Do not let a
+            # stale tuning value brick normal Auto operation: invalidate it and
+            # retry exactly once using scrcpy's own encoder selection.
+            encoder_tuning_store().invalidate_preference(
+                effective_serial,
+                expected=injected_preference,
+                reason="preferred-encoder-start-failed",
+            )
+            fallback_options = replace(selected_options, video_encoder=None)
+            try:
+                session = await super().start_session(serial=effective_serial, options=fallback_options)
+            except Exception as fallback_error:
+                raise fallback_error from preferred_error
+            session.server_log.append(
+                f"preferred video encoder {injected_preference!r} failed; retried successfully with scrcpy auto"
+            )
+            return session
 
     async def stop_session(self, session_id: str, *, reason: str = "requested"):  # type: ignore[override]
         session = self._sessions.get(session_id)
