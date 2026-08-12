@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from droid_web_display.models import SessionOptions, SessionState
 from droid_web_display.scrcpy.encoder_tuning import (
-    EncoderBenchmarkResult,
+    EncoderCompatibilityResult,
     configure_encoder_tuning,
     encoder_tuning_store,
     parse_h264_encoders,
@@ -21,7 +21,7 @@ class EncoderPreferenceRequest(BaseModel):
     encoder: str | None = Field(default=None, max_length=160)
 
 
-class EncoderBenchmarkRequest(BaseModel):
+class EncoderCompatibilityRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     encoders: list[str] = Field(default_factory=list, max_length=6)
 
@@ -81,6 +81,7 @@ def install_latency_api(app: FastAPI) -> FastAPI:
             candidates = store.cached_encoders(serial)
 
         preference = store.preference(serial)
+        compatibility_checks = [item.to_dict() for item in store.compatibility_results(serial)]
         return {
             "serial": serial,
             "codec": "h264",
@@ -91,10 +92,13 @@ def install_latency_api(app: FastAPI) -> FastAPI:
             # no longer chooses from startup timings; only an explicit preference
             # is returned here.
             "recommended": preference,
-            "benchmarks": [item.to_dict() for item in store.benchmark_results(serial)],
+            "compatibilityChecks": compatibility_checks,
             "compatibleEncoders": store.compatible_encoders(serial),
             "mode": "selected" if preference else "auto",
             "automaticSelection": "scrcpy",
+            "compatibilityKind": "startup-compatibility",
+            # Legacy response aliases from the first optimization prototype.
+            "benchmarks": compatibility_checks,
             "benchmarkKind": "startup-compatibility",
             "buildFingerprint": store.fingerprint(serial),
             "staleTuningInvalidated": invalidated,
@@ -119,8 +123,15 @@ def install_latency_api(app: FastAPI) -> FastAPI:
             "automaticSelection": "scrcpy",
         }
 
-    @app.post("/api/v1/devices/{serial}/video-encoders/benchmark")
-    async def benchmark_video_encoders(serial: str, body: EncoderBenchmarkRequest, request: Request) -> dict[str, Any]:
+    # /benchmark remains as an undocumented compatibility alias for clients from
+    # the first optimization prototype. New clients use /compatibility.
+    @app.post("/api/v1/devices/{serial}/video-encoders/compatibility")
+    @app.post("/api/v1/devices/{serial}/video-encoders/benchmark", include_in_schema=False)
+    async def test_video_encoder_compatibility(
+        serial: str,
+        body: EncoderCompatibilityRequest,
+        request: Request,
+    ) -> dict[str, Any]:
         runtime = request.app.state.container
         await runtime.manager.select_device(serial)
         if _active_session_for_serial(runtime.manager, serial):
@@ -143,7 +154,7 @@ def install_latency_api(app: FastAPI) -> FastAPI:
         if not candidates:
             raise HTTPException(status_code=422, detail="No H.264 encoder names could be discovered on this Android device")
 
-        results: list[EncoderBenchmarkResult] = []
+        results: list[EncoderCompatibilityResult] = []
         for encoder in candidates[:6]:
             session = None
             started_at = time.perf_counter()
@@ -162,11 +173,11 @@ def install_latency_api(app: FastAPI) -> FastAPI:
                     ),
                 )
                 elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-                results.append(EncoderBenchmarkResult(encoder=encoder, success=True, startup_ms=elapsed_ms))
+                results.append(EncoderCompatibilityResult(encoder=encoder, success=True, startup_ms=elapsed_ms))
             except Exception as exc:
                 elapsed_ms = (time.perf_counter() - started_at) * 1000.0
                 results.append(
-                    EncoderBenchmarkResult(
+                    EncoderCompatibilityResult(
                         encoder=encoder,
                         success=False,
                         startup_ms=elapsed_ms,
@@ -180,16 +191,20 @@ def install_latency_api(app: FastAPI) -> FastAPI:
                     except Exception:
                         pass
 
-        store.set_benchmark_results(serial, results)
+        store.set_compatibility_results(serial, results)
         preference = store.preference(serial)
+        compatibility_checks = [item.to_dict() for item in results]
         return {
             "serial": serial,
             "codec": "h264",
-            "benchmarks": [item.to_dict() for item in results],
+            "compatibilityChecks": compatibility_checks,
             "compatibleEncoders": store.compatible_encoders(serial),
             "preference": preference,
             "recommended": preference,
             "automaticSelection": "scrcpy",
+            "compatibilityKind": "startup-compatibility",
+            # Legacy aliases preserved for older clients.
+            "benchmarks": compatibility_checks,
             "benchmarkKind": "startup-compatibility",
             "note": "This is a compatibility/startup test only. Startup time is not used to rank interactive latency; Auto leaves encoder selection to scrcpy.",
         }
