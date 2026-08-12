@@ -35,8 +35,13 @@ class LowLatencyControlScheduler {
                 current.controlMovesCoalesced = Number(current.controlMovesCoalesced ?? 0) + 1;
             this.#pendingMove = message;
             this.scheduleMove();
+            // Pointer move handlers must never wait behind stale move traffic. The
+            // latest event is retained and written at most once per ~8 ms.
             return Promise.resolve();
         }
+        // DOWN/UP/CANCEL, keys, clipboard and other controls are ordering barriers.
+        // Flush the newest pending MOVE before the barrier so Android observes the
+        // final pointer position without receiving the intermediate backlog.
         this.flushPendingMove();
         return this.enqueue(message);
     }
@@ -152,6 +157,8 @@ export class ScrcpyV41Adapter {
             }
             catch (error) {
                 if (error instanceof StreamDisabledError) {
+                    // Audio is optional. A capture or encoder configuration failure must
+                    // not terminate video/control; the UI reports audio as unavailable.
                     audioParser = null;
                 }
                 else {
@@ -195,3 +202,4 @@ export class ScrcpyV41Adapter {
         };
     }
 }
+//# sourceMappingURL=adapter.js.map

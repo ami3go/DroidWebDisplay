@@ -1,3 +1,7 @@
+function latencyMetrics() {
+    const root = globalThis;
+    return root.__dwdLatencyMetrics ??= {};
+}
 export class WebSocketBridgeTransport {
     sessionId;
     baseUrl;
@@ -18,7 +22,7 @@ export class WebSocketBridgeTransport {
     async openControlChannel() {
         const socket = await this.openSocket("control");
         return {
-            readable: readableFromSocket(socket),
+            readable: readableFromSocket(socket, "control"),
             writable: writableToSocket(socket),
         };
     }
@@ -29,9 +33,11 @@ export class WebSocketBridgeTransport {
             }
         }
         this.#sockets.clear();
+        const metrics = latencyMetrics();
+        metrics.controlSocketBufferedBytes = 0;
     }
     async openReadableChannel(channel) {
-        return readableFromSocket(await this.openSocket(channel));
+        return readableFromSocket(await this.openSocket(channel), channel);
     }
     async openSocket(channel) {
         const url = `${this.baseUrl}/ws/v1/sessions/${encodeURIComponent(this.sessionId)}/${channel}?clientId=${encodeURIComponent(this.#clientId)}`;
@@ -75,14 +81,18 @@ function waitForOpen(socket) {
         socket.addEventListener("close", onClose, { once: true });
     });
 }
-function readableFromSocket(socket) {
+function readableFromSocket(socket, channel) {
     return new ReadableStream({
         start(controller) {
             const onMessage = (event) => {
+                const metrics = latencyMetrics();
+                metrics[`${channel}SocketMessages`] = Number(metrics[`${channel}SocketMessages`] ?? 0) + 1;
                 if (event.data instanceof ArrayBuffer) {
+                    metrics[`${channel}SocketLastMessageBytes`] = event.data.byteLength;
                     controller.enqueue(new Uint8Array(event.data));
                 }
                 else if (event.data instanceof Blob) {
+                    metrics[`${channel}SocketLastMessageBytes`] = event.data.size;
                     void event.data.arrayBuffer().then((value) => controller.enqueue(new Uint8Array(value))).catch((error) => controller.error(error));
                 }
                 else {
@@ -117,23 +127,33 @@ function readableFromSocket(socket) {
     });
 }
 function writableToSocket(socket) {
+    // Control frames are tiny. A megabyte-scale backlog is unacceptable for an
+    // interactive pointer/keyboard path, so apply backpressure while the browser
+    // has more than 64 KiB queued for the socket.
+    const maximumBufferedBytes = 64 * 1024;
     return new WritableStream({
         async write(chunk) {
             if (socket.readyState !== WebSocket.OPEN) {
                 throw new Error("Control WebSocket is not open");
             }
-            while (socket.bufferedAmount > 1024 * 1024) {
-                await new Promise((resolve) => setTimeout(resolve, 5));
+            while (socket.bufferedAmount > maximumBufferedBytes) {
+                latencyMetrics().controlBackpressureWaits = Number(latencyMetrics().controlBackpressureWaits ?? 0) + 1;
+                await new Promise((resolve) => setTimeout(resolve, 1));
                 if (socket.readyState !== WebSocket.OPEN)
                     throw new Error("Control WebSocket closed during backpressure wait");
             }
             socket.send(chunk);
+            const metrics = latencyMetrics();
+            metrics.controlSocketBufferedBytes = socket.bufferedAmount;
+            metrics.controlSocketPeakBufferedBytes = Math.max(Number(metrics.controlSocketPeakBufferedBytes ?? 0), socket.bufferedAmount);
         },
         close() {
+            latencyMetrics().controlSocketBufferedBytes = 0;
             if (socket.readyState === WebSocket.OPEN)
                 socket.close(1000, "control writer closed");
         },
         abort(reason) {
+            latencyMetrics().controlSocketBufferedBytes = 0;
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
                 socket.close(1011, String(reason ?? "control writer aborted"));
             }
