@@ -3,10 +3,110 @@ import { InvalidProtocolValueError, StreamDisabledError, VersionMismatchError } 
 import type { BridgeTransport, CompatibilityResult, ServerInfo, SessionOptions } from "../../common/transport.js";
 import type { DeviceInfo, MediaPacket } from "../../common/types.js";
 import { ADAPTER_ID, SCRCPY_VERSION } from "./constants.js";
-import { type ControlMessage, serializeControlMessage } from "./control.js";
+import { ControlMessageType, type ControlMessage, serializeControlMessage } from "./control.js";
 import { DeviceMessageParser, type DeviceMessage } from "./device.js";
 import { readDeviceInfo, readDummyByte } from "./handshake.js";
 import { ScrcpyMediaStreamParser, type MediaStreamHeader } from "./media.js";
+
+const TOUCH_MOVE_ACTION = 2;
+const TOUCH_MOVE_INTERVAL_MS = 8;
+
+type LatencyMetrics = Record<string, number | string | boolean>;
+
+function metrics(): LatencyMetrics {
+  const root = globalThis as typeof globalThis & { __dwdLatencyMetrics?: LatencyMetrics };
+  return root.__dwdLatencyMetrics ??= {};
+}
+
+function monotonicNow(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function isTouchMove(message: ControlMessage): boolean {
+  return message.type === ControlMessageType.InjectTouchEvent && message.action === TOUCH_MOVE_ACTION;
+}
+
+class LowLatencyControlScheduler {
+  #pendingMove: ControlMessage | null = null;
+  #moveTimer: ReturnType<typeof setTimeout> | null = null;
+  #tail: Promise<void> = Promise.resolve();
+  #closed = false;
+
+  public constructor(private readonly writer: WritableStreamDefaultWriter<Uint8Array>) {}
+
+  public send(message: ControlMessage): Promise<void> {
+    if (this.#closed) return Promise.reject(new Error("control scheduler is closed"));
+    if (isTouchMove(message)) {
+      const current = metrics();
+      if (this.#pendingMove) current.controlMovesCoalesced = Number(current.controlMovesCoalesced ?? 0) + 1;
+      this.#pendingMove = message;
+      this.scheduleMove();
+      // Pointer move handlers must never wait behind stale move traffic. The
+      // latest event is retained and written at most once per ~8 ms.
+      return Promise.resolve();
+    }
+
+    // DOWN/UP/CANCEL, keys, clipboard and other controls are ordering barriers.
+    // Flush the newest pending MOVE before the barrier so Android observes the
+    // final pointer position without receiving the intermediate backlog.
+    this.flushPendingMove();
+    return this.enqueue(message);
+  }
+
+  public async close(): Promise<void> {
+    if (this.#closed) return;
+    this.#closed = true;
+    if (this.#moveTimer !== null) {
+      clearTimeout(this.#moveTimer);
+      this.#moveTimer = null;
+    }
+    this.flushPendingMove();
+    await this.#tail;
+  }
+
+  private scheduleMove(): void {
+    if (this.#moveTimer !== null) return;
+    this.#moveTimer = setTimeout(() => {
+      this.#moveTimer = null;
+      const move = this.#pendingMove;
+      this.#pendingMove = null;
+      if (!move || this.#closed) return;
+      void this.enqueue(move).catch((error: unknown) => {
+        metrics().controlLastError = error instanceof Error ? error.message : String(error);
+      });
+    }, TOUCH_MOVE_INTERVAL_MS);
+  }
+
+  private flushPendingMove(): void {
+    if (this.#moveTimer !== null) {
+      clearTimeout(this.#moveTimer);
+      this.#moveTimer = null;
+    }
+    const move = this.#pendingMove;
+    this.#pendingMove = null;
+    if (!move) return;
+    void this.enqueue(move).catch((error: unknown) => {
+      metrics().controlLastError = error instanceof Error ? error.message : String(error);
+    });
+  }
+
+  private enqueue(message: ControlMessage): Promise<void> {
+    const current = metrics();
+    current.controlPendingWrites = Number(current.controlPendingWrites ?? 0) + 1;
+    const queuedAt = monotonicNow();
+    const write = this.#tail.then(async () => {
+      const startedAt = monotonicNow();
+      current.controlQueueDelayMs = Math.max(0, startedAt - queuedAt);
+      await this.writer.write(serializeControlMessage(message));
+      current.controlLastWriteMs = Math.max(0, monotonicNow() - startedAt);
+      current.controlMessagesSent = Number(current.controlMessagesSent ?? 0) + 1;
+    });
+    this.#tail = write.catch(() => undefined);
+    return write.finally(() => {
+      current.controlPendingWrites = Math.max(0, Number(current.controlPendingWrites ?? 1) - 1);
+    });
+  }
+}
 
 export interface ScrcpyV41Session {
   readonly device: DeviceInfo | null;
@@ -74,6 +174,7 @@ export class ScrcpyV41Adapter {
       : null;
     const deviceParser = controlReader ? new DeviceMessageParser(controlReader) : null;
     const controlWriter = controlPair?.writable.getWriter() ?? null;
+    const controlScheduler = controlWriter ? new LowLatencyControlScheduler(controlWriter) : null;
 
     const videoHeader = videoParser ? await videoParser.readHeader() : null;
     let audioHeader: MediaStreamHeader | null = null;
@@ -108,11 +209,12 @@ export class ScrcpyV41Adapter {
         return deviceParser.read();
       },
       sendControl: async (message) => {
-        if (!controlWriter) throw new VersionMismatchError("control channel is disabled");
-        await controlWriter.write(serializeControlMessage(message));
+        if (!controlScheduler) throw new VersionMismatchError("control channel is disabled");
+        await controlScheduler.send(message);
       },
       close: async () => {
         try {
+          await controlScheduler?.close();
           await controlWriter?.close();
         } finally {
           await transport.close();
