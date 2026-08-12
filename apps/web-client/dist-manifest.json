@@ -200,33 +200,33 @@
     },
     {
       "path": "assets/video-render-worker.d.ts",
-      "bytes": 617,
-      "sha256": "519df73e34360030599357ee28fa0f3e07a213953c0512adec150692d154460b"
+      "bytes": 770,
+      "sha256": "ff14f79c33dd027fea87060e43b63ae6cb8075f527758e29c2628eb7e9acd524"
     },
     {
       "path": "assets/video-render-worker.js",
-      "bytes": 1966,
-      "sha256": "06f5657c82f912fe9249dd158f104f52319eb99b35a771020a6bce007441491e"
+      "bytes": 2944,
+      "sha256": "7d0c850782c913ca16b3e808590ed6c3e535be85d692fdfd2657b0ccee09f8a7"
     },
     {
       "path": "assets/video-render-worker.js.map",
-      "bytes": 2016,
-      "sha256": "c29f8c9783f21873030448be8329c16fb3753589c6d67a5fad3765318c0ac818"
+      "bytes": 3026,
+      "sha256": "5657d90ea8ee1c7f2cb7994824b196afaec8d1fd17f1973364e4ddc0cf01d4f9"
     },
     {
       "path": "assets/video-renderer.d.ts",
-      "bytes": 1722,
-      "sha256": "43a29fcdbd28b4fd53e0749a550b2029e7d31459c99f20422ef0d75ee8c166d3"
+      "bytes": 1827,
+      "sha256": "9256881a6b43e5ff2af6070b0f0e1aae705ffa5933f0083de4942fa4d8514322"
     },
     {
       "path": "assets/video-renderer.js",
-      "bytes": 15004,
-      "sha256": "1e675883fc36419032c703c4177038a390ba8639ebd181d7e3fe6d829b7c4b3e"
+      "bytes": 17050,
+      "sha256": "09038579cc62107ca93c95478855b101dfc39e98a7e602cc38e2c26c0d669c99"
     },
     {
       "path": "assets/video-renderer.js.map",
-      "bytes": 14509,
-      "sha256": "311f19b320f6ec9a928911aea56e2ffb34a9d81a6b64dac54f46a883c409ddf2"
+      "bytes": 16019,
+      "sha256": "1822c5710ec314b28eb3bd2934a4c1c0b345a7d2f2eae1e65bd2df441d526588"
     },
     {
       "path": "assets/websocket-transport.d.ts",
@@ -235,13 +235,13 @@
     },
     {
       "path": "assets/websocket-transport.js",
-      "bytes": 6807,
-      "sha256": "c4633304112f212b769b2586d43f473366cf44683e466366f0ca71760d097ba0"
+      "bytes": 11785,
+      "sha256": "73882b06d3864f85c70874da7dc3bf7448aca8c8fd894296df8a1adfd5685e87"
     },
     {
       "path": "assets/websocket-transport.js.map",
-      "bytes": 6335,
-      "sha256": "fa91316ca0ac01f9b8086d913f75305f288080df4e9be8b7f6f1907a924074cd"
+      "bytes": 10125,
+      "sha256": "28a49d5cb0ed831a5e8a13728041c1b88abfb1b4d2fa83a33eb20906771038f4"
     },
     {
       "path": "droidwebdisplay-main-drawer.css",
@@ -250,8 +250,8 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 12861,
-      "sha256": "4fdae94b9185315d509c02b337ba9da6565c67415d94e269734961166f4298b9"
+      "bytes": 13976,
+      "sha256": "5c941b101584b852083e8a37cc03aed0fc1e07f536fb4ea1744f8354fb604da4"
     },
     {
       "path": "index.html",
@@ -360,13 +360,13 @@
     },
     {
       "path": "vendor/scrcpy-protocol/src/versions/v4_1/adapter.js",
-      "bytes": 8827,
-      "sha256": "aa80e7330b1dea298dcf431c73165a312a9e30207c3fc2092881cd7fb5d2cf86"
+      "bytes": 9211,
+      "sha256": "ec49cc69236f3e60df7e5069013deffaf4a2bfdddaf23423d8dd6f73b8aa7da6"
     },
     {
       "path": "vendor/scrcpy-protocol/src/versions/v4_1/adapter.js.map",
-      "bytes": 7737,
-      "sha256": "474dfbec06c96bb771f3c0d1f9d5124c55d040ff7ccdda3ef026fd2c8c1f1495"
+      "bytes": 8091,
+      "sha256": "6849ce94d6359e63a35d233a2d51b41d304e7588f24b13c71825a02f4c3ff7f2"
     },
     {
       "path": "vendor/scrcpy-protocol/src/versions/v4_1/constants.d.ts",

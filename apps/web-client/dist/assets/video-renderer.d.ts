@@ -11,9 +11,11 @@ export interface VideoStatistics {
     readonly fps: number;
     readonly decodeLatencyMs: number;
     readonly presentationLatencyMs: number;
+    readonly parserToDrawMs: number;
     readonly browserPipelineMs: number;
     readonly decoderRecoveries: number;
     readonly rendererBackend: "offscreen-worker" | "canvas2d";
+    readonly workerRestarts: number;
 }
 export type StatisticsListener = (statistics: VideoStatistics) => void;
 export declare class WebCodecsVideoRenderer {
@@ -35,6 +37,7 @@ export declare class WebCodecsVideoRenderer {
         height: number;
     }>;
     private initializeRenderingBackend;
+    private startRenderWorker;
     private processPacket;
     private applySession;
     private configure;

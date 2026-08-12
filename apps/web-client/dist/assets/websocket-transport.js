@@ -2,6 +2,9 @@ function latencyMetrics() {
     const root = globalThis;
     return root.__dwdLatencyMetrics ??= {};
 }
+function now() {
+    return globalThis.performance?.now?.() ?? Date.now();
+}
 export class WebSocketBridgeTransport {
     sessionId;
     baseUrl;
@@ -35,6 +38,9 @@ export class WebSocketBridgeTransport {
         this.#sockets.clear();
         const metrics = latencyMetrics();
         metrics.controlSocketBufferedBytes = 0;
+        metrics.videoSocketQueuedBytes = 0;
+        metrics.audioSocketQueuedBytes = 0;
+        metrics.controlSocketQueuedBytes = 0;
     }
     async openReadableChannel(channel) {
         return readableFromSocket(await this.openSocket(channel), channel);
@@ -81,36 +87,121 @@ function waitForOpen(socket) {
         socket.addEventListener("close", onClose, { once: true });
     });
 }
+function maximumIncomingQueueBytes(channel) {
+    // WebSocket itself has no receive-side backpressure API. Keep only a small,
+    // explicit queue between WebSocket delivery and the scrcpy parser. If video
+    // exceeds this bound, fail/reconnect rather than displaying increasingly old
+    // frames. Chunks cannot be dropped individually because they are byte-stream
+    // fragments, not guaranteed H.264 access-unit boundaries.
+    if (channel === "video")
+        return 512 * 1024;
+    if (channel === "audio")
+        return 256 * 1024;
+    return 128 * 1024;
+}
 function readableFromSocket(socket, channel) {
+    const maximumQueuedBytes = maximumIncomingQueueBytes(channel);
+    const metricPrefix = `${channel}Socket`;
+    let queue = [];
+    let queuedBytes = 0;
+    let closed = false;
+    let conversionTail = Promise.resolve();
+    let removeListeners = () => undefined;
     return new ReadableStream({
         start(controller) {
-            const onMessage = (event) => {
+            const updateQueueMetrics = () => {
                 const metrics = latencyMetrics();
-                metrics[`${channel}SocketMessages`] = Number(metrics[`${channel}SocketMessages`] ?? 0) + 1;
-                if (event.data instanceof ArrayBuffer) {
-                    metrics[`${channel}SocketLastMessageBytes`] = event.data.byteLength;
-                    controller.enqueue(new Uint8Array(event.data));
-                }
-                else if (event.data instanceof Blob) {
-                    metrics[`${channel}SocketLastMessageBytes`] = event.data.size;
-                    void event.data.arrayBuffer().then((value) => controller.enqueue(new Uint8Array(value))).catch((error) => controller.error(error));
-                }
-                else {
-                    controller.error(new Error("Expected binary WebSocket frame"));
+                metrics[`${metricPrefix}QueuedBytes`] = queuedBytes;
+                metrics[`${metricPrefix}QueuePeakBytes`] = Math.max(Number(metrics[`${metricPrefix}QueuePeakBytes`] ?? 0), queuedBytes);
+            };
+            const drain = () => {
+                while (!closed && queue.length > 0 && (controller.desiredSize ?? 1) > 0) {
+                    const item = queue.shift();
+                    queuedBytes = Math.max(0, queuedBytes - item.data.byteLength);
+                    const metrics = latencyMetrics();
+                    metrics[`${metricPrefix}QueueDelayMs`] = Math.max(0, now() - item.receivedAt);
+                    updateQueueMetrics();
+                    controller.enqueue(item.data);
                 }
             };
+            const failBacklog = () => {
+                if (closed)
+                    return;
+                closed = true;
+                const metrics = latencyMetrics();
+                metrics[`${metricPrefix}BacklogOverflows`] = Number(metrics[`${metricPrefix}BacklogOverflows`] ?? 0) + 1;
+                metrics[`${metricPrefix}QueuedBytes`] = queuedBytes;
+                queue = [];
+                queuedBytes = 0;
+                removeListeners();
+                if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+                    socket.close(1013, `${channel} backlog exceeded`);
+                }
+                controller.error(new Error(`${channel} WebSocket backlog exceeded ${maximumQueuedBytes} bytes; reconnecting instead of rendering stale data`));
+            };
+            const accept = (data, receivedAt) => {
+                if (closed)
+                    return;
+                const metrics = latencyMetrics();
+                metrics[`${metricPrefix}Messages`] = Number(metrics[`${metricPrefix}Messages`] ?? 0) + 1;
+                metrics[`${metricPrefix}LastMessageBytes`] = data.byteLength;
+                queue.push({ data, receivedAt });
+                queuedBytes += data.byteLength;
+                updateQueueMetrics();
+                if (queuedBytes > maximumQueuedBytes) {
+                    failBacklog();
+                    return;
+                }
+                drain();
+            };
+            const onMessage = (event) => {
+                const receivedAt = now();
+                // Serialize Blob conversion with ArrayBuffer delivery so the byte stream
+                // cannot be reordered if a browser ignores binaryType for one message.
+                conversionTail = conversionTail.then(async () => {
+                    if (closed)
+                        return;
+                    if (event.data instanceof ArrayBuffer) {
+                        accept(new Uint8Array(event.data), receivedAt);
+                        return;
+                    }
+                    if (event.data instanceof Blob) {
+                        accept(new Uint8Array(await event.data.arrayBuffer()), receivedAt);
+                        return;
+                    }
+                    throw new Error("Expected binary WebSocket frame");
+                }).catch((error) => {
+                    if (closed)
+                        return;
+                    closed = true;
+                    removeListeners();
+                    controller.error(error);
+                });
+            };
             const onClose = (event) => {
-                cleanup();
+                if (closed)
+                    return;
+                closed = true;
+                removeListeners();
+                latencyMetrics()[`${metricPrefix}QueuedBytes`] = 0;
+                queue = [];
+                queuedBytes = 0;
                 if (event.code === 1000)
                     controller.close();
                 else
                     controller.error(new Error(`WebSocket closed (${event.code}: ${event.reason})`));
             };
             const onError = () => {
-                cleanup();
+                if (closed)
+                    return;
+                closed = true;
+                removeListeners();
+                queue = [];
+                queuedBytes = 0;
+                latencyMetrics()[`${metricPrefix}QueuedBytes`] = 0;
                 controller.error(new Error("WebSocket transport error"));
             };
-            const cleanup = () => {
+            removeListeners = () => {
                 socket.removeEventListener("message", onMessage);
                 socket.removeEventListener("close", onClose);
                 socket.removeEventListener("error", onError);
@@ -118,19 +209,45 @@ function readableFromSocket(socket, channel) {
             socket.addEventListener("message", onMessage);
             socket.addEventListener("close", onClose);
             socket.addEventListener("error", onError);
+            controller.__dwdDrain = drain;
+        },
+        pull(controller) {
+            controller.__dwdDrain?.();
         },
         cancel() {
+            closed = true;
+            removeListeners();
+            queue = [];
+            queuedBytes = 0;
+            latencyMetrics()[`${metricPrefix}QueuedBytes`] = 0;
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
                 socket.close(1000, "reader cancelled");
             }
         },
-    });
+    }, { highWaterMark: 1 });
 }
 function writableToSocket(socket) {
     // Control frames are tiny. A megabyte-scale backlog is unacceptable for an
     // interactive pointer/keyboard path, so apply backpressure while the browser
     // has more than 64 KiB queued for the socket.
     const maximumBufferedBytes = 64 * 1024;
+    let sampling = false;
+    const sampleBufferedAmount = () => {
+        const metrics = latencyMetrics();
+        metrics.controlSocketBufferedBytes = socket.readyState === WebSocket.OPEN ? socket.bufferedAmount : 0;
+        if (socket.readyState === WebSocket.OPEN && socket.bufferedAmount > 0) {
+            setTimeout(sampleBufferedAmount, 4);
+        }
+        else {
+            sampling = false;
+        }
+    };
+    const startSampling = () => {
+        if (sampling)
+            return;
+        sampling = true;
+        sampleBufferedAmount();
+    };
     return new WritableStream({
         async write(chunk) {
             if (socket.readyState !== WebSocket.OPEN) {
@@ -146,6 +263,7 @@ function writableToSocket(socket) {
             const metrics = latencyMetrics();
             metrics.controlSocketBufferedBytes = socket.bufferedAmount;
             metrics.controlSocketPeakBufferedBytes = Math.max(Number(metrics.controlSocketPeakBufferedBytes ?? 0), socket.bufferedAmount);
+            startSampling();
         },
         close() {
             latencyMetrics().controlSocketBufferedBytes = 0;

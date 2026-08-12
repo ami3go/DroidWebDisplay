@@ -1507,6 +1507,16 @@
               "title": "Serial",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "probe",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Probe",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

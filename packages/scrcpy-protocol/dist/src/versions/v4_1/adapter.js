@@ -19,8 +19,9 @@ function isTouchMove(message) {
 }
 class LowLatencyControlScheduler {
     writer;
-    #pendingMove = null;
+    #pendingMoves = new Map();
     #moveTimer = null;
+    #moveSequence = 0;
     #tail = Promise.resolve();
     #closed = false;
     constructor(writer) {
@@ -31,57 +32,64 @@ class LowLatencyControlScheduler {
             return Promise.reject(new Error("control scheduler is closed"));
         if (isTouchMove(message)) {
             const current = metrics();
-            if (this.#pendingMove)
+            if (this.#pendingMoves.has(message.pointerId)) {
                 current.controlMovesCoalesced = Number(current.controlMovesCoalesced ?? 0) + 1;
-            this.#pendingMove = message;
-            this.scheduleMove();
-            // Pointer move handlers must never wait behind stale move traffic. The
-            // latest event is retained and written at most once per ~8 ms.
+            }
+            this.#moveSequence += 1;
+            this.#pendingMoves.set(message.pointerId, { message, sequence: this.#moveSequence });
+            current.controlPendingMovePointers = this.#pendingMoves.size;
+            this.scheduleMoves();
+            // Pointer MOVE handlers never wait behind stale MOVE traffic. The newest
+            // position is retained independently for each active pointer and written
+            // at most once per ~8 ms.
             return Promise.resolve();
         }
         // DOWN/UP/CANCEL, keys, clipboard and other controls are ordering barriers.
-        // Flush the newest pending MOVE before the barrier so Android observes the
-        // final pointer position without receiving the intermediate backlog.
-        this.flushPendingMove();
+        // Flush the newest MOVE for every pointer first so Android observes each
+        // pointer's final position without receiving the intermediate backlog.
+        this.flushPendingMoves();
         return this.enqueue(message);
     }
     async close() {
         if (this.#closed)
             return;
-        this.#closed = true;
         if (this.#moveTimer !== null) {
             clearTimeout(this.#moveTimer);
             this.#moveTimer = null;
         }
-        this.flushPendingMove();
+        this.flushPendingMoves();
+        this.#closed = true;
         await this.#tail;
+        metrics().controlPendingMovePointers = 0;
     }
-    scheduleMove() {
+    scheduleMoves() {
         if (this.#moveTimer !== null)
             return;
         this.#moveTimer = setTimeout(() => {
             this.#moveTimer = null;
-            const move = this.#pendingMove;
-            this.#pendingMove = null;
-            if (!move || this.#closed)
+            if (this.#closed)
                 return;
-            void this.enqueue(move).catch((error) => {
-                metrics().controlLastError = error instanceof Error ? error.message : String(error);
-            });
+            this.flushPendingMoves();
         }, TOUCH_MOVE_INTERVAL_MS);
     }
-    flushPendingMove() {
+    takePendingMoves() {
+        const moves = [...this.#pendingMoves.values()]
+            .sort((left, right) => left.sequence - right.sequence)
+            .map((item) => item.message);
+        this.#pendingMoves.clear();
+        metrics().controlPendingMovePointers = 0;
+        return moves;
+    }
+    flushPendingMoves() {
         if (this.#moveTimer !== null) {
             clearTimeout(this.#moveTimer);
             this.#moveTimer = null;
         }
-        const move = this.#pendingMove;
-        this.#pendingMove = null;
-        if (!move)
-            return;
-        void this.enqueue(move).catch((error) => {
-            metrics().controlLastError = error instanceof Error ? error.message : String(error);
-        });
+        for (const move of this.takePendingMoves()) {
+            void this.enqueue(move).catch((error) => {
+                metrics().controlLastError = error instanceof Error ? error.message : String(error);
+            });
+        }
     }
     enqueue(message) {
         const current = metrics();
