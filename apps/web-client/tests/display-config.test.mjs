@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { alignedFlexSize, buildSessionRequest, validateDisplayForm, VIRTUAL_DISPLAY_PROFILES } from "../dist/assets/display-config.js";
+import {
+  alignedFlexSize,
+  buildSessionRequest,
+  PHYSICAL_DISPLAY_DEFAULTS,
+  validateDisplayForm,
+  VIRTUAL_DISPLAY_PROFILES,
+} from "../dist/assets/display-config.js";
 
 const base = {
   displayMode: "virtual",
@@ -36,11 +42,18 @@ test("low-latency profile targets 720p at 60 fps", () => {
   assert.equal(profile.maxFps, 60);
 });
 
-test("physical mode defaults to the interactive 60 fps envelope", () => {
+test("physical mode uses the exported interactive defaults", () => {
+  assert.deepEqual(PHYSICAL_DISPLAY_DEFAULTS, {
+    videoCodec: "h264",
+    maxSize: 1600,
+    videoBitRate: 10_000_000,
+    maxFps: 60,
+  });
   const request = buildSessionRequest({ ...base, displayMode: "physical" }, "PHONE");
-  assert.equal(request.maxSize, 1600);
-  assert.equal(request.videoBitRate, 10_000_000);
-  assert.equal(request.maxFps, 60);
+  assert.equal(request.videoCodec, PHYSICAL_DISPLAY_DEFAULTS.videoCodec);
+  assert.equal(request.maxSize, PHYSICAL_DISPLAY_DEFAULTS.maxSize);
+  assert.equal(request.videoBitRate, PHYSICAL_DISPLAY_DEFAULTS.videoBitRate);
+  assert.equal(request.maxFps, PHYSICAL_DISPLAY_DEFAULTS.maxFps);
 });
 
 test("virtual-display request maps typed values", () => {
