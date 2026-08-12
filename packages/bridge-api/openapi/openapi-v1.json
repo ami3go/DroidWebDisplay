@@ -321,7 +321,7 @@
         "title": "DuplicatePolicy",
         "type": "string"
       },
-      "EncoderBenchmarkRequest": {
+      "EncoderCompatibilityRequest": {
         "additionalProperties": false,
         "properties": {
           "encoders": {
@@ -333,7 +333,7 @@
             "type": "array"
           }
         },
-        "title": "EncoderBenchmarkRequest",
+        "title": "EncoderCompatibilityRequest",
         "type": "object"
       },
       "EncoderPreferenceRequest": {
@@ -1551,9 +1551,9 @@
         "summary": "Video Encoders"
       }
     },
-    "/api/v1/devices/{serial}/video-encoders/benchmark": {
+    "/api/v1/devices/{serial}/video-encoders/compatibility": {
       "post": {
-        "operationId": "benchmark_video_encoders_api_v1_devices__serial__video_encoders_benchmark_post",
+        "operationId": "test_video_encoder_compatibility_api_v1_devices__serial__video_encoders_compatibility_post",
         "parameters": [
           {
             "in": "path",
@@ -1569,7 +1569,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EncoderBenchmarkRequest"
+                "$ref": "#/components/schemas/EncoderCompatibilityRequest"
               }
             }
           },
@@ -1581,7 +1581,7 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Benchmark Video Encoders Api V1 Devices  Serial  Video Encoders Benchmark Post",
+                  "title": "Response Test Video Encoder Compatibility Api V1 Devices  Serial  Video Encoders Compatibility Post",
                   "type": "object"
                 }
               }
@@ -1604,7 +1604,7 @@
             "pcLocalSession": []
           }
         ],
-        "summary": "Benchmark Video Encoders"
+        "summary": "Test Video Encoder Compatibility"
       }
     },
     "/api/v1/devices/{serial}/virtual-display-capabilities": {

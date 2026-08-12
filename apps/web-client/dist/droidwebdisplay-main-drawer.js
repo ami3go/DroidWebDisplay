@@ -1,4 +1,4 @@
-/* DroidWebDisplay native single-drawer controller v1.2.1 */
+/* DroidWebDisplay native single-drawer controller v1.2.2 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
@@ -169,10 +169,11 @@
     if (button) button.disabled = true;
     setEncoderStatus('Testing H.264 encoder compatibility… this may take several seconds.');
     try {
-      const data = await requestJson(`/api/v1/devices/${encodeURIComponent(serial)}/video-encoders/benchmark`, {
+      const data = await requestJson(`/api/v1/devices/${encodeURIComponent(serial)}/video-encoders/compatibility`, {
         method: 'POST', body: JSON.stringify({ encoders: [] }),
       });
-      const details = (data.benchmarks || []).map(item => item.success ? `${item.encoder} compatible` : `${item.encoder} failed`).join(' · ');
+      const checks = data.compatibilityChecks || data.benchmarks || [];
+      const details = checks.map(item => item.success ? `${item.encoder} compatible` : `${item.encoder} failed`).join(' · ');
       setEncoderStatus(`${data.compatibleEncoders?.length || 0} compatible${details ? ` · ${details}` : ''}. Auto still uses scrcpy selection.`);
       await refreshEncoderUi(false);
     } catch (error) {
@@ -196,7 +197,7 @@
       const fps = Number(m.videoFps || 0).toFixed(1);
       const wsQueueDelay = Number(m.videoSocketQueueDelayMs || 0).toFixed(1);
       const wsQueued = (Number(m.videoSocketQueuedBytes || 0) / 1024).toFixed(1);
-      const parserToDraw = Number(m.parserToDrawMs ?? m.browserPipelineMs ?? 0).toFixed(1);
+      const parserToDraw = Number(m.parserToDrawMs || 0).toFixed(1);
       const decode = Number(m.decodeLatencyMs || 0).toFixed(1);
       const present = Number(m.presentationLatencyMs || 0).toFixed(1);
       const queue = Number(m.decoderQueue || 0);
