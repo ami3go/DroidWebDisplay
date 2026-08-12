@@ -35,6 +35,17 @@ async def discover_h264_encoders(adb: Any, serial: str) -> list[str]:
     return parse_h264_encoders(text)
 
 
+async def device_build_fingerprint(adb: Any, serial: str) -> str | None:
+    shell = getattr(adb, "shell", None)
+    if not callable(shell):
+        return None
+    result = await shell(serial, "getprop", "ro.build.fingerprint", check=False, timeout=10.0)
+    if getattr(result, "returncode", 1) != 0:
+        return None
+    value = str(getattr(result, "stdout", "")).strip()
+    return value or None
+
+
 def _active_session_for_serial(manager: Any, serial: str) -> bool:
     active_states = {
         SessionState.PROBING,
@@ -56,19 +67,38 @@ def install_latency_api(app: FastAPI) -> FastAPI:
     configure_encoder_tuning(container.config.resolved_transfer_data_directory / "video-encoder-tuning.json")
 
     @app.get("/api/v1/devices/{serial}/video-encoders")
-    async def video_encoders(serial: str, request: Request) -> dict[str, Any]:
+    async def video_encoders(serial: str, request: Request, probe: bool = False) -> dict[str, Any]:
         runtime = request.app.state.container
         await runtime.manager.select_device(serial)
-        candidates = await discover_h264_encoders(runtime.adb, serial)
         store = encoder_tuning_store()
+        invalidated = False
+        if probe:
+            fingerprint = await device_build_fingerprint(runtime.adb, serial)
+            invalidated = store.bind_device(serial, fingerprint)
+            candidates = await discover_h264_encoders(runtime.adb, serial)
+            store.set_discovered_encoders(serial, candidates)
+        else:
+            candidates = store.cached_encoders(serial)
+
+        preference = store.preference(serial)
         return {
             "serial": serial,
             "codec": "h264",
             "encoders": candidates,
-            "preference": store.preference(serial),
-            "recommended": store.recommended(serial),
+            "probed": probe,
+            "preference": preference,
+            # Compatibility field retained for existing clients. Automatic mode
+            # no longer chooses from startup timings; only an explicit preference
+            # is returned here.
+            "recommended": preference,
             "benchmarks": [item.to_dict() for item in store.benchmark_results(serial)],
-            "mode": "selected" if store.preference(serial) else "auto",
+            "compatibleEncoders": store.compatible_encoders(serial),
+            "mode": "selected" if preference else "auto",
+            "automaticSelection": "scrcpy",
+            "benchmarkKind": "startup-compatibility",
+            "buildFingerprint": store.fingerprint(serial),
+            "staleTuningInvalidated": invalidated,
+            "lastInvalidation": store.last_invalidation(serial),
         }
 
     @app.put("/api/v1/devices/{serial}/video-encoder")
@@ -76,16 +106,17 @@ def install_latency_api(app: FastAPI) -> FastAPI:
         runtime = request.app.state.container
         await runtime.manager.select_device(serial)
         encoder = validate_encoder_name(body.encoder) if body.encoder else None
-        candidates = await discover_h264_encoders(runtime.adb, serial)
-        if encoder and candidates and encoder not in candidates:
-            raise HTTPException(status_code=422, detail="Selected encoder was not found in Android codec diagnostics")
         store = encoder_tuning_store()
+        candidates = store.cached_encoders(serial)
+        if encoder and candidates and encoder not in candidates:
+            raise HTTPException(status_code=422, detail="Selected encoder was not found in the cached Android codec probe")
         store.set_preference(serial, encoder)
         return {
             "serial": serial,
             "preference": store.preference(serial),
-            "recommended": store.recommended(serial),
+            "recommended": store.preference(serial),
             "mode": "selected" if encoder else "auto",
+            "automaticSelection": "scrcpy",
         }
 
     @app.post("/api/v1/devices/{serial}/video-encoders/benchmark")
@@ -93,9 +124,16 @@ def install_latency_api(app: FastAPI) -> FastAPI:
         runtime = request.app.state.container
         await runtime.manager.select_device(serial)
         if _active_session_for_serial(runtime.manager, serial):
-            raise HTTPException(status_code=409, detail="Disconnect the active Android session before benchmarking video encoders")
+            raise HTTPException(status_code=409, detail="Disconnect the active Android session before testing video encoders")
 
-        discovered = await discover_h264_encoders(runtime.adb, serial)
+        store = encoder_tuning_store()
+        discovered = store.cached_encoders(serial)
+        if not discovered:
+            fingerprint = await device_build_fingerprint(runtime.adb, serial)
+            store.bind_device(serial, fingerprint)
+            discovered = await discover_h264_encoders(runtime.adb, serial)
+            store.set_discovered_encoders(serial, discovered)
+
         requested = [validate_encoder_name(value) for value in body.encoders]
         candidates = requested or discovered[:4]
         if discovered:
@@ -138,19 +176,22 @@ def install_latency_api(app: FastAPI) -> FastAPI:
             finally:
                 if session is not None:
                     try:
-                        await runtime.manager.stop_session(session.session_id, reason="encoder_benchmark")
+                        await runtime.manager.stop_session(session.session_id, reason="encoder_compatibility_test")
                     except Exception:
                         pass
 
-        store = encoder_tuning_store()
         store.set_benchmark_results(serial, results)
+        preference = store.preference(serial)
         return {
             "serial": serial,
             "codec": "h264",
             "benchmarks": [item.to_dict() for item in results],
-            "recommended": store.recommended(serial),
-            "preference": store.preference(serial),
-            "note": "Benchmark measures scrcpy encoder startup compatibility and startup time; live browser metrics measure interactive pipeline latency.",
+            "compatibleEncoders": store.compatible_encoders(serial),
+            "preference": preference,
+            "recommended": preference,
+            "automaticSelection": "scrcpy",
+            "benchmarkKind": "startup-compatibility",
+            "note": "This is a compatibility/startup test only. Startup time is not used to rank interactive latency; Auto leaves encoder selection to scrcpy.",
         }
 
     return app
