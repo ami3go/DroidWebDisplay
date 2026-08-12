@@ -9,6 +9,7 @@ const files = [
   resolve(root, "tests/api.test.mjs"),
   resolve(root, "tests/transfer.test.mjs"),
   resolve(root, "tests/display-config.test.mjs"),
+  resolve(root, "tests/connection-profile.test.mjs"),
   resolve(root, "tests/layout.test.mjs"),
 ];
 await new Promise((resolvePromise, reject) => {
