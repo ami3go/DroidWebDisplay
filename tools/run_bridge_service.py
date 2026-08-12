@@ -140,6 +140,10 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
         log_level="info",
         ssl_certfile=str(config.tls_certificate_path) if config.tls_enabled and config.tls_certificate_path else None,
         ssl_keyfile=str(config.tls_private_key_path) if config.tls_enabled and config.tls_private_key_path else None,
+        # H.264/Opus payloads are already compressed. Per-message-deflate adds
+        # CPU work to every media/control frame without useful bandwidth savings
+        # on the local bridge, so keep the WebSocket path compression-free.
+        ws_per_message_deflate=False,
     )
     server = uvicorn.Server(uvicorn_config)
     server_holder["server"] = server
@@ -148,6 +152,7 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
     print(f"Web UI marker: {WEB_UI_MARKER}")
     print(f"Network access mode: {config.network_mode}")
     print(f"WebSocket backend: {websocket_backend}")
+    print("WebSocket compression: disabled (low-latency mode)")
     print(f"PC download folder: {config.resolved_default_download_directory}")
     print(f"Transfer concurrency: {config.transfer_concurrency}")
     print(f"Authentication store: {config.resolved_auth_data_file}")
