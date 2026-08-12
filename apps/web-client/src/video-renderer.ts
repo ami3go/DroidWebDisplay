@@ -7,6 +7,7 @@ import {
 
 const DECODER_BACKLOG_RECOVERY_THRESHOLD = 4;
 const STATISTICS_INTERVAL_MS = 250;
+const MAX_RENDER_WORKER_RESTARTS = 2;
 
 export interface VideoStatistics {
   readonly framesDecoded: number;
@@ -20,9 +21,11 @@ export interface VideoStatistics {
   readonly fps: number;
   readonly decodeLatencyMs: number;
   readonly presentationLatencyMs: number;
+  readonly parserToDrawMs: number;
   readonly browserPipelineMs: number;
   readonly decoderRecoveries: number;
   readonly rendererBackend: "offscreen-worker" | "canvas2d";
+  readonly workerRestarts: number;
 }
 
 export type StatisticsListener = (statistics: VideoStatistics) => void;
@@ -36,11 +39,13 @@ interface ResizeWaiter {
 }
 
 interface RenderWorkerMessage {
-  readonly type: "ready" | "presented";
+  readonly type: "ready" | "presented" | "fatal";
   readonly timestamp?: number;
   readonly presentedAt?: number;
   readonly drawMilliseconds?: number;
   readonly dropped?: number;
+  readonly error?: string;
+  readonly canvas?: OffscreenCanvas;
 }
 
 type LatencyMetrics = Record<string, number | string | boolean>;
@@ -68,10 +73,11 @@ export class WebCodecsVideoRenderer {
   #lastTimestamp = 0;
   #sessionChanges = 0;
   #decoderRecoveries = 0;
+  #workerRestarts = 0;
   #awaitingKeyFrame = false;
   #decodeLatencyMs = 0;
   #presentationLatencyMs = 0;
-  #browserPipelineMs = 0;
+  #parserToDrawMs = 0;
   #fps = 0;
   #fpsWindowStartedAt = now();
   #fpsWindowFrames = 0;
@@ -149,16 +155,8 @@ export class WebCodecsVideoRenderer {
     const offscreenCapable = typeof Worker !== "undefined" && "transferControlToOffscreen" in this.canvas;
     if (offscreenCapable) {
       try {
-        const worker = new Worker(new URL("./video-render-worker.js", import.meta.url), { type: "module" });
         const offscreen = this.canvas.transferControlToOffscreen();
-        worker.addEventListener("message", (event: MessageEvent<RenderWorkerMessage>) => this.onWorkerMessage(event.data));
-        worker.addEventListener("error", (event) => {
-          metrics.videoWorkerError = event.message || "OffscreenCanvas worker failed";
-        });
-        worker.postMessage({ type: "init", canvas: offscreen }, [offscreen]);
-        this.#worker = worker;
-        this.#rendererBackend = "offscreen-worker";
-        metrics.rendererBackend = this.#rendererBackend;
+        this.startRenderWorker(offscreen);
         return;
       } catch (error) {
         metrics.videoWorkerError = error instanceof Error ? error.message : String(error);
@@ -169,6 +167,21 @@ export class WebCodecsVideoRenderer {
     if (!this.#context) throw new Error("Canvas 2D context is unavailable");
     this.#rendererBackend = "canvas2d";
     metrics.rendererBackend = this.#rendererBackend;
+  }
+
+  private startRenderWorker(offscreen: OffscreenCanvas): void {
+    const metrics = latencyMetrics();
+    const worker = new Worker(new URL("./video-render-worker.js", import.meta.url), { type: "module" });
+    worker.addEventListener("message", (event: MessageEvent<RenderWorkerMessage>) => this.onWorkerMessage(event.data));
+    worker.addEventListener("error", (event) => {
+      metrics.videoWorkerError = event.message || "OffscreenCanvas worker failed";
+      metrics.videoWorkerFatal = true;
+    });
+    worker.postMessage({ type: "init", canvas: offscreen }, [offscreen]);
+    this.#worker = worker;
+    this.#rendererBackend = "offscreen-worker";
+    metrics.rendererBackend = this.#rendererBackend;
+    metrics.videoWorkerFatal = false;
   }
 
   private async processPacket(packet: MediaPacket): Promise<void> {
@@ -184,16 +197,21 @@ export class WebCodecsVideoRenderer {
       throw new Error("Received video frame before H.264 decoder configuration");
     }
 
+    if (this.#decoder.decodeQueueSize >= DECODER_BACKLOG_RECOVERY_THRESHOLD) {
+      this.recoverDecoderBacklog();
+      // A keyframe is exactly the packet needed to resume after reset. Decode it
+      // immediately instead of discarding it with the old backlog. Delta frames
+      // are dropped until the next keyframe arrives.
+      if (!packet.keyFrame) {
+        this.#framesDropped += 1;
+        this.emitStatistics(true);
+        return;
+      }
+    }
+
     if (this.#awaitingKeyFrame && !packet.keyFrame) {
       this.#framesDropped += 1;
       this.emitStatistics();
-      return;
-    }
-
-    if (this.#decoder.decodeQueueSize >= DECODER_BACKLOG_RECOVERY_THRESHOLD && !packet.keyFrame) {
-      this.recoverDecoderBacklog();
-      this.#framesDropped += 1;
-      this.emitStatistics(true);
       return;
     }
 
@@ -258,13 +276,17 @@ export class WebCodecsVideoRenderer {
 
   private recoverDecoderBacklog(): void {
     if (!this.#decoder || !this.#decoderConfig || this.#decoder.state === "closed") return;
+    const discarded = this.#decoder.decodeQueueSize;
     this.#decoder.reset();
     this.#decoder.configure(this.#decoderConfig);
     this.#decoderRecoveries += 1;
+    this.#framesDropped += discarded;
     this.#awaitingKeyFrame = true;
     this.#packetArrivals.clear();
     this.#decodeOutputs.clear();
-    latencyMetrics().decoderRecoveries = this.#decoderRecoveries;
+    const metrics = latencyMetrics();
+    metrics.decoderRecoveries = this.#decoderRecoveries;
+    metrics.decoderFramesDiscardedByRecovery = Number(metrics.decoderFramesDiscardedByRecovery ?? 0) + discarded;
   }
 
   private closeDecoder(): void {
@@ -312,7 +334,12 @@ export class WebCodecsVideoRenderer {
     this.#animationFrame = null;
     const frame = this.#pendingFrame;
     this.#pendingFrame = null;
-    if (!frame || !this.#context) return;
+    if (!frame) return;
+    if (!this.#context) {
+      frame.close();
+      this.#framesDropped += 1;
+      return;
+    }
     try {
       this.#context.drawImage(frame, 0, 0, this.canvas.width, this.canvas.height);
       this.recordPresentation(frame.timestamp, now(), 0);
@@ -329,7 +356,24 @@ export class WebCodecsVideoRenderer {
       latencyMetrics().rendererBackend = "offscreen-worker";
       return;
     }
-    if (message.type !== "presented" || message.timestamp === undefined || message.presentedAt === undefined) return;
+    if (message.type === "fatal") {
+      const metrics = latencyMetrics();
+      metrics.videoWorkerError = message.error || "OffscreenCanvas worker failed";
+      const failedWorker = this.#worker;
+      this.#worker = null;
+      failedWorker?.terminate();
+      if (message.canvas && this.#workerRestarts < MAX_RENDER_WORKER_RESTARTS) {
+        this.#workerRestarts += 1;
+        metrics.videoWorkerRestarts = this.#workerRestarts;
+        this.startRenderWorker(message.canvas);
+        if (this.#width > 0 && this.#height > 0) this.resizeCanvas(this.#width, this.#height);
+      } else {
+        metrics.videoWorkerFatal = true;
+      }
+      this.emitStatistics(true);
+      return;
+    }
+    if (message.timestamp === undefined || message.presentedAt === undefined) return;
     if (message.dropped) this.#framesDropped += message.dropped;
     this.recordPresentation(message.timestamp, message.presentedAt - performance.timeOrigin, message.drawMilliseconds ?? 0);
   }
@@ -338,7 +382,7 @@ export class WebCodecsVideoRenderer {
     const decodedAt = this.#decodeOutputs.get(timestamp);
     const arrivedAt = this.#packetArrivals.get(timestamp);
     if (decodedAt !== undefined) this.#presentationLatencyMs = Math.max(0, presentedAt - decodedAt);
-    if (arrivedAt !== undefined) this.#browserPipelineMs = Math.max(0, presentedAt - arrivedAt);
+    if (arrivedAt !== undefined) this.#parserToDrawMs = Math.max(0, presentedAt - arrivedAt);
     this.#decodeOutputs.delete(timestamp);
     this.#packetArrivals.delete(timestamp);
     this.#framesPresented += 1;
@@ -366,7 +410,7 @@ export class WebCodecsVideoRenderer {
   private resizeCanvas(width: number, height: number): void {
     if (this.#worker) {
       this.#worker.postMessage({ type: "resize", width, height });
-    } else {
+    } else if (this.#context) {
       this.canvas.width = width;
       this.canvas.height = height;
     }
@@ -390,12 +434,16 @@ export class WebCodecsVideoRenderer {
     current.decoderQueue = decoderQueue;
     current.decodeLatencyMs = Number(this.#decodeLatencyMs.toFixed(1));
     current.presentationLatencyMs = Number(this.#presentationLatencyMs.toFixed(1));
-    current.browserPipelineMs = Number(this.#browserPipelineMs.toFixed(1));
+    current.parserToDrawMs = Number(this.#parserToDrawMs.toFixed(1));
+    // Preserve the old metric key for compatibility, but make its scope clear in
+    // the HUD. It starts at parser submission, not WebSocket receipt or Android.
+    current.browserPipelineMs = current.parserToDrawMs;
     current.videoFramesDecoded = this.#framesDecoded;
     current.videoFramesPresented = this.#framesPresented;
     current.videoFramesDropped = this.#framesDropped;
     current.decoderRecoveries = this.#decoderRecoveries;
     current.rendererBackend = this.#rendererBackend;
+    current.videoWorkerRestarts = this.#workerRestarts;
     if (!force && timestamp - this.#lastStatisticsAt < STATISTICS_INTERVAL_MS) return;
     this.#lastStatisticsAt = timestamp;
     this.onStatistics({
@@ -410,9 +458,11 @@ export class WebCodecsVideoRenderer {
       fps: this.#fps,
       decodeLatencyMs: this.#decodeLatencyMs,
       presentationLatencyMs: this.#presentationLatencyMs,
-      browserPipelineMs: this.#browserPipelineMs,
+      parserToDrawMs: this.#parserToDrawMs,
+      browserPipelineMs: this.#parserToDrawMs,
       decoderRecoveries: this.#decoderRecoveries,
       rendererBackend: this.#rendererBackend,
+      workerRestarts: this.#workerRestarts,
     });
   }
 
