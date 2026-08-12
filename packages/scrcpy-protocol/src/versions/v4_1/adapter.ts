@@ -12,6 +12,12 @@ const TOUCH_MOVE_ACTION = 2;
 const TOUCH_MOVE_INTERVAL_MS = 8;
 
 type LatencyMetrics = Record<string, number | string | boolean>;
+type TouchMessage = Extract<ControlMessage, { readonly type: ControlMessageType.InjectTouchEvent }>;
+
+interface PendingMove {
+  readonly message: TouchMessage;
+  readonly sequence: number;
+}
 
 function metrics(): LatencyMetrics {
   const root = globalThis as typeof globalThis & { __dwdLatencyMetrics?: LatencyMetrics };
@@ -22,13 +28,14 @@ function monotonicNow(): number {
   return globalThis.performance?.now?.() ?? Date.now();
 }
 
-function isTouchMove(message: ControlMessage): boolean {
+function isTouchMove(message: ControlMessage): message is TouchMessage {
   return message.type === ControlMessageType.InjectTouchEvent && message.action === TOUCH_MOVE_ACTION;
 }
 
 class LowLatencyControlScheduler {
-  #pendingMove: ControlMessage | null = null;
+  readonly #pendingMoves = new Map<bigint, PendingMove>();
   #moveTimer: ReturnType<typeof setTimeout> | null = null;
+  #moveSequence = 0;
   #tail: Promise<void> = Promise.resolve();
   #closed = false;
 
@@ -38,56 +45,66 @@ class LowLatencyControlScheduler {
     if (this.#closed) return Promise.reject(new Error("control scheduler is closed"));
     if (isTouchMove(message)) {
       const current = metrics();
-      if (this.#pendingMove) current.controlMovesCoalesced = Number(current.controlMovesCoalesced ?? 0) + 1;
-      this.#pendingMove = message;
-      this.scheduleMove();
-      // Pointer move handlers must never wait behind stale move traffic. The
-      // latest event is retained and written at most once per ~8 ms.
+      if (this.#pendingMoves.has(message.pointerId)) {
+        current.controlMovesCoalesced = Number(current.controlMovesCoalesced ?? 0) + 1;
+      }
+      this.#moveSequence += 1;
+      this.#pendingMoves.set(message.pointerId, { message, sequence: this.#moveSequence });
+      current.controlPendingMovePointers = this.#pendingMoves.size;
+      this.scheduleMoves();
+      // Pointer MOVE handlers never wait behind stale MOVE traffic. The newest
+      // position is retained independently for each active pointer and written
+      // at most once per ~8 ms.
       return Promise.resolve();
     }
 
     // DOWN/UP/CANCEL, keys, clipboard and other controls are ordering barriers.
-    // Flush the newest pending MOVE before the barrier so Android observes the
-    // final pointer position without receiving the intermediate backlog.
-    this.flushPendingMove();
+    // Flush the newest MOVE for every pointer first so Android observes each
+    // pointer's final position without receiving the intermediate backlog.
+    this.flushPendingMoves();
     return this.enqueue(message);
   }
 
   public async close(): Promise<void> {
     if (this.#closed) return;
-    this.#closed = true;
     if (this.#moveTimer !== null) {
       clearTimeout(this.#moveTimer);
       this.#moveTimer = null;
     }
-    this.flushPendingMove();
+    this.flushPendingMoves();
+    this.#closed = true;
     await this.#tail;
+    metrics().controlPendingMovePointers = 0;
   }
 
-  private scheduleMove(): void {
+  private scheduleMoves(): void {
     if (this.#moveTimer !== null) return;
     this.#moveTimer = setTimeout(() => {
       this.#moveTimer = null;
-      const move = this.#pendingMove;
-      this.#pendingMove = null;
-      if (!move || this.#closed) return;
-      void this.enqueue(move).catch((error: unknown) => {
-        metrics().controlLastError = error instanceof Error ? error.message : String(error);
-      });
+      if (this.#closed) return;
+      this.flushPendingMoves();
     }, TOUCH_MOVE_INTERVAL_MS);
   }
 
-  private flushPendingMove(): void {
+  private takePendingMoves(): TouchMessage[] {
+    const moves = [...this.#pendingMoves.values()]
+      .sort((left, right) => left.sequence - right.sequence)
+      .map((item) => item.message);
+    this.#pendingMoves.clear();
+    metrics().controlPendingMovePointers = 0;
+    return moves;
+  }
+
+  private flushPendingMoves(): void {
     if (this.#moveTimer !== null) {
       clearTimeout(this.#moveTimer);
       this.#moveTimer = null;
     }
-    const move = this.#pendingMove;
-    this.#pendingMove = null;
-    if (!move) return;
-    void this.enqueue(move).catch((error: unknown) => {
-      metrics().controlLastError = error instanceof Error ? error.message : String(error);
-    });
+    for (const move of this.takePendingMoves()) {
+      void this.enqueue(move).catch((error: unknown) => {
+        metrics().controlLastError = error instanceof Error ? error.message : String(error);
+      });
+    }
   }
 
   private enqueue(message: ControlMessage): Promise<void> {
