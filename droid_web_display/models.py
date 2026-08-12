@@ -97,6 +97,7 @@ class DisplayImePolicy(StrEnum):
 
 
 _PACKAGE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+$")
+_ENCODER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
 
 
 @dataclass(frozen=True)
@@ -158,6 +159,12 @@ class VirtualDisplayOptions:
 
 
 VIRTUAL_DISPLAY_PROFILES: dict[str, VirtualDisplayOptions] = {
+    "low-latency": VirtualDisplayOptions(
+        profile_id="low-latency",
+        width=1280,
+        height=720,
+        dpi=220,
+    ),
     "chatgpt-desktop": VirtualDisplayOptions(),
     "full-hd-desktop": VirtualDisplayOptions(
         profile_id="full-hd-desktop",
@@ -188,6 +195,7 @@ class SessionOptions:
     audio_codec: str = "opus"
     audio_bit_rate: int = 128_000
     video_codec: str = "h264"
+    video_encoder: str | None = None
     max_size: int = 1920
     video_bit_rate: int = 8_000_000
     max_fps: int = 30
@@ -205,6 +213,8 @@ class SessionOptions:
             raise ValueError("audio_bit_rate must be between 16 Kbps and 512 Kbps")
         if self.video_codec not in {"h264", "h265", "av1"}:
             raise ValueError("video_codec must be h264, h265 or av1")
+        if self.video_encoder is not None and not _ENCODER_RE.fullmatch(self.video_encoder):
+            raise ValueError("video_encoder contains unsupported characters")
         if self.max_size < 0:
             raise ValueError("max_size must be zero or positive")
         if not 2_000_000 <= self.video_bit_rate <= 50_000_000:
@@ -239,6 +249,7 @@ class SessionOptions:
             "audioCodec": self.audio_codec,
             "audioBitRate": self.audio_bit_rate,
             "videoCodec": self.video_codec,
+            "videoEncoder": self.video_encoder,
             "maxSize": self.max_size,
             "videoBitRate": self.video_bit_rate,
             "maxFps": self.max_fps,
