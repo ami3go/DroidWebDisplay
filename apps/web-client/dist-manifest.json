@@ -79,6 +79,21 @@
       "sha256": "412b951eb2bbf8b3614024506c288498b5033e62c07a49385cd754101f0e8d74"
     },
     {
+      "path": "assets/connection-profile-controller.d.ts",
+      "bytes": 2707,
+      "sha256": "40fd6ac6b53c4988548d0ca2161041c8e4139053f3d5602ae26315a0ded8b152"
+    },
+    {
+      "path": "assets/connection-profile-controller.js",
+      "bytes": 35536,
+      "sha256": "b2b1cdfd1adc8f97a6463f0b440bd60a8cef2f5dc06f5b083a794f0d6325859c"
+    },
+    {
+      "path": "assets/connection-profile-controller.js.map",
+      "bytes": 32023,
+      "sha256": "a2c9944cf5389b7b327c056731ab4c558024aa84b9f83c4a697ec78777f32105"
+    },
+    {
       "path": "assets/controller.d.ts",
       "bytes": 4288,
       "sha256": "1e26e409944d52b33b7698e19146a8ff8cfd1a50e7ef5989a0aaed84bee9a764"
@@ -130,13 +145,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 11145,
-      "sha256": "06bb39ae706a0dd05411bc3ba471dd68c35e1e1a2ea3f2c396f9422a043b6142"
+      "bytes": 11384,
+      "sha256": "fc7b01ff55a73708498cfe47797f0a83f77690391f5e01467b0433412b644848"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 8407,
-      "sha256": "27a10c9b05a266f5aed34d5a9f44437a294c723eb78b407624db3294783e6928"
+      "bytes": 8560,
+      "sha256": "6e4230eec18d7f98e8ec0a0f5b386a8904bbcd4dcc1ca3edc09113726b6d1e7c"
     },
     {
       "path": "assets/network-controller.d.ts",

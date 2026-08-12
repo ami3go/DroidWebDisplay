@@ -266,6 +266,42 @@
         "title": "Body_transfer_upload_api_v1_transfers_upload_post",
         "type": "object"
       },
+      "ConnectionProfileInput": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
+            "$ref": "#/components/schemas/ProfileAudio"
+          },
+          "clipboard": {
+            "$ref": "#/components/schemas/ProfileClipboard"
+          },
+          "device": {
+            "$ref": "#/components/schemas/ProfileDevice"
+          },
+          "display": {
+            "$ref": "#/components/schemas/ProfileDisplay"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "reconnect": {
+            "$ref": "#/components/schemas/ProfileReconnect"
+          },
+          "video": {
+            "$ref": "#/components/schemas/ProfileVideo"
+          }
+        },
+        "required": [
+          "name",
+          "device",
+          "display"
+        ],
+        "title": "ConnectionProfileInput",
+        "type": "object"
+      },
       "DisplayImePolicy": {
         "enum": [
           "default",
@@ -503,6 +539,240 @@
           "currentPin"
         ],
         "title": "NetworkPinRequest",
+        "type": "object"
+      },
+      "ProfileAudio": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "muted": {
+            "default": false,
+            "title": "Muted",
+            "type": "boolean"
+          },
+          "volume": {
+            "default": 100,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Volume",
+            "type": "integer"
+          }
+        },
+        "title": "ProfileAudio",
+        "type": "object"
+      },
+      "ProfileClipboard": {
+        "additionalProperties": false,
+        "properties": {
+          "automatic": {
+            "default": false,
+            "title": "Automatic",
+            "type": "boolean"
+          },
+          "maximumKiB": {
+            "default": 256,
+            "maximum": 256.0,
+            "minimum": 1.0,
+            "title": "Maximumkib",
+            "type": "integer"
+          }
+        },
+        "title": "ProfileClipboard",
+        "type": "object"
+      },
+      "ProfileDevice": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "serial": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "title": "Serial",
+            "type": "string"
+          }
+        },
+        "required": [
+          "serial"
+        ],
+        "title": "ProfileDevice",
+        "type": "object"
+      },
+      "ProfileDisplay": {
+        "additionalProperties": false,
+        "properties": {
+          "destroyContentOnClose": {
+            "default": true,
+            "title": "Destroycontentonclose",
+            "type": "boolean"
+          },
+          "displayMode": {
+            "enum": [
+              "physical",
+              "virtual"
+            ],
+            "title": "Displaymode",
+            "type": "string"
+          },
+          "dpi": {
+            "default": 240,
+            "maximum": 640.0,
+            "minimum": 120.0,
+            "title": "Dpi",
+            "type": "integer"
+          },
+          "forceStopBeforeLaunch": {
+            "default": false,
+            "title": "Forcestopbeforelaunch",
+            "type": "boolean"
+          },
+          "height": {
+            "default": 900,
+            "maximum": 2160.0,
+            "minimum": 480.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "imePolicy": {
+            "default": "local",
+            "enum": [
+              "default",
+              "local",
+              "fallback",
+              "hide"
+            ],
+            "title": "Imepolicy",
+            "type": "string"
+          },
+          "keepActive": {
+            "default": true,
+            "title": "Keepactive",
+            "type": "boolean"
+          },
+          "maxFps": {
+            "default": 60,
+            "maximum": 120.0,
+            "minimum": 15.0,
+            "title": "Maxfps",
+            "type": "integer"
+          },
+          "preserveAspectRatio": {
+            "default": true,
+            "title": "Preserveaspectratio",
+            "type": "boolean"
+          },
+          "profileId": {
+            "default": "custom",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Profileid",
+            "type": "string"
+          },
+          "sizeMode": {
+            "default": "fixed",
+            "enum": [
+              "fixed",
+              "flex"
+            ],
+            "title": "Sizemode",
+            "type": "string"
+          },
+          "startApp": {
+            "default": "com.openai.chatgpt",
+            "maxLength": 255,
+            "title": "Startapp",
+            "type": "string"
+          },
+          "systemDecorations": {
+            "default": true,
+            "title": "Systemdecorations",
+            "type": "boolean"
+          },
+          "videoBitRateMbps": {
+            "default": 10.0,
+            "maximum": 50.0,
+            "minimum": 2.0,
+            "title": "Videobitratembps",
+            "type": "number"
+          },
+          "width": {
+            "default": 1600,
+            "maximum": 3840.0,
+            "minimum": 640.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "displayMode"
+        ],
+        "title": "ProfileDisplay",
+        "type": "object"
+      },
+      "ProfileReconnect": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "default": 5,
+            "enum": [
+              3,
+              5,
+              10
+            ],
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "title": "ProfileReconnect",
+        "type": "object"
+      },
+      "ProfileVideo": {
+        "additionalProperties": false,
+        "properties": {
+          "encoder": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "pattern": "^[A-Za-z0-9._:+-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder"
+          },
+          "encoderMode": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "selected"
+            ],
+            "title": "Encodermode",
+            "type": "string"
+          }
+        },
+        "title": "ProfileVideo",
         "type": "object"
       },
       "ResizeVirtualDisplayRequest": {
@@ -1942,6 +2212,317 @@
           }
         ],
         "summary": "Network Validate"
+      }
+    },
+    "/api/v1/profiles": {
+      "get": {
+        "operationId": "list_profiles_api_v1_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Profiles Api V1 Profiles Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "List Profiles"
+      },
+      "post": {
+        "operationId": "create_profile_api_v1_profiles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Profile Api V1 Profiles Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Create Profile"
+      }
+    },
+    "/api/v1/profiles/default": {
+      "delete": {
+        "operationId": "clear_default_profile_api_v1_profiles_default_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Clear Default Profile"
+      }
+    },
+    "/api/v1/profiles/{profile_id}": {
+      "delete": {
+        "operationId": "delete_profile_api_v1_profiles__profile_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Delete Profile"
+      },
+      "get": {
+        "operationId": "get_profile_api_v1_profiles__profile_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Profile Api V1 Profiles  Profile Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Get Profile"
+      },
+      "put": {
+        "operationId": "update_profile_api_v1_profiles__profile_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Profile Api V1 Profiles  Profile Id  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Update Profile"
+      }
+    },
+    "/api/v1/profiles/{profile_id}/default": {
+      "put": {
+        "operationId": "set_default_profile_api_v1_profiles__profile_id__default_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Default Profile Api V1 Profiles  Profile Id  Default Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Set Default Profile"
+      }
+    },
+    "/api/v1/profiles/{profile_id}/used": {
+      "post": {
+        "operationId": "mark_profile_used_api_v1_profiles__profile_id__used_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Mark Profile Used Api V1 Profiles  Profile Id  Used Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Mark Profile Used"
       }
     },
     "/api/v1/sessions": {

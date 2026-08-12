@@ -5,6 +5,7 @@ import { TransferController } from "./transfer-controller.js";
 import { RunningAppController } from "./running-app-controller.js";
 import { AuthController } from "./auth-controller.js";
 import { NetworkAccessController } from "./network-controller.js";
+import { ConnectionProfileController } from "./connection-profile-controller.js";
 function required(selector) {
     const value = document.querySelector(selector);
     if (!value)
@@ -143,6 +144,7 @@ async function bootstrap() {
             capability: required("#virtual-capability"),
             restoreProfile: required("#restore-profile"),
         });
+        const profileController = new ConnectionProfileController();
         const runningAppController = new RunningAppController({
             device: required("#device"),
             select: required("#running-app-select"),
@@ -199,7 +201,10 @@ async function bootstrap() {
         });
         window.addEventListener("beforeunload", () => { controller.stopOnUnload(); runningAppController.close(); });
         void controller.initialize()
-            .then(() => Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]))
+            .then(async () => {
+            await profileController.initialize();
+            return Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]);
+        })
             .catch((error) => {
             required("#status").textContent = "Initialization failed";
             required("#details").textContent = error instanceof Error ? error.message : String(error);

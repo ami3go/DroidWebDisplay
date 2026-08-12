@@ -327,6 +327,10 @@ export class ConnectionProfileController {
 
   private selectProfile(): void {
     const value = element<HTMLSelectElement>("connection-profile-select").value;
+    if (this.#waitingProfileId && value !== this.#waitingProfileId) {
+      this.cancelWaiting(false);
+      this.setStatus("Waiting cancelled because another connection profile was selected.");
+    }
     this.#selectedProfileId = value || null;
     this.#dirty = false;
     this.renderSelectionState();
@@ -544,13 +548,16 @@ export class ConnectionProfileController {
       const devices = await requestJson<{ devices: AndroidDeviceDto[] }>("/api/v1/devices");
       const saved = devices.devices.find(device => device.serial === profile.device.serial && device.ready !== false && (!device.state || device.state === "device"));
       if (saved) {
-        this.cancelWaiting(false); this.#applying = true;
+        this.cancelWaiting(false);
         try {
-          await this.selectExactDevice(profile); await this.finishProfileConnection(profile);
+          // Re-enter the complete profile load path. This safely disconnects any
+          // session the user may have opened while waiting before selecting the
+          // exact saved serial and restoring the profile.
+          await this.loadAndConnectProfile(profile, false);
         } catch (error) {
           this.setMainStatus("Profile connection failed", `${profile.name} · ${errorMessage(error)}`);
           this.setStatus(`Saved device appeared, but the profile connection failed: ${errorMessage(error)}`, true);
-        } finally { this.#applying = false; }
+        }
         return;
       }
     } catch (error) {
