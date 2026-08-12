@@ -205,13 +205,13 @@
     },
     {
       "path": "assets/video-render-worker.js",
-      "bytes": 1941,
-      "sha256": "66b57206836007be78129dfa300b87d815df5c22726853067a38ee1c12f1651e"
+      "bytes": 1966,
+      "sha256": "06f5657c82f912fe9249dd158f104f52319eb99b35a771020a6bce007441491e"
     },
     {
       "path": "assets/video-render-worker.js.map",
-      "bytes": 1996,
-      "sha256": "df808b976fecdc23f8bc2deaab6f96117a0c3b3380903bec0617b0616b4847ab"
+      "bytes": 2016,
+      "sha256": "c29f8c9783f21873030448be8329c16fb3753589c6d67a5fad3765318c0ac818"
     },
     {
       "path": "assets/video-renderer.d.ts",
@@ -220,13 +220,13 @@
     },
     {
       "path": "assets/video-renderer.js",
-      "bytes": 14979,
-      "sha256": "6f8829a39cea6f044a0cb0e00904f762c2e5ec399940f6b083659ba3c47eef5c"
+      "bytes": 15004,
+      "sha256": "1e675883fc36419032c703c4177038a390ba8639ebd181d7e3fe6d829b7c4b3e"
     },
     {
       "path": "assets/video-renderer.js.map",
-      "bytes": 14489,
-      "sha256": "4369685609c1586990d0262e52004553df56c5370efb9e776d08983d4f24fb67"
+      "bytes": 14509,
+      "sha256": "311f19b320f6ec9a928911aea56e2ffb34a9d81a6b64dac54f46a883c409ddf2"
     },
     {
       "path": "assets/websocket-transport.d.ts",

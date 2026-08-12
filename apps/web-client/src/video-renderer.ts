@@ -331,7 +331,7 @@ export class WebCodecsVideoRenderer {
     }
     if (message.type !== "presented" || message.timestamp === undefined || message.presentedAt === undefined) return;
     if (message.dropped) this.#framesDropped += message.dropped;
-    this.recordPresentation(message.timestamp, message.presentedAt, message.drawMilliseconds ?? 0);
+    this.recordPresentation(message.timestamp, message.presentedAt - performance.timeOrigin, message.drawMilliseconds ?? 0);
   }
 
   private recordPresentation(timestamp: number, presentedAt: number, drawMilliseconds: number): void {

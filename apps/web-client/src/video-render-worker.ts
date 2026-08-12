@@ -32,7 +32,7 @@ function presentLatest(): void {
     postMessage({
       type: "presented",
       timestamp: frame.timestamp,
-      presentedAt: performance.now(),
+      presentedAt: performance.timeOrigin + performance.now(),
       drawMilliseconds: Math.max(0, performance.now() - startedAt),
       dropped,
     });

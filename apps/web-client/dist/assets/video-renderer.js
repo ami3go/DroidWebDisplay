@@ -273,7 +273,7 @@ export class WebCodecsVideoRenderer {
             return;
         if (message.dropped)
             this.#framesDropped += message.dropped;
-        this.recordPresentation(message.timestamp, message.presentedAt, message.drawMilliseconds ?? 0);
+        this.recordPresentation(message.timestamp, message.presentedAt - performance.timeOrigin, message.drawMilliseconds ?? 0);
     }
     recordPresentation(timestamp, presentedAt, drawMilliseconds) {
         const decodedAt = this.#decodeOutputs.get(timestamp);

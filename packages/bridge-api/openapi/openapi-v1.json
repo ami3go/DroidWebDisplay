@@ -321,6 +321,40 @@
         "title": "DuplicatePolicy",
         "type": "string"
       },
+      "EncoderBenchmarkRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "encoders": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Encoders",
+            "type": "array"
+          }
+        },
+        "title": "EncoderBenchmarkRequest",
+        "type": "object"
+      },
+      "EncoderPreferenceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "encoder": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder"
+          }
+        },
+        "title": "EncoderPreferenceRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1403,6 +1437,164 @@
           }
         ],
         "summary": "Running Apps"
+      }
+    },
+    "/api/v1/devices/{serial}/video-encoder": {
+      "put": {
+        "operationId": "set_video_encoder_api_v1_devices__serial__video_encoder_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderPreferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Video Encoder Api V1 Devices  Serial  Video Encoder Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Set Video Encoder"
+      }
+    },
+    "/api/v1/devices/{serial}/video-encoders": {
+      "get": {
+        "operationId": "video_encoders_api_v1_devices__serial__video_encoders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Video Encoders Api V1 Devices  Serial  Video Encoders Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Video Encoders"
+      }
+    },
+    "/api/v1/devices/{serial}/video-encoders/benchmark": {
+      "post": {
+        "operationId": "benchmark_video_encoders_api_v1_devices__serial__video_encoders_benchmark_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderBenchmarkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Benchmark Video Encoders Api V1 Devices  Serial  Video Encoders Benchmark Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Benchmark Video Encoders"
       }
     },
     "/api/v1/devices/{serial}/virtual-display-capabilities": {
