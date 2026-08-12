@@ -187,6 +187,13 @@ VIRTUAL_DISPLAY_PROFILES: dict[str, VirtualDisplayOptions] = {
 }
 
 
+# Canonical interactive physical-display envelope. Browser defaults are kept in
+# sync by release regression coverage so API callers and the web UI do not drift.
+INTERACTIVE_PHYSICAL_MAX_SIZE = 1600
+INTERACTIVE_VIDEO_BIT_RATE = 10_000_000
+INTERACTIVE_MAX_FPS = 60
+
+
 @dataclass(frozen=True)
 class SessionOptions:
     video: bool = True
@@ -196,9 +203,9 @@ class SessionOptions:
     audio_bit_rate: int = 128_000
     video_codec: str = "h264"
     video_encoder: str | None = None
-    max_size: int = 1920
-    video_bit_rate: int = 8_000_000
-    max_fps: int = 30
+    max_size: int = INTERACTIVE_PHYSICAL_MAX_SIZE
+    video_bit_rate: int = INTERACTIVE_VIDEO_BIT_RATE
+    max_fps: int = INTERACTIVE_MAX_FPS
     log_level: str = "info"
     cleanup: bool = True
     display_mode: DisplayMode = DisplayMode.PHYSICAL
