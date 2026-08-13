@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { inspectBrowserCapabilities } from "../dist/assets/browser-support.js";
+import { decoderBacklogAction } from "../dist/assets/video-renderer.js";
 
 test("reports all mandatory Chromium/WebCodecs capabilities", () => {
   const report = inspectBrowserCapabilities({
@@ -43,4 +44,14 @@ test("reports optional audio independently from mandatory video support", () => 
   assert.equal(report.supported, true);
   assert.equal(report.audioSupported, false);
   assert.deepEqual(report.missingAudio, ["AudioDecoder", "EncodedAudioChunk", "AudioContext"]);
+});
+
+test("decoder backlog never drops an arbitrary H.264 delta frame", () => {
+  assert.equal(decoderBacklogAction(9, false), "decode");
+  assert.equal(decoderBacklogAction(100, false), "decode");
+});
+
+test("decoder backlog recovery is allowed only at a fresh keyframe", () => {
+  assert.equal(decoderBacklogAction(8, true), "decode");
+  assert.equal(decoderBacklogAction(9, true), "recover-at-keyframe");
 });
