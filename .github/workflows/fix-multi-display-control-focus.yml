@@ -1,0 +1,98 @@
+name: Fix Multi-display Control Focus
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  fix-control-focus:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web-client/package-lock.json
+
+      - name: Apply control-focus fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old[:160]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          controller = Path('apps/web-client/src/controller.ts')
+
+          # Refresh diagnostics when browser focus enters/leaves a display canvas.
+          replace_once(
+              controller,
+              '''    canvas.addEventListener("keydown", (event) => void this.keydown(event));\n    canvas.addEventListener("paste", (event) => {\n''',
+              '''    canvas.addEventListener("keydown", (event) => void this.keydown(event));\n    canvas.addEventListener("focus", () => this.renderDisplayDiagnostics(true));\n    canvas.addEventListener("blur", () => this.renderDisplayDiagnostics(true));\n    canvas.addEventListener("paste", (event) => {\n''',
+          )
+
+          # Show whether the active control canvas still owns keyboard focus.
+          replace_once(
+              controller,
+              '''      const audioText = audio ? `audio ${audio.codec}, ${audio.bufferedMilliseconds} ms buffered` : "audio off/unavailable";\n      meta.textContent = `${runtime.serverSession.display.kind} display ${displayId} · ${videoText} · ${audioText} · session ${sessionId.slice(0, 8)}`;\n''',
+              '''      const audioText = audio ? `audio ${audio.codec}, ${audio.bufferedMilliseconds} ms buffered` : "audio off/unavailable";\n      const focusText = sessionId === this.#activeSessionId\n        ? `control focus ${runtime.canvas === document.activeElement ? "canvas" : "lost"}`\n        : "control focus background";\n      meta.textContent = `${runtime.serverSession.display.kind} display ${displayId} · ${videoText} · ${audioText} · ${focusText} · session ${sessionId.slice(0, 8)}`;\n''',
+          )
+
+          # Add a single authoritative focus predicate before clipboard polling.
+          replace_once(
+              controller,
+              '''  private async startClipboardPolling(requestPermission: boolean): Promise<void> {\n''',
+              '''  private activeDisplayOwnsKeyboardFocus(): boolean {\n    const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;\n    return runtime?.canvas === document.activeElement;\n  }\n\n  private async startClipboardPolling(requestPermission: boolean): Promise<void> {\n''',
+          )
+
+          # Even with clipboard permission already granted, do not perform the initial
+          # background read after activateRuntime() has focused the Android canvas.
+          replace_once(
+              controller,
+              '''    if (permissionState !== "granted" && !requestPermission) {\n      // Never let a background timer trigger repeated permission/paste prompts. A single\n      // checkbox gesture can explicitly arm PC → Android synchronization when desired.\n      this.setStatus("Clipboard sync ready", "Android → PC sync is active. Toggle automatic sync off/on once to grant PC → Android clipboard access.");\n      return;\n    }\n\n    try {\n''',
+              '''    if (permissionState !== "granted" && !requestPermission) {\n      // Never let a background timer trigger repeated permission/paste prompts. A single\n      // checkbox gesture can explicitly arm PC → Android synchronization when desired.\n      this.setStatus("Clipboard sync ready", "Android → PC sync is active. Toggle automatic sync off/on once to grant PC → Android clipboard access.");\n      return;\n    }\n    if (permissionState === "granted" && !requestPermission && this.activeDisplayOwnsKeyboardFocus()) {\n      // Chromium clipboard reads may still open transient browser UI even after\n      // permission was granted. Never risk stealing keyboard focus from an active\n      // Android canvas. Arm the timer, but every poll remains focus-gated below.\n      this.#clipboardReadAllowed = true;\n      this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);\n      return;\n    }\n\n    try {\n''',
+          )
+
+          # Polling is suppressed for the entire time an Android display owns keyboard focus.
+          replace_once(
+              controller,
+              '''    if (!document.hasFocus() || !sessionId || !session || !this.elements.clipboardAutoSync.checked || !this.#clipboardReadAllowed || this.#clipboardPollBusy) return;\n''',
+              '''    if (\n      !document.hasFocus()\n      || !sessionId\n      || !session\n      || !this.elements.clipboardAutoSync.checked\n      || !this.#clipboardReadAllowed\n      || this.#clipboardPollBusy\n      || this.activeDisplayOwnsKeyboardFocus()\n    ) return;\n''',
+          )
+
+          controller.write_text(controller.read_text(encoding='utf-8'), encoding='utf-8')
+
+          tests = Path('apps/web-client/tests/layout.test.mjs')
+          tests.write_text(tests.read_text(encoding='utf-8') + '''\n\ntest("clipboard polling cannot steal focus from an active Android display", () => {\n  assert.match(controllerSource, /private activeDisplayOwnsKeyboardFocus\(\)/);\n  assert.match(controllerSource, /runtime\?\.canvas === document\.activeElement/);\n  const start = controllerSource.indexOf("private async startClipboardPolling");\n  const end = controllerSource.indexOf("private stopClipboardPolling", start);\n  const polling = controllerSource.slice(start, end);\n  assert.match(polling, /permissionState === "granted" && !requestPermission && this\.activeDisplayOwnsKeyboardFocus\(\)/);\n  assert.match(polling, /this\.activeDisplayOwnsKeyboardFocus\(\)/);\n  assert.match(polling, /this\.#clipboardPollTimer = window\.setInterval/);\n});\n\ntest("display diagnostics distinguish focus loss from control transport failure", () => {\n  assert.match(controllerSource, /control focus \$\{runtime\.canvas === document\.activeElement \? "canvas" : "lost"\}/);\n  assert.match(controllerSource, /canvas\.addEventListener\("focus", \(\) => this\.renderDisplayDiagnostics\(true\)\)/);\n  assert.match(controllerSource, /canvas\.addEventListener\("blur", \(\) => this\.renderDisplayDiagnostics\(true\)\)/);\n});\n''', encoding='utf-8')
+          PY
+
+      - run: npm ci
+        working-directory: apps/web-client
+      - name: Build web client
+        run: node tools/build.mjs
+        working-directory: apps/web-client
+      - name: Run web client tests
+        run: node tools/run-tests.mjs
+        working-directory: apps/web-client
+      - name: Commit control-focus fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web-client/src/controller.ts apps/web-client/tests/layout.test.mjs apps/web-client/dist-manifest.json
+          git add -f apps/web-client/dist
+          git commit -m "Prevent clipboard polling from stealing display control focus"
+          git push origin HEAD:multi-display-tabs
