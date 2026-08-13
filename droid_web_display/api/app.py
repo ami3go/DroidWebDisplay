@@ -748,6 +748,7 @@ def create_app(
         if selected is None:
             raise HTTPException(status_code=404, detail="The selected Android GUI task is no longer running")
         if selected.display_id == session.display_id:
+            session.application = selected.package_name
             return {
                 "status": "already-on-target",
                 "moved": False,
@@ -779,6 +780,8 @@ def create_app(
             ),
             None,
         )
+        if after is not None:
+            session.application = after.package_name
         return {
             "status": "moved" if after else "launch-sent-unverified",
             "moved": True,
