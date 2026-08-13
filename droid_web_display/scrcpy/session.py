@@ -15,6 +15,7 @@ from droid_web_display.errors import (
     DeviceNotFoundError,
     DeviceNotReadyError,
     MultipleDevicesError,
+    SessionConflictError,
     SessionError,
     SessionNotFoundError,
     TunnelError,
