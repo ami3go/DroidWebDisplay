@@ -54,7 +54,9 @@ export type ClipboardShortcut = "copy" | "paste" | null;
 export function clipboardShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): ClipboardShortcut {
   if (event.altKey || (!event.ctrlKey && !event.metaKey)) return null;
   const key = event.key.toLowerCase();
-  if (key === "v") return "paste";
+  // Ctrl/Cmd+V must stay a native browser paste so the canvas "paste"
+  // handler can read ClipboardEvent.clipboardData without Async Clipboard permission.
+  if (key === "v") return null;
   if (key === "c") return "copy";
   return null;
 }
