@@ -185,11 +185,6 @@ export class DroidWebDisplayController {
                 this.applyProfile(this.elements.displayProfile.value);
             this.updateDisplayUi();
         });
-        this.elements.restoreProfile.addEventListener("click", () => {
-            const id = this.elements.displayProfile.value === "custom" ? "chatgpt-desktop" : this.elements.displayProfile.value;
-            this.applyProfile(id);
-            this.updateDisplayUi();
-        });
         for (const element of this.displayInputs()) {
             element.addEventListener("input", () => this.onCustomDisplayChange());
             element.addEventListener("change", () => this.onCustomDisplayChange());

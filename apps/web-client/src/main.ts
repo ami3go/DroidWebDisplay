@@ -143,7 +143,6 @@ async function bootstrap(): Promise<void> {
       virtualMaxFps: required<HTMLInputElement>("#virtual-max-fps"),
       displaySummary: required<HTMLElement>("#display-summary"),
       capability: required<HTMLElement>("#virtual-capability"),
-      restoreProfile: required<HTMLButtonElement>("#restore-profile"),
     });
     const runningAppController = new RunningAppController({
       device: required<HTMLSelectElement>("#device"),

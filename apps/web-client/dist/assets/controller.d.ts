@@ -52,7 +52,6 @@ interface Elements {
     readonly virtualMaxFps: HTMLInputElement;
     readonly displaySummary: HTMLElement;
     readonly capability: HTMLElement;
-    readonly restoreProfile: HTMLButtonElement;
 }
 export declare class DroidWebDisplayController {
     #private;

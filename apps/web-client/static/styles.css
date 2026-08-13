@@ -212,7 +212,6 @@ button.compact { padding: 0.45rem 0.65rem; border-radius: 8px; font-size: 0.78re
   max-width: 100%;
 }
 .display-mode-card select { text-overflow: ellipsis; }
-#restore-profile { white-space: normal; overflow-wrap: anywhere; }
 .virtual-display-settings { min-width: 0; display: grid; gap: 0.55rem; padding-top: 0.2rem; }
 .virtual-display-settings[hidden] { display: none; }
 .three-field-row { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }

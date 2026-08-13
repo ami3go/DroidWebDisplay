@@ -26,7 +26,9 @@ test("Display Mode controls are contained inside their card", () => {
   assert.match(css, /\.display-mode-card > label,/);
   assert.match(css, /\.virtual-display-settings > label,/);
   assert.match(css, /\.display-mode-card select,[\s\S]*max-width: 100%;/);
-  assert.match(css, /#restore-profile \{ white-space: normal; overflow-wrap: anywhere; \}/);
+  assert.equal(html.includes('id=\"restore-profile\"'), false);
+  assert.match(controllerSource, /displayProfile\.addEventListener\(\"change\"[\s\S]*applyProfile\(this\.elements\.displayProfile\.value\)/);
+  assert.match(controllerSource, /onCustomDisplayChange\(\)[\s\S]*displayProfile\.value = \"custom\"/);
 });
 
 test("Display Mode numeric fields collapse safely on narrow viewports", () => {

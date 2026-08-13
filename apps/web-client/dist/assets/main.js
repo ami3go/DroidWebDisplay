@@ -139,7 +139,6 @@ async function bootstrap() {
             virtualMaxFps: required("#virtual-max-fps"),
             displaySummary: required("#display-summary"),
             capability: required("#virtual-capability"),
-            restoreProfile: required("#restore-profile"),
         });
         const runningAppController = new RunningAppController({
             device: required("#device"),

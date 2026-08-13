@@ -80,7 +80,6 @@ interface Elements {
   readonly virtualMaxFps: HTMLInputElement;
   readonly displaySummary: HTMLElement;
   readonly capability: HTMLElement;
-  readonly restoreProfile: HTMLButtonElement;
 }
 
 export class DroidWebDisplayController {
@@ -257,11 +256,6 @@ export class DroidWebDisplayController {
     this.elements.displayMode.addEventListener("change", () => this.updateDisplayUi());
     this.elements.displayProfile.addEventListener("change", () => {
       if (this.elements.displayProfile.value !== "custom") this.applyProfile(this.elements.displayProfile.value);
-      this.updateDisplayUi();
-    });
-    this.elements.restoreProfile.addEventListener("click", () => {
-      const id = this.elements.displayProfile.value === "custom" ? "chatgpt-desktop" : this.elements.displayProfile.value;
-      this.applyProfile(id);
       this.updateDisplayUi();
     });
     for (const element of this.displayInputs()) {
