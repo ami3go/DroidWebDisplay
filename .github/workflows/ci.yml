@@ -1,4 +1,4 @@
-name: Apply Explorer auto-refresh
+name: Apply Explorer drag and drop
 on:
   push:
     branches: [agent/connect-drawer]
@@ -30,21 +30,28 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           p=Path('apps/web-client/src/transfer-controller.ts'); s=p.read_text()
-          s=s.replace('const ACTIVE_STATES = new Set(["queued", "preparing", "transferring", "verifying"]);','const ACTIVE_STATES = new Set(["queued", "preparing", "transferring", "verifying"]);\nconst EXPLORER_REFRESH_STALE_MS = 3000;',1)
-          s=s.replace('  #lastSelectedIndex: number | null = null;','  #lastSelectedIndex: number | null = null;\n  #lastBrowseAt = 0;',1)
-          a='    this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));'
-          b=a+'\n    document.querySelector<HTMLButtonElement>(\'[data-group="files"]\')?.addEventListener("click", () => { void this.runAction(() => this.refreshExplorerIfStale()); });\n    const explorerSection = document.querySelector<HTMLDetailsElement>(\'[data-section-key="files-explorer"]\');\n    explorerSection?.addEventListener("toggle", () => { if (explorerSection.open) void this.runAction(() => this.refreshExplorerIfStale()); });'
+          s=s.replace('this.uploadFiles(this.elements.uploadDirectory.value, this.elements.file)','this.uploadFiles(this.elements.uploadDirectory.value, [...(this.elements.file.files ?? [])])',1)
+          s=s.replace('this.uploadFiles(this.#contextUploadDestination, this.elements.contextUploadFile)','this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])])',1)
+          a='    this.elements.storageBody.addEventListener("click", (event) => {'
+          b='''    this.elements.storageBody.addEventListener("dragover", (event) => {\n      if (!event.dataTransfer?.types.includes("Files")) return;\n      event.preventDefault();\n      event.dataTransfer.dropEffect = "copy";\n      this.clearDropTarget();\n      const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');\n      (row ?? this.elements.storageBody).classList.add("drop-target");\n    });\n    this.elements.storageBody.addEventListener("dragleave", (event) => {\n      if (!this.elements.storageBody.contains(event.relatedTarget as Node | null)) this.clearDropTarget();\n    });\n    this.elements.storageBody.addEventListener("drop", (event) => {\n      if (!event.dataTransfer?.files.length) return;\n      event.preventDefault();\n      const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');\n      const destination = row?.dataset.path ?? this.elements.storagePath.value;\n      const files = [...event.dataTransfer.files];\n      this.clearDropTarget();\n      void this.runAction(() => this.uploadFiles(destination, files));\n    });\n'''+a
           assert a in s; s=s.replace(a,b,1)
-          a='  private async browse(path = this.elements.storagePath.value || "/sdcard/Download"): Promise<void> {'
-          b='  private async refreshExplorerIfStale(): Promise<void> {\n    if (!this.elements.device.value) return;\n    if (Date.now() - this.#lastBrowseAt < EXPLORER_REFRESH_STALE_MS) return;\n    await this.browse();\n  }\n\n'+a
+          a='  private chooseUploadFiles(destination: string): void {'
+          b='''  private clearDropTarget(): void {\n    this.elements.storageBody.classList.remove("drop-target");\n    for (const row of this.elements.storageBody.querySelectorAll(".drop-target")) row.classList.remove("drop-target");\n  }\n\n'''+a
           assert a in s; s=s.replace(a,b,1)
-          a='    this.renderStorage(result.entries);\n    this.setStatus(`${result.entries.length} item(s) in ${result.path}`);'
-          b='    this.renderStorage(result.entries);\n    this.#lastBrowseAt = Date.now();\n    this.setStatus(`${result.entries.length} item(s) in ${result.path}`);'
-          assert a in s; p.write_text(s.replace(a,b,1))
-          p=Path('apps/web-client/tests/layout.test.mjs'); s=p.read_text()
-          if 'const transferSource =' not in s: s=s.replace('const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");','const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");\nconst transferSource = await readFile(resolve(root, "src/transfer-controller.ts"), "utf8");')
-          a='test("File sync keeps Save primary and moves uncommon actions into overflow", () => {'
-          b='test("Android File Explorer refreshes when stale", () => {\n  assert.match(transferSource, /EXPLORER_REFRESH_STALE_MS = 3000/);\n  assert.match(transferSource, /refreshExplorerIfStale/);\n});\n\n'+a
+          a='''  private async uploadFiles(destinationPath: string, sourceInput: HTMLInputElement): Promise<void> {\n    const serial = this.requireSerial();\n    const files = [...(sourceInput.files ?? [])];\n    if (!files.length) throw new Error("Choose one or more PC files to upload");'''
+          b='''  private async uploadFiles(destinationPath: string, files: readonly File[]): Promise<void> {\n    const serial = this.requireSerial();\n    if (!files.length) throw new Error("Choose one or more PC files to upload");'''
+          assert a in s; s=s.replace(a,b,1)
+          assert '      sourceInput.value = "";' in s
+          s=s.replace('      sourceInput.value = "";','      this.elements.file.value = "";\n      this.elements.contextUploadFile.value = "";',1)
+          p.write_text(s)
+
+          p=Path('apps/web-client/static/index.html'); s=p.read_text()
+          s=s.replace('Right-click a file to download it. Right-click a folder or empty space to upload files into that Android folder.','Drag PC files onto a folder to upload there, or onto empty Explorer space to upload to the current folder. Right-click remains available for all actions.',1)
+          p.write_text(s)
+          p=Path('apps/web-client/static/styles.css'); s=p.read_text(); a='.device-diagnostic-summary {'
+          assert a in s; s=s.replace(a,'.explorer-body.drop-target, .explorer-row.drop-target { outline: 2px dashed #82a6ff; outline-offset: -3px; background: #18243a !important; }\n'+a,1); p.write_text(s)
+          p=Path('apps/web-client/tests/layout.test.mjs'); s=p.read_text(); a='test("Android File Explorer refreshes when stale", () => {'
+          b='''test("Android File Explorer accepts PC file drag and drop", () => {\n  assert.match(transferSource, /addEventListener\(\"dragover\"/);\n  assert.match(transferSource, /addEventListener\(\"drop\"/);\n  assert.match(transferSource, /uploadFiles\(destination, files\)/);\n  assert.match(html, /Drag PC files onto a folder to upload there/);\n});\n\n'''+a
           assert a in s; p.write_text(s.replace(a,b,1))
           PY
           npm run build --prefix apps/web-client
@@ -54,5 +61,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A apps/web-client
-          git commit -m "Auto-refresh Android File Explorer"
+          git commit -m "Add drag-and-drop Android upload"
           git push origin HEAD:agent/fix-running-app-always-move
