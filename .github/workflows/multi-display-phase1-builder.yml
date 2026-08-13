@@ -1,0 +1,127 @@
+name: Multi-display Phase 1 Builder
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase1:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Phase 1 multi-session backend changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('droid_web_display/scrcpy/session.py')
+          text = path.read_text(encoding='utf-8')
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '    SessionConflictError,\n',
+              '',
+              'remove one-session conflict import',
+          )
+
+          replace_once(
+              '    _attachment_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)\n',
+              '    _attachment_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)\n',
+              'channel attachment lock sanity',
+          )
+
+          replace_once(
+              '    virtual_display_failure_classification: str | None = None\n',
+              '    virtual_display_failure_classification: str | None = None\n'
+              '    _lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)\n',
+              'add per-session lifecycle lock',
+          )
+
+          replace_once(
+              '        self._sessions: dict[str, ScrcpySession] = {}\n'
+              '        self._serial_index: dict[str, str] = {}\n',
+              '        self._sessions: dict[str, ScrcpySession] = {}\n'
+              '        self._device_sessions: dict[str, set[str]] = {}\n',
+              'replace serial index',
+          )
+
+          old_start = '''        async with self._lock:\n            existing_id = self._serial_index.get(selected.serial)\n            if existing_id:\n                existing = self._sessions.get(existing_id)\n                if existing and existing.state in {\n                    SessionState.PROBING,\n                    SessionState.STARTING,\n                    SessionState.CREATING_DISPLAY,\n                    SessionState.LAUNCHING_APP,\n                    SessionState.CONNECTING_VIDEO,\n                    SessionState.CONNECTING_CONTROL,\n                    SessionState.RUNNING,\n                    SessionState.RESIZING,\n                }:\n                    raise SessionConflictError(\n                        f"A session is already active for device {selected.serial}",\n                        details={"sessionId": existing.session_id, "serial": selected.serial},\n                    )\n            session_id = secrets.token_urlsafe(18)\n            scid = secrets.randbelow(0x80000000)\n            port = self._reserve_local_port()\n            session = ScrcpySession(\n                session_id=session_id,\n                serial=selected.serial,\n                scid=scid,\n                local_port=port,\n                socket_name=socket_name(scid),\n                options=selected_options,\n            )\n            if selected_options.display_mode == DisplayMode.VIRTUAL and selected_options.virtual_display:\n                session.application = selected_options.virtual_display.start_app or None\n                session.application_launch_result = "pending-control-message" if session.application else "not-requested"\n                session.state = SessionState.CREATING_DISPLAY\n            self._sessions[session_id] = session\n            self._serial_index[selected.serial] = session_id\n'''
+
+          new_start = '''        async with self._lock:\n            session_id = self._allocate_session_id()\n            scid = self._allocate_scid()\n            port = self._allocate_local_port()\n            session = ScrcpySession(\n                session_id=session_id,\n                serial=selected.serial,\n                scid=scid,\n                local_port=port,\n                socket_name=socket_name(scid),\n                options=selected_options,\n            )\n            if selected_options.display_mode == DisplayMode.VIRTUAL and selected_options.virtual_display:\n                session.application = selected_options.virtual_display.start_app or None\n                session.application_launch_result = "pending-control-message" if session.application else "not-requested"\n                session.state = SessionState.CREATING_DISPLAY\n            self._sessions[session_id] = session\n            self._index_session(session)\n'''
+          replace_once(old_start, new_start, 'replace single-session start guard')
+
+          replace_once(
+              '''        except Exception as exc:\n            session.state = SessionState.FAILED\n            session.error = str(exc)\n            session.stop_reason = "start_failed"\n            await self._cleanup_session_resources(session)\n            async with self._lock:\n                self._serial_index.pop(session.serial, None)\n            if isinstance(exc, SessionError):\n                raise\n''',
+              '''        except Exception as exc:\n            session.state = SessionState.FAILED\n            session.error = str(exc)\n            session.stop_reason = "start_failed"\n            try:\n                await self._cleanup_session_resources(session)\n            except Exception as cleanup_exc:\n                session.error = f"{session.error}; cleanup failed: {cleanup_exc}"\n            finally:\n                async with self._lock:\n                    self._unindex_session(session)\n            if isinstance(exc, SessionError):\n                raise\n''',
+              'make failed-start unindex reliable',
+          )
+
+          old_stop = '''    async def stop_session(self, session_id: str, *, reason: str = "requested") -> ScrcpySession:\n        session = self._sessions.get(session_id)\n        if not session:\n            raise SessionNotFoundError(f"Session not found: {session_id}")\n        if session.state in {\n            SessionState.STOPPING,\n            SessionState.STOPPED,\n            SessionState.DISCONNECTED,\n            SessionState.FAILED,\n        }:\n            return session\n        session.state = SessionState.STOPPING\n        session.stop_reason = reason\n        await self._cleanup_session_resources(session)\n        session.state = (\n            SessionState.DISCONNECTED\n            if reason in {"device_disconnected", "server_terminated"}\n            else SessionState.STOPPED\n        )\n        session.stopped_at = time.time()\n        async with self._lock:\n            self._serial_index.pop(session.serial, None)\n        return session\n'''
+
+          new_stop = '''    async def stop_session(self, session_id: str, *, reason: str = "requested") -> ScrcpySession:\n        session = self._sessions.get(session_id)\n        if not session:\n            raise SessionNotFoundError(f"Session not found: {session_id}")\n        async with session._lifecycle_lock:\n            if session.state in {\n                SessionState.STOPPING,\n                SessionState.STOPPED,\n                SessionState.DISCONNECTED,\n                SessionState.FAILED,\n            }:\n                return session\n            session.state = SessionState.STOPPING\n            session.stop_reason = reason\n            try:\n                await self._cleanup_session_resources(session)\n            except Exception as exc:\n                session.state = SessionState.FAILED\n                session.error = f"cleanup failed: {exc}" if not session.error else f"{session.error}; cleanup failed: {exc}"\n                raise\n            finally:\n                async with self._lock:\n                    self._unindex_session(session)\n            session.state = (\n                SessionState.DISCONNECTED\n                if reason in {"device_disconnected", "server_terminated"}\n                else SessionState.STOPPED\n            )\n            session.stopped_at = time.time()\n            return session\n'''
+          replace_once(old_stop, new_stop, 'make stop session isolated and idempotent')
+
+          old_lists = '''    def list_sessions(self) -> list[ScrcpySession]:\n        return sorted(self._sessions.values(), key=lambda item: item.created_at)\n\n    def _resolve_artifact(self) -> ScrcpyArtifact:\n'''
+          new_lists = '''    def list_sessions(self) -> list[ScrcpySession]:\n        return sorted(self._sessions.values(), key=lambda item: item.created_at)\n\n    def list_sessions_for_device(self, serial: str) -> list[ScrcpySession]:\n        session_ids = self._device_sessions.get(serial, set())\n        return sorted(\n            (self._sessions[session_id] for session_id in session_ids if session_id in self._sessions),\n            key=lambda item: item.created_at,\n        )\n\n    def _index_session(self, session: ScrcpySession) -> None:\n        self._device_sessions.setdefault(session.serial, set()).add(session.session_id)\n\n    def _unindex_session(self, session: ScrcpySession) -> None:\n        session_ids = self._device_sessions.get(session.serial)\n        if not session_ids:\n            return\n        session_ids.discard(session.session_id)\n        if not session_ids:\n            self._device_sessions.pop(session.serial, None)\n\n    def _allocate_session_id(self) -> str:\n        for _ in range(64):\n            session_id = secrets.token_urlsafe(18)\n            if session_id not in self._sessions:\n                return session_id\n        raise SessionError("Unable to allocate a unique session ID")\n\n    def _allocate_scid(self) -> int:\n        used = {session.scid for session in self._sessions.values()}\n        for _ in range(64):\n            scid = secrets.randbelow(0x80000000)\n            if scid not in used:\n                return scid\n        raise SessionError("Unable to allocate a unique scrcpy SCID")\n\n    def _allocate_local_port(self) -> int:\n        used = {session.local_port for session in self._sessions.values()}\n        for _ in range(64):\n            port = self._reserve_local_port()\n            if port not in used:\n                return port\n        raise SessionError("Unable to allocate a unique local scrcpy port")\n\n    def _resolve_artifact(self) -> ScrcpyArtifact:\n'''
+          replace_once(old_lists, new_lists, 'add device session index and allocators')
+
+          path.write_text(text, encoding='utf-8')
+
+          # Upgrade the ADB test fake so each forward is independent and can remain alive concurrently.
+          fake_path = Path('tests/regression/session/fakes.py')
+          fake = fake_path.read_text(encoding='utf-8')
+          old_fake_init = '''        self.processes: list[FakeProcess] = []\n        self.forward_server: asyncio.AbstractServer | None = None\n        self.connections = 0\n        self.connection_payloads = [\n'''
+          new_fake_init = '''        self.processes: list[FakeProcess] = []\n        self.forward_server: asyncio.AbstractServer | None = None\n        self.forward_servers: dict[int, asyncio.AbstractServer] = {}\n        self.forward_connections: dict[int, int] = {}\n        self.connections = 0\n        self.connection_payloads = [\n'''
+          if fake.count(old_fake_init) != 1:
+              raise SystemExit('fake init: expected exactly one match')
+          fake = fake.replace(old_fake_init, new_fake_init, 1)
+
+          old_forward = '''    async def create_forward(self, serial: str, local_port: int, socket_name: str) -> None:\n        self.forwards.append((serial, local_port, socket_name))\n\n        async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:\n            index = self.connections\n            self.connections += 1\n            payload = self.connection_payloads[index] if index < len(self.connection_payloads) else b"EXTRA"\n            writer.write(payload)\n            await writer.drain()\n            try:\n                await reader.read()\n            finally:\n                writer.close()\n                try:\n                    await writer.wait_closed()\n                except Exception:\n                    pass\n\n        self.forward_server = await asyncio.start_server(handle, "127.0.0.1", local_port)\n\n    async def remove_forward(self, serial: str, local_port: int) -> None:\n        self.removed.append((serial, local_port))\n        if self.forward_server:\n            self.forward_server.close()\n            await self.forward_server.wait_closed()\n            self.forward_server = None\n'''
+          new_forward = '''    async def create_forward(self, serial: str, local_port: int, socket_name: str) -> None:\n        self.forwards.append((serial, local_port, socket_name))\n        self.forward_connections[local_port] = 0\n\n        async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:\n            index = self.forward_connections[local_port]\n            self.forward_connections[local_port] = index + 1\n            self.connections += 1\n            payload = self.connection_payloads[index] if index < len(self.connection_payloads) else b"EXTRA"\n            writer.write(payload)\n            await writer.drain()\n            try:\n                await reader.read()\n            finally:\n                writer.close()\n                try:\n                    await writer.wait_closed()\n                except Exception:\n                    pass\n\n        server = await asyncio.start_server(handle, "127.0.0.1", local_port)\n        self.forward_servers[local_port] = server\n        self.forward_server = server\n\n    async def remove_forward(self, serial: str, local_port: int) -> None:\n        self.removed.append((serial, local_port))\n        server = self.forward_servers.pop(local_port, None)\n        self.forward_connections.pop(local_port, None)\n        if server:\n            server.close()\n            await server.wait_closed()\n            if self.forward_server is server:\n                self.forward_server = next(iter(self.forward_servers.values()), None)\n'''
+          if fake.count(old_forward) != 1:
+              raise SystemExit('fake forward: expected exactly one match')
+          fake = fake.replace(old_forward, new_forward, 1)
+          fake_path.write_text(fake, encoding='utf-8')
+
+          # Update the existing private-index assertion to the new one-device-to-many-sessions index.
+          test_path = Path('tests/regression/session/test_session.py')
+          test = test_path.read_text(encoding='utf-8')
+          old_assert = '    assert "OTHER" not in manager._serial_index\n'
+          if test.count(old_assert) != 1:
+              raise SystemExit('session index assertion: expected exactly one match')
+          test = test.replace(old_assert, '    assert "PHONE" not in manager._device_sessions\n', 1)
+          test_path.write_text(test, encoding='utf-8')
+
+          multi_test = Path('tests/regression/session/test_multi_session.py')
+          multi_test.write_text('''import asyncio\nfrom pathlib import Path\n\nimport pytest\n\nfrom droid_web_display.models import AndroidDevice, SessionOptions, SessionState\nfrom droid_web_display.scrcpy.artifact import ScrcpyArtifact\nfrom droid_web_display.scrcpy.session import SessionManager\nfrom tests.regression.session.fakes import FakeAdb\n\n\ndef artifact(tmp_path: Path) -> ScrcpyArtifact:\n    path = tmp_path / "scrcpy-server-v4.1"\n    path.write_bytes(b"verified-test-server")\n    return ScrcpyArtifact(path, "4.1", "a" * 40, "b" * 64, "scrcpy-4.1")\n\n\nasync def wait_for_state(session, state: SessionState) -> None:\n    for _ in range(200):\n        if session.state == state:\n            return\n        await asyncio.sleep(0.01)\n    raise AssertionError(f"session {session.session_id} did not reach {state.value}; got {session.state.value}")\n\n\n@pytest.mark.asyncio\nasync def test_two_sessions_can_run_on_same_serial(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device", model="Test")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=10)\n\n    first = await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n    second = await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n\n    assert first.state == SessionState.RUNNING\n    assert second.state == SessionState.RUNNING\n    assert first.session_id != second.session_id\n    assert {item.session_id for item in manager.list_sessions_for_device("PHONE")} == {first.session_id, second.session_id}\n    await manager.close()\n\n\n@pytest.mark.asyncio\nasync def test_four_sessions_same_serial_have_unique_transport_resources(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=10)\n\n    sessions = [\n        await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n        for _ in range(4)\n    ]\n\n    assert len({item.session_id for item in sessions}) == 4\n    assert len({item.scid for item in sessions}) == 4\n    assert len({item.socket_name for item in sessions}) == 4\n    assert len({item.local_port for item in sessions}) == 4\n    assert set(adb.forward_servers) == {item.local_port for item in sessions}\n    assert len(manager.list_sessions_for_device("PHONE")) == 4\n    await manager.close()\n\n\n@pytest.mark.asyncio\nasync def test_sessions_on_different_devices_are_indexed_independently(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("A", "device"), AndroidDevice("B", "device")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=10)\n\n    a = await manager.start_session(serial="A", options=SessionOptions(audio=False))\n    b = await manager.start_session(serial="B", options=SessionOptions(audio=False))\n\n    assert [item.session_id for item in manager.list_sessions_for_device("A")] == [a.session_id]\n    assert [item.session_id for item in manager.list_sessions_for_device("B")] == [b.session_id]\n    await manager.close()\n\n\n@pytest.mark.asyncio\nasync def test_stopping_one_session_does_not_touch_siblings(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=10)\n    first = await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n    second = await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n\n    await manager.stop_session(first.session_id)\n\n    assert first.state == SessionState.STOPPED\n    assert second.state == SessionState.RUNNING\n    assert first.local_port not in adb.forward_servers\n    assert second.local_port in adb.forward_servers\n    assert [item.session_id for item in manager.list_sessions_for_device("PHONE")] == [second.session_id]\n    await manager.close()\n\n\n@pytest.mark.asyncio\nasync def test_server_failure_is_isolated_to_one_session(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=10)\n    first = await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n    second = await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n\n    adb.processes[0].exit(17)\n    await wait_for_state(first, SessionState.DISCONNECTED)\n\n    assert second.state == SessionState.RUNNING\n    assert second.local_port in adb.forward_servers\n    assert [item.session_id for item in manager.list_sessions_for_device("PHONE")] == [second.session_id]\n    await manager.close()\n\n\n@pytest.mark.asyncio\nasync def test_device_disconnect_stops_all_sessions_for_that_serial_only(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device"), AndroidDevice("OTHER", "device")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=0.02)\n    phone_sessions = [\n        await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))\n        for _ in range(3)\n    ]\n    other = await manager.start_session(serial="OTHER", options=SessionOptions(audio=False))\n\n    adb.devices = [AndroidDevice("OTHER", "device")]\n    await asyncio.gather(*(wait_for_state(item, SessionState.DISCONNECTED) for item in phone_sessions))\n\n    assert other.state == SessionState.RUNNING\n    assert "PHONE" not in manager._device_sessions\n    assert [item.session_id for item in manager.list_sessions_for_device("OTHER")] == [other.session_id]\n    await manager.close()\n''', encoding='utf-8')
+          PY
+
+      - name: Compile changed Python modules
+        run: python -m compileall -q droid_web_display/scrcpy/session.py tests/regression/session
+
+      - name: Commit Phase 1 implementation
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes produced"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add droid_web_display/scrcpy/session.py tests/regression/session/fakes.py tests/regression/session/test_session.py tests/regression/session/test_multi_session.py
+          git commit -m "Implement multi-display phase 1 session backend"
+          git push origin HEAD:multi-display-tabs
