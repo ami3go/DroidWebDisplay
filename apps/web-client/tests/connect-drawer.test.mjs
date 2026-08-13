@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.js"), "utf8");
+const connectCss = await readFile(resolve(root, "static/droidwebdisplay-connect-drawer.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 
 test("Connect is the first drawer group and owns connection controls", () => {
@@ -16,6 +17,15 @@ test("Connect is the first drawer group and owns connection controls", () => {
     assert.match(drawerSource, new RegExp(`getElementById\\('${id}'\\)`));
   }
   assert.match(drawerSource, /actions\.append\(refresh, connect, disconnect\)/);
+});
+
+test("Connect controls use a compact non-overlapping three-column layout", () => {
+  assert.match(drawerSource, /droidwebdisplay-connect-drawer\.css/);
+  assert.match(connectCss, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\) !important/);
+  assert.match(connectCss, /grid-column: auto !important/);
+  assert.match(connectCss, /min-height: 2rem !important/);
+  assert.match(connectCss, /#device[\s\S]*height: 2rem/);
+  assert.match(connectCss, /@media \(max-width: 380px\)/);
 });
 
 test("readiness indicator stays in header and old subtitle is removed", () => {
