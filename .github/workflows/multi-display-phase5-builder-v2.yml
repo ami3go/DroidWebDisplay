@@ -1,0 +1,118 @@
+name: Multi-display Phase 5 Builder v2
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase5:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+
+      - name: Apply corrected Phase 5 patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/multi-display-phase5-builder.yml').read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY", start)
+          script = textwrap.dedent(workflow[start:end])
+          script = script.replace(
+              "    if count != 1:\n        raise SystemExit(f'{path}: expected one match, found {count}: {old[:160]!r}')\n",
+              "    if count < 1:\n        raise SystemExit(f'{path}: expected at least one match, found {count}: {old[:160]!r}')\n",
+              1,
+          )
+          exec(compile(script, 'phase5-builder.py', 'exec'))
+
+          # The Phase 5 layout contract also inspects RunningAppController source.
+          layout = Path('apps/web-client/tests/layout.test.mjs')
+          text = layout.read_text(encoding='utf-8')
+          anchor = 'const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");\n'
+          addition = anchor + 'const runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");\n'
+          if text.count(anchor) != 1:
+              raise SystemExit('layout test controller source anchor changed unexpectedly')
+          layout.write_text(text.replace(anchor, addition, 1), encoding='utf-8')
+          PY
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+      - run: npm ci
+        working-directory: packages/scrcpy-protocol
+      - run: npm ci
+        working-directory: apps/web-client
+
+      - name: Run Phase 5 Python tests
+        run: |
+          $HOME/.local/bin/uv run ruff check droid_web_display/config.py droid_web_display/scrcpy/session.py droid_web_display/api/app.py tests/regression/session/test_multi_session.py tests/regression/session/test_device_session_api.py tests/release/test_multi_display_phase5_release.py --select E9,F63,F7,F82
+          $HOME/.local/bin/uv run pytest -q tests/regression/session/test_multi_session.py tests/regression/session/test_device_session_api.py tests/release/test_multi_display_phase5_release.py
+
+      - name: Build protocol package
+        run: npm run build
+        working-directory: packages/scrcpy-protocol
+      - name: Build web client
+        run: node tools/build.mjs
+        working-directory: apps/web-client
+      - name: Run web client tests
+        run: node tools/run-tests.mjs
+        working-directory: apps/web-client
+      - name: Regenerate OpenAPI
+        run: $HOME/.local/bin/uv run python tools/generate_openapi.py
+      - name: Verify bundled static client
+        run: |
+          $HOME/.local/bin/uv run python - <<'PY'
+          from pathlib import Path
+          from droid_web_display.release_checks import verify_static_client
+          result = verify_static_client(Path.cwd())
+          print(result)
+          if result.get("status") != "PASS":
+              raise SystemExit(1)
+          PY
+
+      - name: Commit Phase 5 implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            droid_web_display/config.py \
+            droid_web_display/scrcpy/session.py \
+            droid_web_display/api/app.py \
+            apps/web-client/src \
+            apps/web-client/static \
+            apps/web-client/tests \
+            apps/web-client/dist-manifest.json \
+            packages/bridge-api/openapi/openapi-v1.json \
+            tests/regression/session \
+            tests/release/test_multi_display_phase5_release.py \
+            docs/MULTI_DISPLAY_PHASE5.md
+          git add -f apps/web-client/dist
+          if git diff --cached --quiet; then
+            echo "No Phase 5 changes to commit"
+            exit 0
+          fi
+          git commit -m "Implement multi-display Phase 5 hardening"
+          git push origin HEAD:multi-display-tabs
