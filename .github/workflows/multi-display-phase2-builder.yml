@@ -1,0 +1,139 @@
+name: Multi-display Phase 2 Builder
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase2:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Apply display identity model
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old[:80]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          session = Path('droid_web_display/scrcpy/session.py')
+
+          replace_once(
+              session,
+              'ArtifactLoader = Callable[[], ScrcpyArtifact]\n\n\n\nclass PrefixedStreamReader:',
+              '''ArtifactLoader = Callable[[], ScrcpyArtifact]\n\nMAX_DISPLAY_NAME_LENGTH = 80\nDEFAULT_DISPLAY_NAMES = {\n    DisplayMode.PHYSICAL: "Phone",\n    DisplayMode.VIRTUAL: "Virtual display",\n}\n\n\ndef _normalize_display_name(value: str | None, display_mode: DisplayMode) -> str:\n    if value is None:\n        return DEFAULT_DISPLAY_NAMES[display_mode]\n    normalized = value.strip()\n    if not normalized:\n        raise ValueError("Display name must contain at least one visible character")\n    if len(normalized) > MAX_DISPLAY_NAME_LENGTH:\n        raise ValueError(f"Display name must be at most {MAX_DISPLAY_NAME_LENGTH} characters")\n    if any(ord(character) < 32 or ord(character) == 127 for character in normalized):\n        raise ValueError("Display name must not contain control characters")\n    return normalized\n\n\nclass PrefixedStreamReader:''',
+          )
+
+          replace_once(
+              session,
+              '    options: SessionOptions\n    state: SessionState = SessionState.STARTING\n',
+              '    options: SessionOptions\n    display_name: str | None = None\n    display_kind: DisplayMode = field(init=False)\n    state: SessionState = SessionState.STARTING\n',
+          )
+
+          replace_once(
+              session,
+              '    _lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)\n\n    def to_dict(self) -> dict:\n',
+              '''    _lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)\n\n    def __post_init__(self) -> None:\n        self.display_kind = self.options.display_mode\n        self.display_name = _normalize_display_name(self.display_name, self.display_kind)\n        if self.display_kind == DisplayMode.PHYSICAL and self.display_id is None:\n            self.display_id = 0\n\n    def display_metadata(self) -> dict:\n        virtual = self.options.virtual_display if self.display_kind == DisplayMode.VIRTUAL else None\n        if self.actual_width is not None and self.actual_height is not None:\n            width = self.actual_width\n            height = self.actual_height\n            resolution_source = "actual"\n        elif virtual is not None:\n            width = virtual.width\n            height = virtual.height\n            resolution_source = "requested"\n        else:\n            width = None\n            height = None\n            resolution_source = "unknown"\n\n        if self.actual_dpi is not None:\n            dpi = self.actual_dpi\n            dpi_source = "actual"\n        elif virtual is not None:\n            dpi = virtual.dpi\n            dpi_source = "requested"\n        else:\n            dpi = None\n            dpi_source = "unknown"\n\n        return {\n            "sessionId": self.session_id,\n            "kind": self.display_kind.value,\n            "displayId": self.display_id,\n            "name": self.display_name,\n            "application": self.application,\n            "resolution": {\n                "width": width,\n                "height": height,\n                "source": resolution_source,\n            },\n            "dpi": {\n                "value": dpi,\n                "source": dpi_source,\n            },\n            "createdAt": self.created_at,\n            "state": self.state.value,\n        }\n\n    def to_dict(self) -> dict:\n''',
+          )
+
+          replace_once(
+              session,
+              '            "displayMode": self.options.display_mode.value,\n            "virtualDisplay": virtual_diagnostics,\n',
+              '            "displayMode": self.options.display_mode.value,\n            "display": self.display_metadata(),\n            "virtualDisplay": virtual_diagnostics,\n',
+          )
+
+          replace_once(
+              session,
+              '        serial: str | None = None,\n        options: SessionOptions | None = None,\n    ) -> ScrcpySession:\n',
+              '        serial: str | None = None,\n        options: SessionOptions | None = None,\n        display_name: str | None = None,\n    ) -> ScrcpySession:\n',
+          )
+
+          replace_once(
+              session,
+              '        selected_options = options or SessionOptions()\n        selected_options.validate()\n',
+              '        selected_options = options or SessionOptions()\n        selected_options.validate()\n        resolved_display_name = _normalize_display_name(display_name, selected_options.display_mode)\n',
+          )
+
+          replace_once(
+              session,
+              '                socket_name=socket_name(scid),\n                options=selected_options,\n            )\n',
+              '                socket_name=socket_name(scid),\n                options=selected_options,\n                display_name=resolved_display_name,\n            )\n',
+          )
+
+          runtime = Path('droid_web_display/runtime_hardening.py')
+          replace_once(
+              runtime,
+              '        serial: str | None = None,\n        options: SessionOptions | None = None,\n    ):\n',
+              '        serial: str | None = None,\n        options: SessionOptions | None = None,\n        display_name: str | None = None,\n    ):\n',
+          )
+          replace_once(
+              runtime,
+              '            return await super().start_session(serial=effective_serial, options=selected_options)\n',
+              '            return await super().start_session(\n                serial=effective_serial,\n                options=selected_options,\n                display_name=display_name,\n            )\n',
+          )
+          replace_once(
+              runtime,
+              '                session = await super().start_session(serial=effective_serial, options=fallback_options)\n',
+              '                session = await super().start_session(\n                    serial=effective_serial,\n                    options=fallback_options,\n                    display_name=display_name,\n                )\n',
+          )
+
+          api = Path('droid_web_display/api/app.py')
+          replace_once(
+              api,
+              '    serial: str | None = None\n    video: bool = True\n',
+              '    serial: str | None = None\n    display_name: str | None = Field(default=None, alias="displayName", max_length=80)\n    video: bool = True\n',
+          )
+          replace_once(
+              api,
+              '                serial=selected.serial if selected else body.serial,\n                options=options,\n            )\n',
+              '                serial=selected.serial if selected else body.serial,\n                options=options,\n                display_name=body.display_name,\n            )\n',
+          )
+
+          test = Path('tests/regression/session/test_display_identity.py')
+          test.write_text('''from pathlib import Path\n\nimport pytest\nfrom fastapi.testclient import TestClient\n\nfrom droid_web_display.api import create_app\nfrom droid_web_display.config import BridgeConfig\nfrom droid_web_display.models import (\n    AndroidDevice,\n    DisplayMode,\n    SessionOptions,\n    VirtualDisplayOptions,\n)\nfrom droid_web_display.scrcpy.artifact import ScrcpyArtifact\nfrom droid_web_display.scrcpy.session import ScrcpySession, SessionManager\nfrom tests.regression.session.fakes import FakeAdb\n\n\ndef artifact(tmp_path: Path) -> ScrcpyArtifact:\n    path = tmp_path / "scrcpy-server-v4.1"\n    path.write_bytes(b"verified-test-server")\n    return ScrcpyArtifact(path, "4.1", "a" * 40, "b" * 64, "scrcpy-4.1")\n\n\n@pytest.mark.asyncio\nasync def test_physical_session_has_stable_display_identity(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device", model="Test")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0)\n\n    session = await manager.start_session(\n        serial="PHONE",\n        options=SessionOptions(audio=False),\n        display_name="  Primary phone  ",\n    )\n\n    display = session.to_dict()["display"]\n    assert display == {\n        "sessionId": session.session_id,\n        "kind": "physical",\n        "displayId": 0,\n        "name": "Primary phone",\n        "application": None,\n        "resolution": {"width": None, "height": None, "source": "unknown"},\n        "dpi": {"value": None, "source": "unknown"},\n        "createdAt": session.created_at,\n        "state": "running",\n    }\n    assert session.to_dict()["displayMode"] == "physical"\n\n    await manager.close()\n\n\ndef test_virtual_display_identity_uses_requested_then_actual_metadata() -> None:\n    options = SessionOptions(\n        display_mode=DisplayMode.VIRTUAL,\n        virtual_display=VirtualDisplayOptions(\n            width=1280,\n            height=720,\n            dpi=220,\n            start_app="com.openai.chatgpt",\n        ),\n    )\n    session = ScrcpySession(\n        session_id="session-1",\n        serial="PHONE",\n        scid=1,\n        local_port=27183,\n        socket_name="scrcpy_00000001",\n        options=options,\n        display_name="ChatGPT",\n    )\n    session.application = "com.openai.chatgpt"\n\n    before = session.display_metadata()\n    assert before["kind"] == "virtual"\n    assert before["displayId"] is None\n    assert before["resolution"] == {"width": 1280, "height": 720, "source": "requested"}\n    assert before["dpi"] == {"value": 220, "source": "requested"}\n\n    SessionManager._handle_server_log_line(\n        session,\n        "INFO: New display: 1360x768/240 (id=17)",\n    )\n\n    after = session.display_metadata()\n    assert after["displayId"] == 17\n    assert after["resolution"] == {"width": 1360, "height": 768, "source": "actual"}\n    assert after["dpi"] == {"value": 240, "source": "actual"}\n    assert after["name"] == "ChatGPT"\n    assert after["application"] == "com.openai.chatgpt"\n\n\n@pytest.mark.asyncio\nasync def test_blank_display_name_is_rejected_before_resources_start(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0)\n\n    with pytest.raises(ValueError, match="visible character"):\n        await manager.start_session(serial="PHONE", display_name="   ")\n\n    assert adb.forwards == []\n    assert manager.list_sessions() == []\n    await manager.close()\n\n\ndef test_session_api_exposes_named_display_identity(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device", model="Test")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0)\n    config = BridgeConfig(repo_root=tmp_path, authentication_required=False)\n    app = create_app(config=config, manager=manager, adb=adb)  # type: ignore[arg-type]\n\n    with TestClient(app) as client:\n        created = client.post(\n            "/api/v1/sessions",\n            json={\n                "serial": "PHONE",\n                "audio": False,\n                "displayName": "Development",\n            },\n        )\n        assert created.status_code == 201\n        body = created.json()\n        assert body["display"]["name"] == "Development"\n        assert body["display"]["kind"] == "physical"\n        assert body["display"]["displayId"] == 0\n\n        listed = client.get("/api/v1/sessions")\n        assert listed.status_code == 200\n        assert listed.json()["sessions"][0]["display"]["sessionId"] == body["sessionId"]\n        assert listed.json()["sessions"][0]["display"]["name"] == "Development"\n\n        deleted = client.delete(f"/api/v1/sessions/{body['sessionId']}")\n        assert deleted.status_code == 200\n\n\ndef test_session_api_rejects_blank_display_name(tmp_path: Path) -> None:\n    adb = FakeAdb([AndroidDevice("PHONE", "device", model="Test")])\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0)\n    config = BridgeConfig(repo_root=tmp_path, authentication_required=False)\n    app = create_app(config=config, manager=manager, adb=adb)  # type: ignore[arg-type]\n\n    with TestClient(app) as client:\n        response = client.post(\n            "/api/v1/sessions",\n            json={"serial": "PHONE", "displayName": "   "},\n        )\n        assert response.status_code == 422\n        assert "visible character" in response.json()["detail"]\n\n    assert adb.forwards == []\n''', encoding='utf-8')
+          PY
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+
+      - name: Run Phase 2 tests
+        run: |
+          $HOME/.local/bin/uv run ruff check droid_web_display/scrcpy/session.py droid_web_display/runtime_hardening.py droid_web_display/api/app.py tests/regression/session/test_display_identity.py --select E9,F63,F7,F82
+          $HOME/.local/bin/uv run pytest -q tests/regression/session/test_display_identity.py tests/regression/session/test_multi_session.py tests/regression/session/test_session.py tests/regression/session/test_encoder_fallback.py
+
+      - name: Regenerate OpenAPI
+        run: $HOME/.local/bin/uv run python tools/generate_openapi.py
+
+      - name: Commit Phase 2
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add droid_web_display/scrcpy/session.py droid_web_display/runtime_hardening.py droid_web_display/api/app.py tests/regression/session/test_display_identity.py packages/bridge-api/openapi/openapi-v1.json
+          if git diff --cached --quiet; then
+            echo "No Phase 2 changes to commit"
+            exit 0
+          fi
+          git commit -m "Implement multi-display phase 2 identity model"
+          git push origin HEAD:multi-display-tabs
