@@ -94,9 +94,16 @@
     root()?.classList.toggle('gb-pinned', pinned);
     const button = root()?.querySelector('.gb-drawer-pin');
     if (button) {
+      const label = pinned ? 'Unpin drawer' : 'Pin drawer';
       button.setAttribute('aria-pressed', pinned ? 'true' : 'false');
-      button.title = pinned ? 'Unpin drawer' : 'Pin drawer';
-      const text = button.querySelector('.gb-pin-text'); if (text) text.textContent = pinned ? 'Pinned' : 'Pin';
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    }
+    const closeButton = root()?.querySelector('.gb-drawer-close');
+    if (closeButton) {
+      const closeLabel = pinned ? 'Unpin and close drawer' : 'Close drawer';
+      closeButton.setAttribute('aria-label', closeLabel);
+      closeButton.title = closeLabel;
     }
     if (persist) set(PIN_KEY, pinned ? '1' : '0');
     if (pinned) openGroup(activeGroup || storedGroup());
@@ -115,6 +122,17 @@
     drawer()?.classList.remove('gb-open'); drawer()?.setAttribute('aria-hidden', 'true');
     root().querySelectorAll('[data-group]').forEach(button => button.setAttribute('aria-selected', 'false'));
     activeGroup = null;
+  }
+  function closeOrUnpinDrawer() {
+    if (!root()) return;
+    if (pinned) applyPinned(false);
+    closeDrawer();
+  }
+  function bindDrawerKeyboard() {
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || pinned || !drawer()?.classList.contains('gb-open')) return;
+      closeDrawer();
+    });
   }
   function bindStatusShortcut() {
     const status = document.getElementById('connection-status');
@@ -145,9 +163,10 @@
     mergeNetworkIntoAccess();
     applyRailOrder();
     bindStatusShortcut();
+    bindDrawerKeyboard();
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));
     ui.querySelector('.gb-drawer-pin')?.addEventListener('click', () => applyPinned(!pinned));
-    ui.querySelectorAll('[data-action="close"], .gb-drawer-close').forEach(button => button.addEventListener('click', closeDrawer));
+    ui.querySelectorAll('[data-action="close"], .gb-drawer-close').forEach(button => button.addEventListener('click', closeOrUnpinDrawer));
     bindAccordions(); applyPinned(storedPinned(), false); if (pinned) openGroup(storedGroup());
   }
   window.DroidWebDisplayDrawer = { openGroup, closeDrawer, setPinned: value => applyPinned(Boolean(value)) };

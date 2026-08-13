@@ -56,3 +56,14 @@ test("Network settings are integrated into Access", () => {
   assert.match(drawerSource, /label\.textContent = 'Network access'/);
 });
 
+
+
+test("drawer pin control is compact and close can unpin in one action", () => {
+  assert.match(html, /class="gb-drawer-pin"[^>]*aria-label="Pin drawer"/);
+  assert.doesNotMatch(html, /class="gb-pin-text"/);
+  assert.match(drawerSource, /function closeOrUnpinDrawer\(\)/);
+  assert.match(drawerSource, /if \(pinned\) applyPinned\(false\)/);
+  assert.match(drawerSource, /Unpin and close drawer/);
+  assert.match(drawerSource, /bindDrawerKeyboard\(\)/);
+  assert.match(drawerSource, /event\.key !== 'Escape'/);
+});
