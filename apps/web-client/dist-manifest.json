@@ -5,18 +5,18 @@
   "files": [
     {
       "path": "assets/api.d.ts",
-      "bytes": 7716,
-      "sha256": "db22fbd848e24d422d11eb8330917150f5ce56090326bc104da5c28ad220660c"
+      "bytes": 8179,
+      "sha256": "89ad9eba0614db78766b88aea13a2f6c6ee06fe2775e7b9ecd6bc9bd7f6560de"
     },
     {
       "path": "assets/api.js",
-      "bytes": 10090,
-      "sha256": "adb80cd784cfcfd514863c0bede580e589744750c5aaf26bd2755469a88a6556"
+      "bytes": 11615,
+      "sha256": "75a9d40a7f4d13ce2e191287f8b96dab2c0cd52d48b8b6102d67e5eaad128c1a"
     },
     {
       "path": "assets/api.js.map",
-      "bytes": 9405,
-      "sha256": "8b3dc1e3297bf9b4ffec4206b744ca5f00a8b7cbde010806bb4d643ab0f3017d"
+      "bytes": 10654,
+      "sha256": "1cdc68107474024d4d97604af2d6abb92ea3974f2b6d44603388dd7aac1ff874"
     },
     {
       "path": "assets/audio-player.d.ts",
@@ -95,18 +95,18 @@
     },
     {
       "path": "assets/controller.d.ts",
-      "bytes": 4288,
-      "sha256": "1e26e409944d52b33b7698e19146a8ff8cfd1a50e7ef5989a0aaed84bee9a764"
+      "bytes": 4857,
+      "sha256": "0032d51509f176658b164c0f0c0e26d1e3f45b36a3759814c0c3e37b5baa4986"
     },
     {
       "path": "assets/controller.js",
-      "bytes": 49024,
-      "sha256": "2823d37a5ee8e632607f65697f0954f33175cd1afa91b6c54dadd283ff93d855"
+      "bytes": 65354,
+      "sha256": "04e0a133062953950994dc5e42c34d91fe88f7e29bab9f00ed6b1f67be0ca6eb"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 46083,
-      "sha256": "88fd38431273a6e2db240ec115003f4dda0e6c20180352350f57be4f8e20280c"
+      "bytes": 60767,
+      "sha256": "2801bd2edc8172de8b1ca40d90fae59d21d8c0748614f54c25093c3f3114ec2c"
     },
     {
       "path": "assets/display-config.d.ts",
@@ -145,13 +145,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 11384,
-      "sha256": "fc7b01ff55a73708498cfe47797f0a83f77690391f5e01467b0433412b644848"
+      "bytes": 11579,
+      "sha256": "4f2ef784fcce8feb42ebbfde89d670e4581b1165d83f986db3027ca7df242fde"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 8560,
-      "sha256": "6e4230eec18d7f98e8ec0a0f5b386a8904bbcd4dcc1ca3edc09113726b6d1e7c"
+      "bytes": 8708,
+      "sha256": "9ad2a26a4bad3466a93a648d559097c2f679f9bd82530b71fc70b1206ec180c6"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -175,13 +175,13 @@
     },
     {
       "path": "assets/running-app-controller.js",
-      "bytes": 5739,
-      "sha256": "dde90442407553f3e51a8003d93eeab88a1888ef1fc2b811b60da9c0ed21ff4b"
+      "bytes": 6169,
+      "sha256": "43e5927415d8d8780203df851947e80c014e2a478c920cd6b2a6670637e46eda"
     },
     {
       "path": "assets/running-app-controller.js.map",
-      "bytes": 5874,
-      "sha256": "2129de8721683d6a1390d8862db080c6553dbe24999ecd10dbc6fca7e9be0c2b"
+      "bytes": 6319,
+      "sha256": "b19ff3b2af11c33c6458e0915759e56b632e7b6745c9e2e1de6564daf5c7d380"
     },
     {
       "path": "assets/transfer-controller.d.ts",
@@ -200,8 +200,8 @@
     },
     {
       "path": "assets/types.d.ts",
-      "bytes": 10094,
-      "sha256": "9db9dd6a58b20d52d9b561a89627a48cfc169adcb33445a702f9c0e2310f4c1b"
+      "bytes": 11039,
+      "sha256": "906e32910ff1a4921e23ac0b1b6fa5535e48c6d363365b49ff2125017b39f603"
     },
     {
       "path": "assets/types.js",
@@ -270,13 +270,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 30532,
-      "sha256": "9a2397038fca6030f6a6e641e533fb61ea8c78de5b6c1660459736c173c023e6"
+      "bytes": 31204,
+      "sha256": "79f45063098a931268ee294bc3e8bb32522b56c22fde0d950e7dbc5176cb7fcb"
     },
     {
       "path": "styles.css",
-      "bytes": 26601,
-      "sha256": "66bc32e73126c117fb9ea4ac5e1f196d2d1da860f98b33220d914830a203efef"
+      "bytes": 29348,
+      "sha256": "3ec30506b10f106805e49e633e372d1f89dd120a287786198ba64c994d16ab10"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",
