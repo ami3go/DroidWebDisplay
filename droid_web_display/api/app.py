@@ -720,6 +720,64 @@ def create_app(
     async def delete_session(session_id: str, container: Annotated[ServiceContainer, Depends(get_container)]) -> dict:
         return (await container.manager.stop_session(session_id)).to_dict()
 
+    @app.get("/api/v1/devices/{serial}/sessions")
+    async def device_sessions(
+        serial: str,
+        container: Annotated[ServiceContainer, Depends(get_container)],
+    ) -> dict:
+        # Validate the device explicitly so a typo cannot silently look like an
+        # empty session list. Only active/indexed sessions belong in display tabs.
+        await container.manager.select_device(serial)
+        values = container.manager.list_sessions_for_device(serial)
+        return {
+            "serial": serial,
+            "activeSessionCount": len(values),
+            "sessions": [item.to_dict() for item in values],
+        }
+
+    @app.post("/api/v1/devices/{serial}/sessions", status_code=201)
+    async def create_device_session(
+        serial: str,
+        body: StartSessionRequest,
+        container: Annotated[ServiceContainer, Depends(get_container)],
+    ) -> dict:
+        if body.serial is not None and body.serial != serial:
+            raise HTTPException(
+                status_code=422,
+                detail="Body serial must match the device serial in the request path",
+            )
+        scoped_body = body.model_copy(update={"serial": serial})
+        return await create_session(scoped_body, container)
+
+    @app.delete("/api/v1/devices/{serial}/sessions/{session_id}")
+    async def delete_device_session(
+        serial: str,
+        session_id: str,
+        container: Annotated[ServiceContainer, Depends(get_container)],
+    ) -> dict:
+        session = container.manager.get_session(session_id)
+        if session.serial != serial:
+            raise HTTPException(status_code=404, detail="Session not found for this device")
+        return (await container.manager.stop_session(session_id)).to_dict()
+
+    @app.delete("/api/v1/devices/{serial}/sessions")
+    async def delete_device_sessions(
+        serial: str,
+        container: Annotated[ServiceContainer, Depends(get_container)],
+    ) -> dict:
+        # Snapshot before stopping because stop_session removes each session from
+        # the per-device active index. Sequential cleanup keeps ADB resource
+        # release deterministic and isolates failures to the session being closed.
+        values = list(container.manager.list_sessions_for_device(serial))
+        stopped: list[dict] = []
+        for session in values:
+            stopped.append((await container.manager.stop_session(session.session_id)).to_dict())
+        return {
+            "serial": serial,
+            "stoppedCount": len(stopped),
+            "sessions": stopped,
+        }
+
     @app.post("/api/v1/sessions/{session_id}/virtual-display/resize")
     async def record_virtual_resize(
         session_id: str,
