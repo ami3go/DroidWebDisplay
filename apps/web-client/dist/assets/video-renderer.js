@@ -1,8 +1,19 @@
 import { extractH264DecoderConfiguration, } from "@droid-web-display/scrcpy-protocol";
+const DECODER_BACKLOG_RECOVERY_THRESHOLD = 8;
+export function decoderBacklogAction(queueSize, packetIsKeyFrame) {
+    // H.264 delta frames may depend on earlier delta frames. Dropping one arbitrary
+    // delta frame can make following frames undecodable until a future I-frame.
+    // Recover only when the current packet is itself a keyframe, which is a safe
+    // independent point from which decoding can resume.
+    return queueSize > DECODER_BACKLOG_RECOVERY_THRESHOLD && packetIsKeyFrame
+        ? "recover-at-keyframe"
+        : "decode";
+}
 export class WebCodecsVideoRenderer {
     canvas;
     onStatistics;
     #decoder = null;
+    #decoderConfig = null;
     #configurationPacket = null;
     #stopped = false;
     #framesDecoded = 0;
@@ -35,6 +46,7 @@ export class WebCodecsVideoRenderer {
     stop() {
         this.#stopped = true;
         this.closeDecoder();
+        this.#decoderConfig = null;
         for (const waiter of this.#resizeWaiters) {
             window.clearTimeout(waiter.timer);
             waiter.reject(new Error("Video renderer stopped before rotation completed"));
@@ -71,10 +83,8 @@ export class WebCodecsVideoRenderer {
         if (!this.#decoder || this.#decoder.state !== "configured") {
             throw new Error("Received video frame before H.264 decoder configuration");
         }
-        if (this.#decoder.decodeQueueSize > 8 && !packet.keyFrame) {
-            this.#framesDropped += 1;
-            this.emitStatistics();
-            return;
+        if (decoderBacklogAction(this.#decoder.decodeQueueSize, packet.keyFrame) === "recover-at-keyframe") {
+            this.recoverDecoderAtKeyFrame();
         }
         const pts = packet.pts === null ? this.#lastTimestamp + 33_333 : Number(packet.pts);
         this.#lastTimestamp = Math.max(pts, this.#lastTimestamp + 1);
@@ -96,6 +106,7 @@ export class WebCodecsVideoRenderer {
         if (restarted) {
             this.#sessionChanges += 1;
             this.#configurationPacket = null;
+            this.#decoderConfig = null;
             this.closeDecoder();
         }
         this.resolveResizeWaiters();
@@ -113,11 +124,25 @@ export class WebCodecsVideoRenderer {
             throw new Error(`Browser cannot decode ${h264.codec}`);
         this.#configurationPacket = data.slice();
         this.closeDecoder();
+        this.#decoderConfig = support.config ?? config;
+        this.createConfiguredDecoder();
+    }
+    createConfiguredDecoder() {
+        if (!this.#decoderConfig)
+            throw new Error("Video decoder configuration is unavailable");
         this.#decoder = new VideoDecoder({
             output: (frame) => this.drawFrame(frame),
             error: (error) => console.error("VideoDecoder error", error),
         });
-        this.#decoder.configure(support.config ?? config);
+        this.#decoder.configure(this.#decoderConfig);
+    }
+    recoverDecoderAtKeyFrame() {
+        if (!this.#decoder || !this.#decoderConfig || this.#decoder.state !== "configured")
+            return;
+        const discarded = this.#decoder.decodeQueueSize;
+        this.#decoder.reset();
+        this.#decoder.configure(this.#decoderConfig);
+        this.#framesDropped += discarded;
     }
     closeDecoder() {
         if (this.#decoder && this.#decoder.state !== "closed")

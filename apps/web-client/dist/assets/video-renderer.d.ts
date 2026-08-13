@@ -1,4 +1,6 @@
 import { type ScrcpyV41Session } from "@droid-web-display/scrcpy-protocol";
+export type DecoderBacklogAction = "decode" | "recover-at-keyframe";
+export declare function decoderBacklogAction(queueSize: number, packetIsKeyFrame: boolean): DecoderBacklogAction;
 export interface VideoStatistics {
     readonly framesDecoded: number;
     readonly framesDropped: number;
@@ -30,6 +32,8 @@ export declare class WebCodecsVideoRenderer {
     private processPacket;
     private applySession;
     private configure;
+    private createConfiguredDecoder;
+    private recoverDecoderAtKeyFrame;
     private closeDecoder;
     private drawFrame;
     private resizeCanvas;
