@@ -1,4 +1,4 @@
-name: Apply Explorer drag and drop
+name: Apply Clipboard UI optimization
 on:
   push:
     branches: [agent/connect-drawer]
@@ -10,48 +10,42 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/fix-running-app-always-move
-          fetch-depth: 0
+        with: {ref: agent/fix-running-app-always-move, fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+        with: {node-version: '22'}
       - run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           $HOME/.local/bin/uv sync --locked --extra dev
           npm ci --prefix packages/scrcpy-protocol
           npm run build --prefix packages/scrcpy-protocol
           npm ci --prefix apps/web-client
-      - name: Patch
-        run: |
+      - run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('apps/web-client/src/transfer-controller.ts'); s=p.read_text()
-          s=s.replace('this.uploadFiles(this.elements.uploadDirectory.value, this.elements.file)','this.uploadFiles(this.elements.uploadDirectory.value, [...(this.elements.file.files ?? [])])',1)
-          s=s.replace('this.uploadFiles(this.#contextUploadDestination, this.elements.contextUploadFile)','this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])])',1)
-          a='    this.elements.storageBody.addEventListener("click", (event) => {'
-          b='''    this.elements.storageBody.addEventListener("dragover", (event) => {\n      if (!event.dataTransfer?.types.includes("Files")) return;\n      event.preventDefault();\n      event.dataTransfer.dropEffect = "copy";\n      this.clearDropTarget();\n      const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');\n      (row ?? this.elements.storageBody).classList.add("drop-target");\n    });\n    this.elements.storageBody.addEventListener("dragleave", (event) => {\n      if (!this.elements.storageBody.contains(event.relatedTarget as Node | null)) this.clearDropTarget();\n    });\n    this.elements.storageBody.addEventListener("drop", (event) => {\n      if (!event.dataTransfer?.files.length) return;\n      event.preventDefault();\n      const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');\n      const destination = row?.dataset.path ?? this.elements.storagePath.value;\n      const files = [...event.dataTransfer.files];\n      this.clearDropTarget();\n      void this.runAction(() => this.uploadFiles(destination, files));\n    });\n'''+a
-          assert a in s; s=s.replace(a,b,1)
-          a='  private chooseUploadFiles(destination: string): void {'
-          b='''  private clearDropTarget(): void {\n    this.elements.storageBody.classList.remove("drop-target");\n    for (const row of this.elements.storageBody.querySelectorAll(".drop-target")) row.classList.remove("drop-target");\n  }\n\n'''+a
-          assert a in s; s=s.replace(a,b,1)
-          a='''  private async uploadFiles(destinationPath: string, sourceInput: HTMLInputElement): Promise<void> {\n    const serial = this.requireSerial();\n    const files = [...(sourceInput.files ?? [])];\n    if (!files.length) throw new Error("Choose one or more PC files to upload");'''
-          b='''  private async uploadFiles(destinationPath: string, files: readonly File[]): Promise<void> {\n    const serial = this.requireSerial();\n    if (!files.length) throw new Error("Choose one or more PC files to upload");'''
-          assert a in s; s=s.replace(a,b,1)
-          assert '      sourceInput.value = "";' in s
-          s=s.replace('      sourceInput.value = "";','      this.elements.file.value = "";\n      this.elements.contextUploadFile.value = "";',1)
-          p.write_text(s)
-
           p=Path('apps/web-client/static/index.html'); s=p.read_text()
-          s=s.replace('Right-click a file to download it. Right-click a folder or empty space to upload files into that Android folder.','Drag PC files onto a folder to upload there, or onto empty Explorer space to upload to the current folder. Right-click remains available for all actions.',1)
+          s=s.replace('<div class="help-card clipboard-card">','<div id="clipboard-card" class="help-card clipboard-card">',1)
+          s=s.replace('id="clipboard" aria-label=','id="clipboard" class="clipboard-sync-fallback" aria-label=',1)
+          s=s.replace('id="clipboard-copy-android" class="secondary"','id="clipboard-copy-android" class="secondary clipboard-sync-fallback"',1)
+          s=s.replace('Clipboard text is never written to diagnostics.','In this drawer, Ctrl+Enter types the text box into Android. Clipboard text is never written to diagnostics.',1)
           p.write_text(s)
-          p=Path('apps/web-client/static/styles.css'); s=p.read_text(); a='.device-diagnostic-summary {'
-          assert a in s; s=s.replace(a,'.explorer-body.drop-target, .explorer-row.drop-target { outline: 2px dashed #82a6ff; outline-offset: -3px; background: #18243a !important; }\n'+a,1); p.write_text(s)
-          p=Path('apps/web-client/tests/layout.test.mjs'); s=p.read_text(); a='test("Android File Explorer refreshes when stale", () => {'
-          b='''test("Android File Explorer accepts PC file drag and drop", () => {\n  assert.match(transferSource, /addEventListener\(\"dragover\"/);\n  assert.match(transferSource, /addEventListener\(\"drop\"/);\n  assert.match(transferSource, /uploadFiles\(destination, files\)/);\n  assert.match(html, /Drag PC files onto a folder to upload there/);\n});\n\n'''+a
+          p=Path('apps/web-client/src/controller.ts'); s=p.read_text()
+          a='    this.elements.clipboardTextPaste.addEventListener("click", () => void this.runUiAction(() => this.pasteTypedText()));'
+          b=a+'\n    this.elements.clipboardText.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void this.runUiAction(() => this.pasteTypedText()); } });\n    document.querySelector<HTMLButtonElement>(\'[data-group="clipboard"]\')?.addEventListener("click", () => window.requestAnimationFrame(() => { if (!this.elements.clipboardText.disabled) this.elements.clipboardText.focus(); }));'
+          assert a in s; s=s.replace(a,b,1)
+          a='      this.saveBrowserSettings();\n      await this.startClipboardPolling(true);'
+          b='      this.saveBrowserSettings();\n      this.updateClipboardUi();\n      await this.startClipboardPolling(true);'
+          assert a in s; s=s.replace(a,b,1)
+          a='  private populateProfiles(): void {'
+          b='  private updateClipboardUi(): void { document.querySelector<HTMLElement>("#clipboard-card")?.classList.toggle("auto-sync-enabled", this.elements.clipboardAutoSync.checked); }\n\n'+a
+          assert a in s; s=s.replace(a,b,1)
+          s=s.replace('    this.restoreBrowserSettings();\n    await this.refreshDevices();','    this.restoreBrowserSettings();\n    this.updateClipboardUi();\n    await this.refreshDevices();',1)
+          p.write_text(s)
+          p=Path('apps/web-client/static/styles.css'); s=p.read_text(); a='.clipboard-actions {'; assert a in s
+          s=s.replace(a,'.clipboard-card.auto-sync-enabled .clipboard-sync-fallback { opacity: 0.62; filter: saturate(0.65); }\n'+a,1); p.write_text(s)
+          p=Path('apps/web-client/tests/layout.test.mjs'); s=p.read_text(); a='test("automatic clipboard sync never triggers Android paste", () => {'
+          b='test("Clipboard drawer supports focused Ctrl+Enter Type", () => {\n  assert.match(controllerSource, /clipboardText\.focus\(\)/);\n  assert.match(controllerSource, /updateClipboardUi/);\n  assert.match(html, /id="clipboard-card"/);\n});\n\n'+a
           assert a in s; p.write_text(s.replace(a,b,1))
           PY
           npm run build --prefix apps/web-client
@@ -61,5 +55,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A apps/web-client
-          git commit -m "Add drag-and-drop Android upload"
+          git commit -m "Optimize Clipboard interactions"
           git push origin HEAD:agent/fix-running-app-always-move
