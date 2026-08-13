@@ -1,10 +1,12 @@
 import { BridgeApi } from "./api.js";
 import type { RunningGuiAppDto, SessionDto } from "./types.js";
 
+const DROPDOWN_REFRESH_STALE_MS = 1500;
+
 interface Elements {
   readonly device: HTMLSelectElement;
   readonly select: HTMLSelectElement;
-  readonly refresh: HTMLButtonElement;
+  readonly icon: HTMLElement;
   readonly count: HTMLElement;
   readonly status: HTMLElement;
   readonly diagnosticDisplay: HTMLElement;
@@ -30,11 +32,13 @@ export class RunningAppController {
   #refreshing = false;
   #moving = false;
   #timer: number | null = null;
+  #lastRefreshAt = 0;
 
   public constructor(elements: Elements, api = new BridgeApi()) {
     this.#elements = elements;
     this.#api = api;
-    elements.refresh.addEventListener("click", () => void this.refresh());
+    elements.select.addEventListener("pointerdown", () => void this.refreshIfStale());
+    elements.select.addEventListener("focus", () => void this.refreshIfStale());
     elements.select.addEventListener("change", () => void this.moveSelected());
     elements.device.addEventListener("change", () => void this.refresh());
   }
@@ -58,6 +62,7 @@ export class RunningAppController {
       this.#apps = [];
       this.#activeSession = null;
       this.#virtualSession = null;
+      this.#lastRefreshAt = 0;
       this.render();
       this.renderDiagnostics(null);
       this.#elements.status.textContent = "Select an authorized Android device.";
@@ -65,7 +70,6 @@ export class RunningAppController {
     }
 
     this.#refreshing = true;
-    this.#elements.refresh.disabled = true;
     if (!silent) this.#elements.status.textContent = "Reading running Android applications…";
     try {
       const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
@@ -78,6 +82,7 @@ export class RunningAppController {
         && typeof session.virtualDisplay.displayId === "number"
       ) ?? null;
       this.#activeSession = this.#virtualSession ?? runningSessions[0] ?? null;
+      this.#lastRefreshAt = Date.now();
       this.render();
       this.renderDiagnostics(apps.freeMemoryBytes ?? null);
       const displayId = this.#virtualSession?.virtualDisplay.displayId;
@@ -93,16 +98,20 @@ export class RunningAppController {
       this.#elements.status.textContent = `Running-app query failed: ${errorMessage(error)}`;
     } finally {
       this.#refreshing = false;
-      this.#elements.refresh.disabled = false;
     }
+  }
+
+  private async refreshIfStale(): Promise<void> {
+    if (this.#refreshing || this.#moving) return;
+    if (Date.now() - this.#lastRefreshAt < DROPDOWN_REFRESH_STALE_MS) return;
+    await this.refresh(true);
   }
 
   private render(): void {
     const previous = this.#elements.select.value;
     this.#elements.select.replaceChildren();
     this.#elements.count.textContent = String(this.#apps.length);
-    this.#elements.refresh.title = `Refresh running applications (${this.#apps.length} found)`;
-    this.#elements.refresh.setAttribute("aria-label", `Refresh running applications, ${this.#apps.length} found`);
+    this.#elements.icon.title = `${this.#apps.length} running GUI task(s)`;
 
     const placeholder = document.createElement("option");
     placeholder.value = "";
@@ -159,7 +168,6 @@ export class RunningAppController {
 
     this.#moving = true;
     this.#elements.select.disabled = true;
-    this.#elements.refresh.disabled = true;
     this.#elements.status.textContent = `Moving ${app.label} to display ${displayId}…`;
     try {
       const result = await this.#api.moveRunningApp({
@@ -176,7 +184,6 @@ export class RunningAppController {
     } finally {
       this.#moving = false;
       this.#elements.select.disabled = this.#apps.length === 0;
-      this.#elements.refresh.disabled = false;
       this.updateSelectionStatus();
     }
   }
