@@ -34,6 +34,7 @@ export declare class TransferController {
     initialize(): Promise<void>;
     private bindEvents;
     private refreshStorageRoots;
+    private refreshExplorerIfStale;
     private browse;
     private renderBreadcrumbs;
     private renderStorage;

@@ -1,5 +1,6 @@
 import { BridgeApi } from "./api.js";
 const ACTIVE_STATES = new Set(["queued", "preparing", "transferring", "verifying"]);
+const EXPLORER_REFRESH_STALE_MS = 3000;
 const RETRY_STATES = new Set(["cancelled", "failed", "interrupted"]);
 let ANDROID_ROOTS = ["/sdcard/Download", "/sdcard/Documents", "/sdcard/Pictures", "/sdcard/DCIM", "/sdcard/Movies"];
 export class TransferController {
@@ -14,6 +15,7 @@ export class TransferController {
     #sortKey = "name";
     #sortDirection = "ascending";
     #lastSelectedIndex = null;
+    #lastBrowseAt = 0;
     constructor(elements) {
         this.elements = elements;
         this.bindEvents();
@@ -61,6 +63,10 @@ export class TransferController {
         });
         this.elements.openUploadFolder.addEventListener("click", () => void this.runAction(() => this.browse(this.elements.uploadDirectory.value)));
         this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));
+        document.querySelector('[data-group="files"]')?.addEventListener("click", () => { void this.runAction(() => this.refreshExplorerIfStale()); });
+        const explorerSection = document.querySelector('[data-section-key="files-explorer"]');
+        explorerSection?.addEventListener("toggle", () => { if (explorerSection.open)
+            void this.runAction(() => this.refreshExplorerIfStale()); });
         this.elements.storageUp.addEventListener("click", () => void this.runAction(() => this.browse(parentAndroidPath(this.elements.storagePath.value))));
         this.elements.storageSelectAll.addEventListener("change", () => {
             const files = this.#currentEntries.filter((entry) => !entry.isDirectory);
@@ -163,6 +169,13 @@ export class TransferController {
         this.elements.storageRoot.value = [...this.elements.storageRoot.options].some((item) => item.value === currentRoot) ? currentRoot : roots.defaultPath;
         this.elements.uploadDirectory.value = [...this.elements.uploadDirectory.options].some((item) => item.value === currentUpload) ? currentUpload : inbox.value;
     }
+    async refreshExplorerIfStale() {
+        if (!this.elements.device.value)
+            return;
+        if (Date.now() - this.#lastBrowseAt < EXPLORER_REFRESH_STALE_MS)
+            return;
+        await this.browse();
+    }
     async browse(path = this.elements.storagePath.value || "/sdcard/Download") {
         const serial = this.elements.device.value;
         if (!serial) {
@@ -181,6 +194,7 @@ export class TransferController {
         this.#lastSelectedIndex = null;
         this.renderBreadcrumbs(result.path);
         this.renderStorage(result.entries);
+        this.#lastBrowseAt = Date.now();
         this.setStatus(`${result.entries.length} item(s) in ${result.path}`);
     }
     renderBreadcrumbs(path) {

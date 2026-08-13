@@ -170,18 +170,18 @@
     },
     {
       "path": "assets/transfer-controller.d.ts",
-      "bytes": 2517,
-      "sha256": "698c99d86defba9d2aaf6427c4f051a7fb22958f77bf1bc4ec364fd8e28a23d6"
+      "bytes": 2553,
+      "sha256": "09e4e235763fcf60e0461a450f620219e43b00c7017f709d27ab87c90f5c937c"
     },
     {
       "path": "assets/transfer-controller.js",
-      "bytes": 30149,
-      "sha256": "4c3e692d44ca51da8a68bc9b16bd1a02cdd01c9d9b1aa7b98e7f0f837073119c"
+      "bytes": 30886,
+      "sha256": "bf17c758160c4d40fcf0ec61f8a71711a084948f49feb6e38bd912bb93b8685a"
     },
     {
       "path": "assets/transfer-controller.js.map",
-      "bytes": 31424,
-      "sha256": "643e0d5c6bbb895f7b580eab973d3fbfc247de113614ad7059d2e8c27706b393"
+      "bytes": 32139,
+      "sha256": "37ae006baa5fe7d9c751966c453b9e0ee8dc355279847571ba55909d8d1aceed"
     },
     {
       "path": "assets/types.d.ts",
