@@ -119,6 +119,13 @@ test("audio card uses the concise label without the experimental badge", () => {
   assert.equal(css.includes(".experimental-badge"), false);
 });
 
+test("Android File Explorer accepts PC file drag and drop", () => {
+  assert.match(transferSource, /addEventListener\("dragover"/);
+  assert.match(transferSource, /addEventListener\("drop"/);
+  assert.match(transferSource, /uploadFiles\(destination, files\)/);
+  assert.match(html, /Drag PC files onto a folder to upload there/);
+});
+
 test("Android File Explorer refreshes when stale", () => {
   assert.match(transferSource, /EXPLORER_REFRESH_STALE_MS = 3000/);
   assert.match(transferSource, /refreshExplorerIfStale/);

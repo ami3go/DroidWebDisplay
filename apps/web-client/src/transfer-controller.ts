@@ -88,10 +88,10 @@ export class TransferController {
 
   private bindEvents(): void {
     this.elements.device.addEventListener("change", () => void this.runAction(async () => { await this.refreshStorageRoots(); await this.browse(); }));
-    this.elements.upload.addEventListener("click", () => void this.runAction(() => this.uploadFiles(this.elements.uploadDirectory.value, this.elements.file)));
+    this.elements.upload.addEventListener("click", () => void this.runAction(() => this.uploadFiles(this.elements.uploadDirectory.value, [...(this.elements.file.files ?? [])])));
     this.elements.contextUploadFile.addEventListener("change", () => {
       if (!(this.elements.contextUploadFile.files?.length)) return;
-      void this.runAction(() => this.uploadFiles(this.#contextUploadDestination, this.elements.contextUploadFile));
+      void this.runAction(() => this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])]));
     });
     this.elements.openUploadFolder.addEventListener("click", () => void this.runAction(() => this.browse(this.elements.uploadDirectory.value)));
     this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));
@@ -116,6 +116,26 @@ export class TransferController {
     this.elements.storageRoot.addEventListener("change", () => void this.runAction(() => this.browse(this.elements.storageRoot.value)));
     this.elements.storagePath.addEventListener("keydown", (event) => {
       if (event.key === "Enter") void this.runAction(() => this.browse());
+    });
+    this.elements.storageBody.addEventListener("dragover", (event) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      this.clearDropTarget();
+      const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');
+      (row ?? this.elements.storageBody).classList.add("drop-target");
+    });
+    this.elements.storageBody.addEventListener("dragleave", (event) => {
+      if (!this.elements.storageBody.contains(event.relatedTarget as Node | null)) this.clearDropTarget();
+    });
+    this.elements.storageBody.addEventListener("drop", (event) => {
+      if (!event.dataTransfer?.files.length) return;
+      event.preventDefault();
+      const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');
+      const destination = row?.dataset.path ?? this.elements.storagePath.value;
+      const files = [...event.dataTransfer.files];
+      this.clearDropTarget();
+      void this.runAction(() => this.uploadFiles(destination, files));
     });
     this.elements.storageBody.addEventListener("click", (event) => {
       if (event.target === this.elements.storageBody) this.clearSelection();
@@ -427,15 +447,19 @@ export class TransferController {
     this.#contextTarget = null;
   }
 
+  private clearDropTarget(): void {
+    this.elements.storageBody.classList.remove("drop-target");
+    for (const row of this.elements.storageBody.querySelectorAll(".drop-target")) row.classList.remove("drop-target");
+  }
+
   private chooseUploadFiles(destination: string): void {
     this.#contextUploadDestination = destination;
     this.elements.contextUploadFile.value = "";
     this.elements.contextUploadFile.click();
   }
 
-  private async uploadFiles(destinationPath: string, sourceInput: HTMLInputElement): Promise<void> {
+  private async uploadFiles(destinationPath: string, files: readonly File[]): Promise<void> {
     const serial = this.requireSerial();
-    const files = [...(sourceInput.files ?? [])];
     if (!files.length) throw new Error("Choose one or more PC files to upload");
     this.elements.upload.disabled = true;
     try {
@@ -447,7 +471,8 @@ export class TransferController {
           duplicatePolicy: this.duplicatePolicy(),
         });
       }
-      sourceInput.value = "";
+      this.elements.file.value = "";
+      this.elements.contextUploadFile.value = "";
       await this.refreshTransfers();
       this.setStatus(`Queued ${files.length} upload(s) to ${destinationPath}`);
     } finally {

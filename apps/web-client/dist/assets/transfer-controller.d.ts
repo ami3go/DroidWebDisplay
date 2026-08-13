@@ -46,6 +46,7 @@ export declare class TransferController {
     private updateSortHeaders;
     private showContextMenu;
     private hideContextMenu;
+    private clearDropTarget;
     private chooseUploadFiles;
     private uploadFiles;
     private download;
