@@ -255,3 +255,21 @@ test("active-session event does not query ADB or REST during tab switch", () => 
   assert.doesNotMatch(body, /#api/);
   assert.match(body, /selectActiveVirtualSession/);
 });
+
+
+test("clipboard polling cannot steal focus from an active Android display", () => {
+  assert.match(controllerSource, /private activeDisplayOwnsKeyboardFocus\(\)/);
+  assert.match(controllerSource, /runtime\?\.canvas === document\.activeElement/);
+  const start = controllerSource.indexOf("private async startClipboardPolling");
+  const end = controllerSource.indexOf("private stopClipboardPolling", start);
+  const polling = controllerSource.slice(start, end);
+  assert.match(polling, /permissionState === "granted" && !requestPermission && this\.activeDisplayOwnsKeyboardFocus\(\)/);
+  assert.match(polling, /this\.activeDisplayOwnsKeyboardFocus\(\)/);
+  assert.match(polling, /this\.#clipboardPollTimer = window\.setInterval/);
+});
+
+test("display diagnostics distinguish focus loss from control transport failure", () => {
+  assert.match(controllerSource, /control focus \$\{runtime\.canvas === document\.activeElement \? "canvas" : "lost"\}/);
+  assert.match(controllerSource, /canvas\.addEventListener\("focus", \(\) => this\.renderDisplayDiagnostics\(true\)\)/);
+  assert.match(controllerSource, /canvas\.addEventListener\("blur", \(\) => this\.renderDisplayDiagnostics\(true\)\)/);
+});

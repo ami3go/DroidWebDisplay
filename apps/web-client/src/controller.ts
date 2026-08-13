@@ -396,6 +396,8 @@ export class DroidWebDisplayController {
     canvas.addEventListener("pointercancel", (event) => void this.pointer(event, 3));
     canvas.addEventListener("wheel", (event) => void this.scroll(event), { passive: false });
     canvas.addEventListener("keydown", (event) => void this.keydown(event));
+    canvas.addEventListener("focus", () => this.renderDisplayDiagnostics(true));
+    canvas.addEventListener("blur", () => this.renderDisplayDiagnostics(true));
     canvas.addEventListener("paste", (event) => {
       const text = event.clipboardData?.getData("text/plain") ?? "";
       if (!text) return;
@@ -590,7 +592,10 @@ export class DroidWebDisplayController {
         ? `video ${video.width}×${video.height}, decoded ${video.framesDecoded}, dropped ${video.framesDropped}, queue ${video.decoderQueue}`
         : "video waiting";
       const audioText = audio ? `audio ${audio.codec}, ${audio.bufferedMilliseconds} ms buffered` : "audio off/unavailable";
-      meta.textContent = `${runtime.serverSession.display.kind} display ${displayId} · ${videoText} · ${audioText} · session ${sessionId.slice(0, 8)}`;
+      const focusText = sessionId === this.#activeSessionId
+        ? `control focus ${runtime.canvas === document.activeElement ? "canvas" : "lost"}`
+        : "control focus background";
+      meta.textContent = `${runtime.serverSession.display.kind} display ${displayId} · ${videoText} · ${audioText} · ${focusText} · session ${sessionId.slice(0, 8)}`;
       row.append(heading, meta);
       this.elements.displayDiagnostics.append(row);
     }
@@ -1264,6 +1269,11 @@ export class DroidWebDisplayController {
     this.setStatus("Clipboard copied", "Android clipboard was copied to the PC clipboard.");
   }
 
+  private activeDisplayOwnsKeyboardFocus(): boolean {
+    const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+    return runtime?.canvas === document.activeElement;
+  }
+
   private async startClipboardPolling(requestPermission: boolean): Promise<void> {
     this.stopClipboardPolling();
     this.#clipboardReadAllowed = false;
@@ -1297,6 +1307,14 @@ export class DroidWebDisplayController {
       this.setStatus("Clipboard sync ready", "Android → PC sync is active. Toggle automatic sync off/on once to grant PC → Android clipboard access.");
       return;
     }
+    if (permissionState === "granted" && !requestPermission && this.activeDisplayOwnsKeyboardFocus()) {
+      // Chromium clipboard reads may still open transient browser UI even after
+      // permission was granted. Never risk stealing keyboard focus from an active
+      // Android canvas. Arm the timer, but every poll remains focus-gated below.
+      this.#clipboardReadAllowed = true;
+      this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);
+      return;
+    }
 
     try {
       // This read is either already permission-granted or is called directly from the user's
@@ -1323,7 +1341,15 @@ export class DroidWebDisplayController {
   private async pollPcClipboard(): Promise<void> {
     const sessionId = this.#activeSessionId;
     const session = this.#protocolSession;
-    if (!document.hasFocus() || !sessionId || !session || !this.elements.clipboardAutoSync.checked || !this.#clipboardReadAllowed || this.#clipboardPollBusy) return;
+    if (
+      !document.hasFocus()
+      || !sessionId
+      || !session
+      || !this.elements.clipboardAutoSync.checked
+      || !this.#clipboardReadAllowed
+      || this.#clipboardPollBusy
+      || this.activeDisplayOwnsKeyboardFocus()
+    ) return;
     this.#clipboardPollBusy = true;
     try {
       const text = await navigator.clipboard.readText();

@@ -123,6 +123,7 @@ export declare class DroidWebDisplayController {
     private toggleAudioMute;
     private setAudioVolume;
     private copyAndroidClipboard;
+    private activeDisplayOwnsKeyboardFocus;
     private startClipboardPolling;
     private stopClipboardPolling;
     private pollPcClipboard;

@@ -95,18 +95,18 @@
     },
     {
       "path": "assets/controller.d.ts",
-      "bytes": 5044,
-      "sha256": "0609ac00cb68a30ce8e3db0feff9da7642cc1023df86b0beca5070989bd55dd5"
+      "bytes": 5088,
+      "sha256": "582daddcbdb17991609c8225a22256b18691b7197519ab1512529bd6920521f9"
     },
     {
       "path": "assets/controller.js",
-      "bytes": 71251,
-      "sha256": "6dd9fc17f18846c0ee32d02a8c7dd055b226c8e8848f0f34ebba983b439e7e55"
+      "bytes": 72511,
+      "sha256": "6b60362070dab2ab8296851fe8612344c82ae8d26b4ce2639b7129ef42d8440e"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 65799,
-      "sha256": "0cbc8e5cfa3882a669dd02dc30be739bfe58aa23e380ea6d961fd816a5c2217f"
+      "bytes": 66700,
+      "sha256": "b8e985510ad9a67dd44d7029a47bfcd7f7faeaa886cb43a149874c46bc7b0577"
     },
     {
       "path": "assets/display-config.d.ts",
