@@ -80,18 +80,18 @@
     },
     {
       "path": "assets/controller.d.ts",
-      "bytes": 4282,
-      "sha256": "7b74e2b6817515a5246d4e4f5f3e8ba8a1dc09bef2f5d450dff7da8af986204a"
+      "bytes": 4238,
+      "sha256": "4baac355c00c0278c5447c448282c669bd7fb606a98fbb628505877b65c68034"
     },
     {
       "path": "assets/controller.js",
-      "bytes": 49692,
-      "sha256": "9e1283db1e2a347db7155a38eaf6f0bdf82b59088f3b9faca8c532fb6bc5f73a"
+      "bytes": 49828,
+      "sha256": "5fde1b075223551001b11ea8569f8cbdc08042d37eff80c981db3c990a2dce4b"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 46740,
-      "sha256": "2a00db666d46156ca57ff6fd24c5a27feb644d82db163bedd8c9dc7c7e2b3a1b"
+      "bytes": 46885,
+      "sha256": "9ad4760dbb5031e018ded5df2d1fe5110ae0e016af04a395e904d59bab8783f0"
     },
     {
       "path": "assets/display-config.d.ts",
@@ -130,13 +130,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 11218,
-      "sha256": "68691dc8ff9bdd118432e21f519a1075b5268670328a688ea03b06e16ece2662"
+      "bytes": 11169,
+      "sha256": "c001bb5906fd8c0fbf6c8177926500264c3f4b70b89c9e70b8801810bead09ab"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 8446,
-      "sha256": "7dedb9024841378fbde33642364faae9074059d363c795844b32776cbe5f9b98"
+      "bytes": 8409,
+      "sha256": "e8fd2429ee651ae6095698a220c5a4a35ccc8755796cc324f6cd742dae180777"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -230,8 +230,8 @@
     },
     {
       "path": "droidwebdisplay-connect-drawer.css",
-      "bytes": 1976,
-      "sha256": "00489f0a227ffdb849b3238b4ccad575992ecc203cb323301964b54efa83d167"
+      "bytes": 1965,
+      "sha256": "5f05b7765bcebe7401970f4fcbf12266f1edc5438b31e0880cf4e66477d921e3"
     },
     {
       "path": "droidwebdisplay-main-drawer.css",
@@ -240,13 +240,13 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 6163,
-      "sha256": "718dd7811c55a96d3ecb35d22c11aaf5b222f85b5ec6dc4c0bc17bed73554c9e"
+      "bytes": 6074,
+      "sha256": "d9910752bd98d6ba50824aead6af3081a8c23b0ca061817145f5ab28d1d6cc8d"
     },
     {
       "path": "index.html",
-      "bytes": 30562,
-      "sha256": "a043e13a56966cff4c2a1b7987c61e77ab97070b734825d1fcb85d763f0325b6"
+      "bytes": 30478,
+      "sha256": "9b62468d826c106c0d99b45864ec896d6b4b4886ad4230b0ff805f6a6f727f6a"
     },
     {
       "path": "styles.css",

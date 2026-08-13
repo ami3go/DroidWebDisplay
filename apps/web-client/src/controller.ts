@@ -29,7 +29,6 @@ interface ClipboardAckWaiter {
 interface Elements {
   readonly device: HTMLSelectElement;
   readonly connect: HTMLButtonElement;
-  readonly disconnect: HTMLButtonElement;
   readonly canvas: HTMLCanvasElement;
   readonly stage: HTMLElement;
   readonly statusContainer: HTMLElement;
@@ -254,8 +253,7 @@ export class DroidWebDisplayController {
     this.elements.device.addEventListener("pointerdown", () => void this.runUiAction(() => this.refreshDevicesIfStale()));
     this.elements.device.addEventListener("focus", () => void this.runUiAction(() => this.refreshDevicesIfStale()));
     this.elements.device.addEventListener("change", () => void this.runUiAction(() => this.refreshVirtualCapabilities()));
-    this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.connect()));
-    this.elements.disconnect.addEventListener("click", () => void this.runUiAction(() => this.disconnect()));
+    this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.#serverSession ? this.disconnect() : this.connect()));
     this.elements.displayMode.addEventListener("change", () => this.updateDisplayUi());
     this.elements.displayProfile.addEventListener("change", () => {
       if (this.elements.displayProfile.value !== "custom") this.applyProfile(this.elements.displayProfile.value);
@@ -415,6 +413,10 @@ export class DroidWebDisplayController {
   }
 
   private updateConnectAvailability(): void {
+    if (this.#serverSession) {
+      this.elements.connect.disabled = false;
+      return;
+    }
     const hasDevice = [...this.elements.device.options].some((option) => !option.disabled);
     const errors = validateDisplayForm(this.readDisplayValues());
     const unsupported = this.elements.displayMode.value === "virtual" && this.#capabilities?.virtualDisplaySupported === false;
@@ -737,8 +739,9 @@ export class DroidWebDisplayController {
   }
 
   private setConnectedControls(connected: boolean): void {
-    this.elements.connect.disabled = connected;
-    this.elements.disconnect.disabled = !connected;
+    this.elements.connect.textContent = connected ? "Disconnect" : "Connect";
+    this.elements.connect.classList.toggle("danger", connected);
+    this.elements.connect.disabled = false;
     for (const button of [
       this.elements.back,
       this.elements.home,

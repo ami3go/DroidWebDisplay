@@ -88,7 +88,6 @@ async function bootstrap() {
         const controller = new DroidWebDisplayController({
             device: required("#device"),
             connect: required("#connect"),
-            disconnect: required("#disconnect"),
             canvas: required("#screen"),
             stage: required("#stage"),
             statusContainer: required("#connection-status"),

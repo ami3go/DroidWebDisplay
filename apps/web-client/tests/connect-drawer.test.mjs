@@ -14,19 +14,19 @@ test("Display is the first drawer group and owns connection controls", () => {
   assert.doesNotMatch(drawerSource, /data-group=\"connect\"/);
   assert.doesNotMatch(drawerSource, /dataset\.group = 'connect'/);
   assert.match(drawerSource, /data-slot=\"display\"/);
-  for (const id of ["device", "connect", "disconnect"]) {
+  for (const id of ["device", "connect"]) {
     assert.match(drawerSource, new RegExp(`getElementById\\('${id}'\\)`));
   }
-  assert.match(drawerSource, /actions\.append\(connect, disconnect\)/);
+  assert.match(drawerSource, /actions\.append\(connect\)/);
   assert.match(drawerSource, /displaySlot\.insertBefore\(card, displaySlot\.firstElementChild\)/);
   assert.doesNotMatch(html, /id=\"refresh\"/);
 });
 
-test("Display connection controls use a compact non-overlapping two-column layout", () => {
+test("Display connection controls use one compact stateful action", () => {
   assert.match(drawerSource, /droidwebdisplay-connect-drawer\.css/);
   assert.match(connectCss, /data-slot=\"display\"/);
   assert.doesNotMatch(connectCss, /data-slot=\"connect\"/);
-  assert.match(connectCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important/);
+  assert.match(connectCss, /grid-template-columns: minmax\(0, 1fr\) !important/);
   assert.match(connectCss, /grid-column: auto !important/);
   assert.match(connectCss, /min-height: 2rem !important/);
   assert.match(connectCss, /#device[\s\S]*height: 2rem/);

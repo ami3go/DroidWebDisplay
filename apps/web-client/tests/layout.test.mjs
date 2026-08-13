@@ -144,7 +144,7 @@ test("compact header keeps device and Android controls beside the title", () => 
   const headerStart = html.indexOf('<header class="topbar">');
   const headerEnd = html.indexOf('</header>', headerStart);
   const header = html.slice(headerStart, headerEnd);
-  for (const id of ["device", "connect", "disconnect", "back", "home", "recent", "rotate", "power", "fullscreen"]) {
+  for (const id of ["device", "connect", "back", "home", "recent", "rotate", "power", "fullscreen"]) {
     assert.match(header, new RegExp(`id="${id}"`));
   }
   assert.match(header, /class="topbar-brand"/);
@@ -154,6 +154,8 @@ test("compact header keeps device and Android controls beside the title", () => 
   assert.match(controllerSource, /DEVICE_DROPDOWN_REFRESH_STALE_MS/);
   assert.match(controllerSource, /device\.addEventListener\(\"pointerdown\"/);
   assert.equal(header.includes('id=\"refresh\"'), false);
+  assert.equal(header.includes('id=\"disconnect\"'), false);
+  assert.match(controllerSource, /connect\.textContent = connected \? \"Disconnect\" : \"Connect\"/);
 });
 
 test("optional LAN access is explicit, authenticated and recoverable", () => {

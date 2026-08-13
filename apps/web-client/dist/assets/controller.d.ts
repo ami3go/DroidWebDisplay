@@ -1,7 +1,6 @@
 interface Elements {
     readonly device: HTMLSelectElement;
     readonly connect: HTMLButtonElement;
-    readonly disconnect: HTMLButtonElement;
     readonly canvas: HTMLCanvasElement;
     readonly stage: HTMLElement;
     readonly statusContainer: HTMLElement;
