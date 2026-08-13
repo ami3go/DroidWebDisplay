@@ -183,3 +183,33 @@ test("network access API validates and applies authenticated HTTPS configuration
   assert.equal(calls[0].init.method, "POST");
   assert.equal(JSON.parse(calls[1].init.body).mode, "lan-https");
 });
+
+
+test("device-scoped display-session API supports tab lifecycle", async () => {
+  const calls = [];
+  const api = new BridgeApi("", async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    const method = init.method ?? "GET";
+    const payload = method === "GET"
+      ? { serial: "PHONE", activeSessionCount: 1, sessions: [] }
+      : method === "DELETE" && String(url).endsWith("/sessions")
+        ? { serial: "PHONE", stoppedCount: 1, sessions: [] }
+        : { sessionId: "S1", serial: "PHONE", state: "running", channels: ["video", "control"], options: {}, display: { name: "ChatGPT" } };
+    return new Response(JSON.stringify(payload), { status: method === "POST" ? 201 : 200, headers: { "content-type": "application/json" } });
+  });
+  await api.deviceSessions("PHONE");
+  await api.startDeviceSession("PHONE", { serial: "WRONG-IGNORED", displayName: "ChatGPT" });
+  await api.stopDeviceSession("PHONE", "S1");
+  await api.stopDeviceSessions("PHONE");
+  assert.deepEqual(calls.map((call) => call.url), [
+    "/api/v1/devices/PHONE/sessions",
+    "/api/v1/devices/PHONE/sessions",
+    "/api/v1/devices/PHONE/sessions/S1",
+    "/api/v1/devices/PHONE/sessions",
+  ]);
+  const createBody = JSON.parse(calls[1].init.body);
+  assert.equal(createBody.serial, "PHONE");
+  assert.equal(createBody.displayName, "ChatGPT");
+  assert.equal(calls[2].init.method, "DELETE");
+  assert.equal(calls[3].init.method, "DELETE");
+});

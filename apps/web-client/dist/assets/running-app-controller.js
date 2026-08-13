@@ -9,6 +9,7 @@ export class RunningAppController {
     #virtualSession = null;
     #refreshing = false;
     #timer = null;
+    #activeSessionId = null;
     constructor(elements, api = new BridgeApi()) {
         this.#elements = elements;
         this.#api = api;
@@ -16,6 +17,11 @@ export class RunningAppController {
         elements.move.addEventListener("click", () => void this.moveSelected());
         elements.select.addEventListener("change", () => this.updateControls());
         elements.device.addEventListener("change", () => void this.refresh());
+        globalThis.addEventListener("droidwebdisplay-active-session", (event) => {
+            const detail = event.detail;
+            this.#activeSessionId = detail?.sessionId ?? null;
+            void this.refresh(true);
+        });
     }
     async initialize() {
         await this.refresh();
@@ -44,12 +50,13 @@ export class RunningAppController {
         if (!silent)
             this.#elements.status.textContent = "Reading running Android applications…";
         try {
-            const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
+            const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.deviceSessions(serial)]);
             this.#apps = apps.apps;
-            this.#virtualSession = sessions.sessions.find((session) => session.serial === serial
-                && session.state === "running"
+            const virtualSessions = sessions.sessions.filter((session) => session.state === "running"
                 && session.displayMode === "virtual"
-                && typeof session.virtualDisplay.displayId === "number") ?? null;
+                && typeof session.virtualDisplay.displayId === "number");
+            this.#virtualSession = virtualSessions.find((session) => session.sessionId === this.#activeSessionId)
+                ?? (this.#activeSessionId === null ? virtualSessions[0] ?? null : null);
             this.render();
             const displayId = this.#virtualSession?.virtualDisplay.displayId;
             this.#elements.status.textContent = displayId === null || displayId === undefined

@@ -6,6 +6,8 @@ import type {
   BrowserSupportResponse,
   DestinationProfileResponse,
   DeviceListResponse,
+  DeviceSessionListResponse,
+  DeviceSessionStopResponse,
   DuplicatePolicy,
   LaunchableAppsResponse,
   MoveRunningAppResponse,
@@ -64,6 +66,7 @@ export class BridgeApiError extends Error {
 
 export interface StartSessionRequest {
   readonly serial?: string;
+  readonly displayName?: string;
   readonly video?: boolean;
   readonly audio?: boolean;
   readonly control?: boolean;
@@ -180,6 +183,55 @@ export class BridgeApi {
 
   public async sessions(): Promise<SessionListResponse> {
     return this.request<SessionListResponse>("/api/v1/sessions");
+  }
+
+  public async deviceSessions(serial: string): Promise<DeviceSessionListResponse> {
+    return this.request<DeviceSessionListResponse>(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`);
+  }
+
+  public async startDeviceSession(serial: string, request: StartSessionRequest): Promise<SessionDto> {
+    return this.request<SessionDto>(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        video: true,
+        audio: false,
+        control: true,
+        audioCodec: "opus",
+        audioBitRate: 128_000,
+        videoCodec: "h264",
+        maxSize: 1920,
+        videoBitRate: 8_000_000,
+        maxFps: 30,
+        displayMode: "physical",
+        ...request,
+        serial,
+      }),
+    });
+  }
+
+  public async stopDeviceSession(serial: string, sessionId: string, keepalive = false): Promise<SessionDto | null> {
+    try {
+      return await this.request<SessionDto>(
+        `/api/v1/devices/${encodeURIComponent(serial)}/sessions/${encodeURIComponent(sessionId)}`,
+        { method: "DELETE", keepalive },
+      );
+    } catch (error) {
+      if (keepalive) return null;
+      throw error;
+    }
+  }
+
+  public async stopDeviceSessions(serial: string, keepalive = false): Promise<DeviceSessionStopResponse | null> {
+    try {
+      return await this.request<DeviceSessionStopResponse>(
+        `/api/v1/devices/${encodeURIComponent(serial)}/sessions`,
+        { method: "DELETE", keepalive },
+      );
+    } catch (error) {
+      if (keepalive) return null;
+      throw error;
+    }
   }
 
   public async startSession(request: StartSessionRequest): Promise<SessionDto> {

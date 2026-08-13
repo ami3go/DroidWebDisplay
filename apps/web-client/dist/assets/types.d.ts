@@ -64,6 +64,24 @@ export interface ChannelDiagnosticDto {
     readonly attached: boolean;
     readonly relayCloseReason: string | null;
 }
+export interface DisplayIdentityDto {
+    readonly sessionId: string;
+    readonly kind: "physical" | "virtual";
+    readonly displayId: number | null;
+    readonly name: string;
+    readonly application: string | null;
+    readonly resolution: {
+        readonly width: number | null;
+        readonly height: number | null;
+        readonly source: "unknown" | "requested" | "actual";
+    };
+    readonly dpi: {
+        readonly value: number | null;
+        readonly source: "unknown" | "requested" | "actual";
+    };
+    readonly createdAt: number;
+    readonly state: string;
+}
 export interface SessionDto {
     readonly sessionId: string;
     readonly serial: string;
@@ -71,6 +89,7 @@ export interface SessionDto {
     readonly channels: readonly string[];
     readonly options: SessionOptionsDto;
     readonly displayMode: DisplayMode;
+    readonly display: DisplayIdentityDto;
     readonly virtualDisplay: VirtualDisplayDiagnosticDto;
     readonly error: string | null;
     readonly stopReason: string | null;
@@ -82,6 +101,16 @@ export interface DeviceListResponse {
     readonly devices: readonly AndroidDevice[];
 }
 export interface SessionListResponse {
+    readonly sessions: readonly SessionDto[];
+}
+export interface DeviceSessionListResponse {
+    readonly serial: string;
+    readonly activeSessionCount: number;
+    readonly sessions: readonly SessionDto[];
+}
+export interface DeviceSessionStopResponse {
+    readonly serial: string;
+    readonly stoppedCount: number;
     readonly sessions: readonly SessionDto[];
 }
 export interface BrowserSupportResponse {

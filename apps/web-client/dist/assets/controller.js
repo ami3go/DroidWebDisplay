@@ -12,6 +12,7 @@ export class DroidWebDisplayController {
     #transport = null;
     #protocolSession = null;
     #serverSession = null;
+    #baseRenderer;
     #renderer;
     #audioPlayer;
     #latestAudioStatistics = null;
@@ -36,13 +37,18 @@ export class DroidWebDisplayController {
     #resizeTimer = null;
     #lastResizeAt = 0;
     #lastRequestedSize = null;
+    #runtimes = new Map();
+    #activeSessionId = null;
     #clipboardAcks = new Map();
     constructor(elements) {
         this.elements = elements;
-        this.#renderer = new WebCodecsVideoRenderer(elements.canvas, (stats) => this.updateStatistics(stats));
-        this.#audioPlayer = new WebCodecsAudioPlayer((stats) => this.updateAudioStatistics(stats));
+        this.#baseRenderer = new WebCodecsVideoRenderer(elements.canvas, (stats) => this.updateRuntimeStatistics(elements.canvas.dataset.sessionId ?? null, stats));
+        this.#renderer = this.#baseRenderer;
+        this.#audioPlayer = new WebCodecsAudioPlayer(() => undefined);
         this.populateProfiles();
         this.bindEvents();
+        this.bindCanvasEvents(elements.canvas);
+        this.renderTabs();
     }
     async initialize() {
         this.applyProfile(localStorage.getItem("droidwebdisplay-virtual-profile-v1") ?? "chatgpt-desktop");
@@ -69,104 +75,360 @@ export class DroidWebDisplayController {
         this.updateConnectAvailability();
     }
     async connect() {
-        if (this.#serverSession)
-            return;
         const serial = this.elements.device.value;
         if (!serial)
             throw new Error("No authorized device is selected");
+        const existingSerial = this.firstRuntime()?.serverSession.serial ?? null;
+        if (existingSerial && existingSerial !== serial) {
+            throw new Error("Close the current device display tabs before selecting another Android device");
+        }
         const values = this.readDisplayValues();
-        this.#lastConnectValues = values;
         const errors = validateDisplayForm(values);
         if (errors.length)
             throw new Error(errors.join(" "));
         if (values.displayMode === "virtual" && !this.#capabilities?.virtualDisplaySupported) {
             throw new Error(this.#capabilities?.warnings.join(" ") || "Virtual Display mode is not supported by this device.");
         }
+        const explicitDisplayName = this.elements.displayName.value.trim();
+        const displayName = explicitDisplayName || this.automaticDisplayName(values);
+        let serverSession = null;
+        let transport = null;
+        let protocolSession = null;
+        let runtimeCanvas = null;
+        let renderer = null;
+        let audioPlayer = null;
         this.setBusy(true);
-        this.setStatus("Starting", values.displayMode === "virtual" ? "Creating Android virtual display and opening browser channels…" : "Launching scrcpy and opening browser channels…");
+        this.setStatus(this.#runtimes.size ? "Adding display" : "Starting", values.displayMode === "virtual" ? "Creating Android virtual display and opening browser channels…" : "Launching scrcpy and opening browser channels…");
         try {
-            const request = { ...buildSessionRequest(values, serial), audio: this.elements.audioEnabled.checked, audioCodec: "opus", audioBitRate: 128_000 };
-            const serverSession = await this.#api.startSession(request);
-            this.#serverSession = serverSession;
-            this.#transport = new WebSocketBridgeTransport(serverSession.sessionId);
-            this.#protocolSession = await this.#adapter.connect(this.#transport, {
+            const request = {
+                ...buildSessionRequest(values, serial),
+                displayName,
+                audio: this.elements.audioEnabled.checked,
+                audioCodec: "opus",
+                audioBitRate: 128_000,
+            };
+            serverSession = await this.#api.startDeviceSession(serial, request);
+            runtimeCanvas = this.allocateRuntimeCanvas(serverSession.sessionId);
+            renderer = runtimeCanvas === this.elements.canvas
+                ? this.#baseRenderer
+                : new WebCodecsVideoRenderer(runtimeCanvas, (stats) => this.updateRuntimeStatistics(runtimeCanvas?.dataset.sessionId ?? null, stats));
+            audioPlayer = new WebCodecsAudioPlayer((stats) => this.updateRuntimeAudioStatistics(serverSession?.sessionId ?? null, stats));
+            audioPlayer.setMuted(true);
+            audioPlayer.setVolume(Number(this.elements.audioVolume.value) / 100);
+            transport = new WebSocketBridgeTransport(serverSession.sessionId);
+            protocolSession = await this.#adapter.connect(transport, {
                 video: true,
                 audio: this.elements.audioEnabled.checked,
                 control: true,
             });
-            this.setConnectedControls(true);
-            this.elements.canvas.focus();
-            this.#deviceMessageTask = this.consumeDeviceMessages(this.#protocolSession);
-            void this.#deviceMessageTask.catch((error) => {
-                if (!this.#closing && this.#serverSession)
+            const runtime = {
+                serverSession,
+                transport,
+                protocolSession,
+                renderer,
+                audioPlayer,
+                canvas: runtimeCanvas,
+                values,
+                audioTask: null,
+                deviceMessageTask: null,
+                latestStatistics: null,
+                latestAudioStatistics: null,
+                lastAndroidClipboard: "",
+                lastSentClipboard: "",
+            };
+            this.#runtimes.set(serverSession.sessionId, runtime);
+            this.renderTabs();
+            runtime.deviceMessageTask = this.consumeDeviceMessages(serverSession.sessionId, protocolSession);
+            void runtime.deviceMessageTask.catch((error) => {
+                if (this.#runtimes.has(serverSession.sessionId))
                     console.warn("Control device-message stream ended", error);
             });
-            void this.#renderer.run(this.#protocolSession).catch((error) => this.handleStreamFailure(error));
-            if (this.elements.audioEnabled.checked) {
-                if (this.#protocolSession.audioHeader) {
-                    this.#audioPlayer.setMuted(this.elements.audioMute.textContent === "Unmute");
-                    this.#audioPlayer.setVolume(Number(this.elements.audioVolume.value) / 100);
-                    this.elements.audioStatus.textContent = `Audio connected · ${this.#protocolSession.audioHeader.codec}`;
-                    this.#audioTask = this.#audioPlayer.run(this.#protocolSession);
-                    void this.#audioTask.catch((error) => {
-                        if (this.#serverSession)
-                            this.elements.audioStatus.textContent = `Audio unavailable: ${errorMessage(error)}. Video and control remain active.`;
-                    });
-                }
-                else {
-                    this.elements.audioStatus.textContent = "Android audio capture is unavailable. Video and control remain active.";
-                }
+            void renderer.run(protocolSession).catch((error) => this.handleRuntimeFailure(serverSession.sessionId, error));
+            if (this.elements.audioEnabled.checked && protocolSession.audioHeader) {
+                runtime.audioTask = audioPlayer.run(protocolSession);
+                void runtime.audioTask.catch((error) => {
+                    if (this.#activeSessionId === serverSession.sessionId) {
+                        this.elements.audioStatus.textContent = `Audio unavailable: ${errorMessage(error)}. Video and control remain active.`;
+                    }
+                });
             }
-            else {
-                this.elements.audioStatus.textContent = "Audio disabled.";
+            if (values.displayMode === "virtual" && values.startApp) {
+                const payload = values.forceStopBeforeLaunch ? `+${values.startApp}` : values.startApp;
+                await protocolSession.sendControl({ type: ControlMessageType.StartApp, name: payload });
+                runtime.serverSession = await this.#api.recordApplicationLaunch(serverSession.sessionId, "sent");
             }
-            void this.startClipboardPolling(false);
+            this.activateRuntime(serverSession.sessionId);
             this.#reconnectCount = 0;
-            if (values.displayMode === "virtual") {
-                if (values.startApp) {
-                    const payload = values.forceStopBeforeLaunch ? `+${values.startApp}` : values.startApp;
-                    await this.sendMessages([{ type: ControlMessageType.StartApp, name: payload }]);
-                    await this.#api.recordApplicationLaunch(serverSession.sessionId, "sent");
-                }
-                if (values.sizeMode === "flex")
-                    this.startFlexResize(values);
-                const display = serverSession.virtualDisplay;
-                this.setStatus("Virtual display connected", `Display ${display.displayId ?? "pending"} · ${display.actualSize ?? `${values.width}x${values.height}`} · ${display.actualDpi ?? values.dpi} DPI`);
-            }
-            else {
-                const deviceName = this.#protocolSession.device?.name ?? serverSession.serial;
-                this.setStatus("Connected", `${deviceName} · H.264 · ${serverSession.options.maxFps} fps limit`);
-            }
+            this.renderTabs();
         }
         catch (error) {
-            await this.cleanupSession();
-            this.setStatus("Connection failed", errorMessage(error));
-            this.setConnectedControls(false);
+            if (serverSession && this.#runtimes.has(serverSession.sessionId)) {
+                await this.cleanupRuntime(serverSession.sessionId);
+            }
+            else {
+                renderer?.stop();
+                audioPlayer?.stop();
+                try {
+                    await protocolSession?.close();
+                }
+                catch {
+                    await transport?.close();
+                }
+                if (runtimeCanvas)
+                    this.releaseRuntimeCanvas(runtimeCanvas);
+                if (serverSession) {
+                    try {
+                        await this.#api.stopDeviceSession(serial, serverSession.sessionId);
+                    }
+                    catch {
+                        // The WebSocket endpoint may already have stopped the failed session.
+                    }
+                }
+            }
+            if (this.#serverSession)
+                this.updateActiveRuntimeStatus();
+            else
+                this.setStatus("Connection failed", errorMessage(error));
+            this.setConnectedControls(this.#serverSession !== null);
             throw error;
         }
         finally {
             this.setBusy(false);
+            this.updateConnectAvailability();
         }
     }
     async disconnect() {
+        if (!this.#activeSessionId)
+            return;
         this.#manualDisconnect = true;
         this.cancelReconnect();
         this.#closing = true;
         try {
+            const closingName = this.#serverSession?.display.name ?? "display";
             await this.cleanupSession();
-            this.setStatus("Disconnected", "The Android session was stopped and virtual-display cleanup was requested.");
+            if (this.#serverSession)
+                this.updateActiveRuntimeStatus();
+            else
+                this.setStatus("Disconnected", `${closingName} was stopped. No display tabs remain.`);
         }
         finally {
             this.#closing = false;
-            this.setConnectedControls(false);
+            this.setConnectedControls(this.#serverSession !== null);
             this.#manualDisconnect = false;
         }
     }
     stopOnUnload() {
-        const sessionId = this.#serverSession?.sessionId;
-        if (!sessionId)
+        const serial = this.firstRuntime()?.serverSession.serial;
+        if (!serial)
             return;
-        void this.#api.stopSession(sessionId, true);
+        void this.#api.stopDeviceSessions(serial, true);
+    }
+    firstRuntime() {
+        return this.#runtimes.values().next().value ?? null;
+    }
+    automaticDisplayName(values) {
+        const sameKind = [...this.#runtimes.values()].filter((runtime) => runtime.serverSession.display.kind === values.displayMode);
+        if (values.displayMode === "physical")
+            return sameKind.length ? `Phone ${sameKind.length + 1}` : "Phone";
+        const base = values.startApp === "com.openai.chatgpt"
+            ? "ChatGPT"
+            : values.startApp ? values.startApp.split(".").at(-1) || "Virtual display" : "Virtual display";
+        const duplicateCount = [...this.#runtimes.values()].filter((runtime) => runtime.serverSession.display.name.startsWith(base)).length;
+        return duplicateCount ? `${base} ${duplicateCount + 1}` : base;
+    }
+    allocateRuntimeCanvas(sessionId) {
+        if (![...this.#runtimes.values()].some((runtime) => runtime.canvas === this.elements.canvas)) {
+            this.elements.canvas.dataset.sessionId = sessionId;
+            this.elements.canvas.hidden = false;
+            return this.elements.canvas;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.className = "display-canvas";
+        canvas.tabIndex = 0;
+        canvas.setAttribute("aria-label", "Android display session");
+        canvas.dataset.sessionId = sessionId;
+        canvas.hidden = true;
+        this.bindCanvasEvents(canvas);
+        this.elements.stage.insertBefore(canvas, this.elements.stageHint);
+        return canvas;
+    }
+    releaseRuntimeCanvas(canvas) {
+        canvas.dataset.sessionId = "";
+        canvas.hidden = true;
+        if (canvas !== this.elements.canvas)
+            canvas.remove();
+        else if (this.#runtimes.size === 0) {
+            canvas.hidden = false;
+            const context = canvas.getContext?.("2d");
+            context?.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+    bindCanvasEvents(canvas) {
+        canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+        canvas.addEventListener("pointerdown", (event) => void this.pointer(event, 0));
+        canvas.addEventListener("pointermove", (event) => {
+            if (event.buttons !== 0)
+                void this.pointer(event, 2);
+        });
+        canvas.addEventListener("pointerup", (event) => void this.pointer(event, 1));
+        canvas.addEventListener("pointercancel", (event) => void this.pointer(event, 3));
+        canvas.addEventListener("wheel", (event) => void this.scroll(event), { passive: false });
+        canvas.addEventListener("keydown", (event) => void this.keydown(event));
+        canvas.addEventListener("paste", (event) => {
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (!text)
+                return;
+            event.preventDefault();
+            void this.runUiAction(() => this.pasteText(text, "Ctrl+V"));
+        });
+    }
+    renderTabs() {
+        this.elements.tabs.replaceChildren();
+        if (!this.#runtimes.size) {
+            const empty = document.createElement("span");
+            empty.className = "display-tabs-empty";
+            empty.textContent = "No active displays";
+            this.elements.tabs.append(empty);
+            return;
+        }
+        const ids = [...this.#runtimes.keys()];
+        for (const [sessionId, runtime] of this.#runtimes) {
+            const identity = runtime.serverSession.display;
+            const item = document.createElement("div");
+            item.className = "display-tab";
+            item.dataset.active = String(sessionId === this.#activeSessionId);
+            const select = document.createElement("button");
+            select.type = "button";
+            select.className = "display-tab-select";
+            select.setAttribute("role", "tab");
+            select.setAttribute("aria-selected", String(sessionId === this.#activeSessionId));
+            select.dataset.sessionId = sessionId;
+            select.title = identity.application ? `${identity.name} · ${identity.application}` : identity.name;
+            const kind = document.createElement("span");
+            kind.className = "display-tab-kind";
+            kind.textContent = identity.kind === "physical" ? "PHONE" : "VD";
+            const name = document.createElement("span");
+            name.className = "display-tab-name";
+            name.textContent = identity.name;
+            const meta = document.createElement("span");
+            meta.className = "display-tab-meta";
+            meta.textContent = identity.kind === "physical"
+                ? "display 0 · live"
+                : `display ${identity.displayId ?? "…"} · live`;
+            select.append(kind, name, meta);
+            select.addEventListener("click", () => this.activateRuntime(sessionId));
+            select.addEventListener("keydown", (event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight")
+                    return;
+                event.preventDefault();
+                const current = ids.indexOf(sessionId);
+                const offset = event.key === "ArrowRight" ? 1 : -1;
+                const next = ids[(current + offset + ids.length) % ids.length];
+                if (next)
+                    this.activateRuntime(next);
+            });
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "display-tab-close";
+            close.textContent = "×";
+            close.title = `Close ${identity.name}`;
+            close.setAttribute("aria-label", `Close ${identity.name}`);
+            close.addEventListener("click", () => void this.runUiAction(() => this.closeDisplayTab(sessionId)));
+            item.append(select, close);
+            this.elements.tabs.append(item);
+        }
+    }
+    activateRuntime(sessionId) {
+        const runtime = this.#runtimes.get(sessionId);
+        if (!runtime)
+            return;
+        this.stopFlexResize();
+        this.stopClipboardPolling();
+        this.#activeSessionId = sessionId;
+        this.#serverSession = runtime.serverSession;
+        this.#transport = runtime.transport;
+        this.#protocolSession = runtime.protocolSession;
+        this.#renderer = runtime.renderer;
+        this.#audioPlayer = runtime.audioPlayer;
+        this.#audioTask = runtime.audioTask;
+        this.#deviceMessageTask = runtime.deviceMessageTask;
+        this.#latestStatistics = runtime.latestStatistics;
+        this.#latestAudioStatistics = runtime.latestAudioStatistics;
+        this.#lastAndroidClipboard = runtime.lastAndroidClipboard;
+        this.#lastSentClipboard = runtime.lastSentClipboard;
+        this.#lastConnectValues = runtime.values;
+        const userMuted = this.elements.audioMute.textContent === "Unmute";
+        for (const [id, value] of this.#runtimes) {
+            value.canvas.hidden = id !== sessionId;
+            value.audioPlayer.setMuted(id === sessionId ? userMuted : true);
+        }
+        this.elements.stageHint.hidden = true;
+        this.renderTabs();
+        this.setConnectedControls(true);
+        if (runtime.values.displayMode === "virtual" && runtime.values.sizeMode === "flex")
+            this.startFlexResize(runtime.values);
+        this.updateActiveRuntimeStatus();
+        if (runtime.latestStatistics)
+            this.showStatistics(runtime.latestStatistics);
+        else
+            this.elements.statistics.textContent = "Waiting for video statistics";
+        if (runtime.latestAudioStatistics)
+            this.showAudioStatistics(runtime.latestAudioStatistics);
+        else
+            this.elements.audioStatus.textContent = runtime.protocolSession.audioHeader
+                ? `Audio connected · ${runtime.protocolSession.audioHeader.codec}`
+                : "Audio disabled or unavailable for this display.";
+        this.updateChannelStatus();
+        void this.startClipboardPolling(false);
+        runtime.canvas.focus();
+        globalThis.dispatchEvent(new CustomEvent("droidwebdisplay-active-session", { detail: { sessionId } }));
+    }
+    clearActiveRuntime() {
+        this.stopFlexResize();
+        this.stopClipboardPolling();
+        this.#activeSessionId = null;
+        this.#serverSession = null;
+        this.#transport = null;
+        this.#protocolSession = null;
+        this.#audioTask = null;
+        this.#deviceMessageTask = null;
+        this.#latestStatistics = null;
+        this.#latestAudioStatistics = null;
+        this.#lastAndroidClipboard = "";
+        this.#lastSentClipboard = "";
+        this.elements.stageHint.hidden = false;
+        this.elements.statistics.textContent = "No video statistics";
+        this.elements.audioStatus.textContent = "Audio disabled.";
+        this.elements.sessionChannels.textContent = "No active channels.";
+        this.renderTabs();
+        this.setConnectedControls(false);
+        globalThis.dispatchEvent(new CustomEvent("droidwebdisplay-active-session", { detail: { sessionId: null } }));
+    }
+    updateActiveRuntimeStatus() {
+        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        if (!runtime)
+            return;
+        const display = runtime.serverSession.display;
+        if (display.kind === "virtual") {
+            const resolution = display.resolution.width && display.resolution.height
+                ? `${display.resolution.width}×${display.resolution.height}`
+                : `${runtime.values.width}×${runtime.values.height}`;
+            const dpi = display.dpi.value ?? runtime.values.dpi;
+            this.setStatus("Virtual display connected", `${display.name} · display ${display.displayId ?? "pending"} · ${resolution} · ${dpi} DPI`);
+        }
+        else {
+            const deviceName = runtime.protocolSession.device?.name ?? runtime.serverSession.serial;
+            this.setStatus("Connected", `${display.name} · ${deviceName} · H.264 · ${runtime.serverSession.options.maxFps} fps limit`);
+        }
+    }
+    async closeDisplayTab(sessionId) {
+        const runtime = this.#runtimes.get(sessionId);
+        if (!runtime)
+            return;
+        const name = runtime.serverSession.display.name;
+        await this.cleanupRuntime(sessionId);
+        if (!this.#serverSession)
+            this.setStatus("Disconnected", `${name} was stopped. No display tabs remain.`);
     }
     bindEvents() {
         this.elements.refresh.addEventListener("click", () => void this.runUiAction(async () => {
@@ -175,6 +437,7 @@ export class DroidWebDisplayController {
         }));
         this.elements.device.addEventListener("change", () => void this.runUiAction(() => this.refreshVirtualCapabilities()));
         this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.connect()));
+        this.elements.tabAdd.addEventListener("click", () => void this.runUiAction(() => this.connect()));
         this.elements.disconnect.addEventListener("click", () => void this.runUiAction(() => this.disconnect()));
         this.elements.displayMode.addEventListener("change", () => this.updateDisplayUi());
         this.elements.displayProfile.addEventListener("change", () => {
@@ -221,28 +484,11 @@ export class DroidWebDisplayController {
         this.elements.settingsExport.addEventListener("click", () => this.exportSettings());
         this.elements.settingsImport.addEventListener("click", () => this.elements.settingsFile.click());
         this.elements.settingsFile.addEventListener("change", () => void this.runUiAction(() => this.importSettings()));
-        this.elements.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-        this.elements.canvas.addEventListener("pointerdown", (event) => void this.pointer(event, 0));
-        this.elements.canvas.addEventListener("pointermove", (event) => {
-            if (event.buttons !== 0)
-                void this.pointer(event, 2);
-        });
-        this.elements.canvas.addEventListener("pointerup", (event) => void this.pointer(event, 1));
-        this.elements.canvas.addEventListener("pointercancel", (event) => void this.pointer(event, 3));
-        this.elements.canvas.addEventListener("wheel", (event) => void this.scroll(event), { passive: false });
         document.addEventListener("keydown", (event) => {
             if (event.key === "F11") {
                 event.preventDefault();
                 void this.toggleFullscreen();
             }
-        });
-        this.elements.canvas.addEventListener("keydown", (event) => void this.keydown(event));
-        this.elements.canvas.addEventListener("paste", (event) => {
-            const text = event.clipboardData?.getData("text/plain") ?? "";
-            if (!text)
-                return;
-            event.preventDefault();
-            void this.runUiAction(() => this.pasteText(text, "Ctrl+V"));
         });
     }
     populateProfiles() {
@@ -322,7 +568,7 @@ export class DroidWebDisplayController {
     updateDisplayUi() {
         const virtual = this.elements.displayMode.value === "virtual";
         this.elements.virtualSettings.hidden = !virtual;
-        this.elements.imePolicy.disabled = Boolean(this.#protocolSession) || this.elements.hideVirtualKeyboard.checked;
+        this.elements.imePolicy.disabled = this.elements.hideVirtualKeyboard.checked;
         const values = this.readDisplayValues();
         const errors = validateDisplayForm(values);
         const aspect = values.height > 0 ? (values.width / values.height).toFixed(3) : "—";
@@ -338,7 +584,12 @@ export class DroidWebDisplayController {
         const hasDevice = [...this.elements.device.options].some((option) => !option.disabled);
         const errors = validateDisplayForm(this.readDisplayValues());
         const unsupported = this.elements.displayMode.value === "virtual" && this.#capabilities?.virtualDisplaySupported === false;
-        this.elements.connect.disabled = !hasDevice || this.#serverSession !== null || errors.length > 0 || unsupported;
+        const selectedReady = [...this.elements.device.options].some((option) => option.value === this.elements.device.value && !option.disabled);
+        const runtimeSerial = this.firstRuntime()?.serverSession.serial ?? null;
+        const sameDevice = runtimeSerial === null || runtimeSerial === this.elements.device.value;
+        const disabled = !hasDevice || !selectedReady || !sameDevice || errors.length > 0 || unsupported;
+        this.elements.connect.disabled = disabled;
+        this.elements.tabAdd.disabled = disabled;
     }
     async refreshVirtualCapabilities() {
         const serial = this.elements.device.value;
@@ -427,17 +678,21 @@ export class DroidWebDisplayController {
         await this.#api.recordVirtualResize(server.sessionId, target.width, target.height);
     }
     async pointer(event, action) {
-        if (!this.#protocolSession)
+        if (!this.#protocolSession || !this.#activeSessionId)
+            return;
+        const runtime = this.#runtimes.get(this.#activeSessionId);
+        const canvas = event.currentTarget instanceof HTMLCanvasElement ? event.currentTarget : runtime?.canvas;
+        if (!runtime || !canvas || canvas !== runtime.canvas)
             return;
         event.preventDefault();
         if (action === 0) {
-            this.elements.canvas.setPointerCapture(event.pointerId);
-            this.elements.canvas.focus();
+            canvas.setPointerCapture(event.pointerId);
+            canvas.focus();
         }
         const size = this.#renderer.screenSize;
         if (size.width <= 0 || size.height <= 0)
             return;
-        const position = mapClientPoint(event.clientX, event.clientY, this.elements.canvas.getBoundingClientRect(), size);
+        const position = mapClientPoint(event.clientX, event.clientY, canvas.getBoundingClientRect(), size);
         await this.#protocolSession.sendControl({
             type: ControlMessageType.InjectTouchEvent,
             action,
@@ -447,18 +702,22 @@ export class DroidWebDisplayController {
             actionButton: 0,
             buttons: event.buttons,
         });
-        if ((action === 1 || action === 3) && this.elements.canvas.hasPointerCapture(event.pointerId)) {
-            this.elements.canvas.releasePointerCapture(event.pointerId);
+        if ((action === 1 || action === 3) && canvas.hasPointerCapture(event.pointerId)) {
+            canvas.releasePointerCapture(event.pointerId);
         }
     }
     async scroll(event) {
-        if (!this.#protocolSession)
+        if (!this.#protocolSession || !this.#activeSessionId)
+            return;
+        const runtime = this.#runtimes.get(this.#activeSessionId);
+        const canvas = event.currentTarget instanceof HTMLCanvasElement ? event.currentTarget : runtime?.canvas;
+        if (!runtime || !canvas || canvas !== runtime.canvas)
             return;
         event.preventDefault();
         const size = this.#renderer.screenSize;
         if (size.width <= 0 || size.height <= 0)
             return;
-        const position = mapClientPoint(event.clientX, event.clientY, this.elements.canvas.getBoundingClientRect(), size);
+        const position = mapClientPoint(event.clientX, event.clientY, canvas.getBoundingClientRect(), size);
         await this.#protocolSession.sendControl({
             type: ControlMessageType.InjectScrollEvent,
             position,
@@ -542,6 +801,9 @@ export class DroidWebDisplayController {
         if (new TextEncoder().encode(text).byteLength > maximum)
             throw new Error(`Clipboard text exceeds the configured ${maximum / 1024} KiB limit`);
         this.#lastSentClipboard = text;
+        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        if (runtime)
+            runtime.lastSentClipboard = text;
         if (!session)
             return;
         const sequence = this.#clipboardSequence++;
@@ -591,83 +853,109 @@ export class DroidWebDisplayController {
         for (const message of messages)
             await session.sendControl(message);
     }
-    async consumeDeviceMessages(session) {
-        while (this.#protocolSession === session) {
+    async consumeDeviceMessages(sessionId, session) {
+        while (this.#runtimes.get(sessionId)?.protocolSession === session) {
             const message = await session.readDeviceMessage();
             if (message.type === DeviceMessageType.AckClipboard) {
                 this.resolveClipboardAcknowledgement(message.sequence, true);
                 continue;
             }
-            if (message.type === DeviceMessageType.Clipboard) {
-                const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
-                if (new TextEncoder().encode(message.text).byteLength > maximum) {
-                    this.setStatus("Clipboard skipped", `Android clipboard exceeds the configured ${maximum / 1024} KiB limit.`);
-                    continue;
+            if (message.type !== DeviceMessageType.Clipboard)
+                continue;
+            const runtime = this.#runtimes.get(sessionId);
+            if (!runtime)
+                continue;
+            runtime.lastAndroidClipboard = message.text;
+            if (sessionId !== this.#activeSessionId)
+                continue;
+            const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
+            if (new TextEncoder().encode(message.text).byteLength > maximum) {
+                this.setStatus("Clipboard skipped", `Android clipboard exceeds the configured ${maximum / 1024} KiB limit.`);
+                continue;
+            }
+            this.#lastAndroidClipboard = message.text;
+            this.elements.clipboardText.value = message.text;
+            const copyShortcut = this.#copyShortcutPending;
+            this.#copyShortcutPending = false;
+            if (this.elements.clipboardAutoSync.checked || copyShortcut) {
+                try {
+                    await navigator.clipboard.writeText(message.text);
+                    this.setStatus(copyShortcut ? "Clipboard copied" : "Clipboard synchronized", copyShortcut
+                        ? "Ctrl+C copied the Android selection to the PC clipboard."
+                        : "Android clipboard was copied to the PC clipboard.");
                 }
-                this.#lastAndroidClipboard = message.text;
-                this.elements.clipboardText.value = message.text;
-                const copyShortcut = this.#copyShortcutPending;
-                this.#copyShortcutPending = false;
-                if (this.elements.clipboardAutoSync.checked || copyShortcut) {
-                    try {
-                        await navigator.clipboard.writeText(message.text);
-                        this.setStatus(copyShortcut ? "Clipboard copied" : "Clipboard synchronized", copyShortcut
-                            ? "Ctrl+C copied the Android selection to the PC clipboard."
-                            : "Android clipboard was copied to the PC clipboard.");
-                    }
-                    catch {
-                        this.setStatus("Clipboard received", "Android clipboard is available in the clipboard panel; browser write permission was unavailable.");
-                    }
+                catch {
+                    this.setStatus("Clipboard received", "Android clipboard is available in the clipboard panel; browser write permission was unavailable.");
                 }
-                else {
-                    this.setStatus("Clipboard received", "Android clipboard is available in the clipboard panel.");
-                }
+            }
+            else {
+                this.setStatus("Clipboard received", "Android clipboard is available in the clipboard panel.");
             }
         }
     }
-    async handleStreamFailure(error) {
-        if (this.#closing)
+    async handleRuntimeFailure(sessionId, error) {
+        if (this.#closing || !this.#runtimes.has(sessionId))
             return;
+        const wasActive = sessionId === this.#activeSessionId;
         const message = errorMessage(error);
-        await this.cleanupSession();
-        this.setConnectedControls(false);
-        this.setStatus("Stream stopped", message);
-        if (!this.#manualDisconnect && this.elements.autoReconnect.checked)
-            this.scheduleReconnect();
+        await this.cleanupRuntime(sessionId);
+        if (wasActive && !this.#serverSession) {
+            this.setStatus("Stream stopped", message);
+            if (!this.#manualDisconnect && this.elements.autoReconnect.checked)
+                this.scheduleReconnect();
+        }
     }
     async cleanupSession() {
-        this.stopFlexResize();
-        const protocol = this.#protocolSession;
-        const transport = this.#transport;
-        const server = this.#serverSession;
-        this.#protocolSession = null;
-        this.#transport = null;
-        this.#deviceMessageTask = null;
-        this.#serverSession = null;
-        this.#renderer.stop();
-        this.#audioPlayer.stop();
-        this.#audioTask = null;
-        this.stopClipboardPolling();
-        this.#copyShortcutPending = false;
-        for (const sequence of [...this.#clipboardAcks.keys()])
-            this.resolveClipboardAcknowledgement(sequence, false);
+        if (!this.#activeSessionId)
+            return;
+        await this.cleanupRuntime(this.#activeSessionId);
+    }
+    async cleanupRuntime(sessionId) {
+        const runtime = this.#runtimes.get(sessionId);
+        if (!runtime)
+            return;
+        const wasActive = sessionId === this.#activeSessionId;
+        if (wasActive) {
+            this.stopFlexResize();
+            this.stopClipboardPolling();
+        }
+        this.#runtimes.delete(sessionId);
+        this.renderTabs();
+        runtime.renderer.stop();
+        runtime.audioPlayer.stop();
+        runtime.lastAndroidClipboard = "";
+        runtime.lastSentClipboard = "";
+        if (wasActive) {
+            this.#copyShortcutPending = false;
+            for (const sequence of [...this.#clipboardAcks.keys()])
+                this.resolveClipboardAcknowledgement(sequence, false);
+        }
         try {
-            await protocol?.close();
+            await runtime.protocolSession.close();
         }
         catch {
-            await transport?.close();
+            await runtime.transport.close();
         }
-        if (server) {
-            try {
-                await this.#api.stopSession(server.sessionId);
-            }
-            catch {
-                // The WebSocket endpoint may already have stopped the session.
-            }
+        try {
+            await this.#api.stopDeviceSession(runtime.serverSession.serial, sessionId);
+        }
+        catch {
+            // A closing WebSocket may already have stopped this isolated server session.
+        }
+        this.releaseRuntimeCanvas(runtime.canvas);
+        if (wasActive) {
+            const next = this.#runtimes.values().next().value;
+            if (next)
+                this.activateRuntime(next.serverSession.sessionId);
+            else
+                this.clearActiveRuntime();
+        }
+        else {
+            this.renderTabs();
+            this.updateConnectAvailability();
         }
     }
     setConnectedControls(connected) {
-        this.elements.connect.disabled = connected;
         this.elements.disconnect.disabled = !connected;
         for (const button of [
             this.elements.back,
@@ -682,20 +970,18 @@ export class DroidWebDisplayController {
         ])
             button.disabled = !connected;
         this.elements.clipboardText.disabled = !connected;
-        this.elements.audioMute.disabled = !connected || !this.elements.audioEnabled.checked;
-        this.elements.audioVolume.disabled = !connected || !this.elements.audioEnabled.checked;
-        this.elements.audioEnabled.disabled = connected;
+        this.elements.audioMute.disabled = !connected || !this.#protocolSession?.audioHeader;
+        this.elements.audioVolume.disabled = !connected || !this.#protocolSession?.audioHeader;
+        this.elements.device.disabled = this.#runtimes.size > 0;
         this.elements.reconnect.disabled = connected || !this.elements.device.value;
-        this.elements.displayMode.disabled = connected;
-        this.elements.displayProfile.disabled = connected;
-        for (const input of this.displayInputs())
-            input.disabled = connected;
-        if (!connected)
-            this.updateDisplayUi();
+        this.updateDisplayUi();
+        this.updateConnectAvailability();
     }
     setBusy(busy) {
-        if (busy)
+        if (busy) {
             this.elements.connect.disabled = true;
+            this.elements.tabAdd.disabled = true;
+        }
     }
     setStatus(title, details) {
         this.elements.status.textContent = title;
@@ -708,15 +994,37 @@ export class DroidWebDisplayController {
         this.elements.statusIcon.dataset.state = state;
         this.elements.statusContainer.setAttribute("aria-label", `${state}: ${title}. ${details}`);
     }
-    updateStatistics(stats) {
+    updateRuntimeStatistics(sessionId, stats) {
+        if (!sessionId)
+            return;
+        const runtime = this.#runtimes.get(sessionId);
+        if (!runtime)
+            return;
+        runtime.latestStatistics = stats;
+        if (sessionId !== this.#activeSessionId)
+            return;
         this.#latestStatistics = stats;
-        this.elements.statistics.textContent = `${stats.width}×${stats.height} · video decoded ${stats.framesDecoded} · dropped ${stats.framesDropped} · queue ${stats.decoderQueue} · sessions ${stats.sessionChanges + 1}`;
+        this.showStatistics(stats);
         this.updateChannelStatus();
     }
-    updateAudioStatistics(stats) {
+    showStatistics(stats) {
+        this.elements.statistics.textContent = `${stats.width}×${stats.height} · video decoded ${stats.framesDecoded} · dropped ${stats.framesDropped} · queue ${stats.decoderQueue} · sessions ${stats.sessionChanges + 1} · live tabs ${this.#runtimes.size}`;
+    }
+    updateRuntimeAudioStatistics(sessionId, stats) {
+        if (!sessionId)
+            return;
+        const runtime = this.#runtimes.get(sessionId);
+        if (!runtime)
+            return;
+        runtime.latestAudioStatistics = stats;
+        if (sessionId !== this.#activeSessionId)
+            return;
         this.#latestAudioStatistics = stats;
-        this.elements.audioStatus.textContent = `${stats.codec} · ${stats.packetsDecoded} packets · ${stats.bufferedMilliseconds} ms buffered${stats.muted ? " · muted" : ""}`;
+        this.showAudioStatistics(stats);
         this.updateChannelStatus();
+    }
+    showAudioStatistics(stats) {
+        this.elements.audioStatus.textContent = `${stats.codec} · ${stats.packetsDecoded} packets · ${stats.bufferedMilliseconds} ms buffered${stats.muted ? " · muted" : ""}`;
     }
     updateChannelStatus() {
         const channels = this.#serverSession?.channels ?? [];
@@ -734,9 +1042,11 @@ export class DroidWebDisplayController {
         this.saveBrowserSettings();
     }
     async copyAndroidClipboard() {
-        if (!this.#lastAndroidClipboard)
+        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        const text = runtime?.lastAndroidClipboard ?? this.#lastAndroidClipboard;
+        if (!text)
             throw new Error("No Android clipboard text has been received yet");
-        await navigator.clipboard.writeText(this.#lastAndroidClipboard);
+        await navigator.clipboard.writeText(text);
         this.setStatus("Clipboard copied", "Android clipboard was copied to the PC clipboard.");
     }
     async startClipboardPolling(requestPermission) {
@@ -820,6 +1130,9 @@ export class DroidWebDisplayController {
             return;
         }
         this.#lastSentClipboard = text;
+        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        if (runtime)
+            runtime.lastSentClipboard = text;
         const sequence = this.#clipboardSequence++;
         // Automatic synchronization updates Android's clipboard only.  It MUST NOT
         // request a paste action, because repeated paste=true messages steal focus

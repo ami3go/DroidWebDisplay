@@ -177,3 +177,26 @@ test("virtual keyboard suppression is virtual-display-only and Ctrl+V is explici
   assert.match(controllerSource, /shortcut === "copy"[\s\S]*androidClipboardCopyMessage\(\)/);
   assert.match(controllerSource, /hideVirtualKeyboard\.checked \? "hide"/);
 });
+
+
+test("multi-display workspace exposes live accessible session tabs", () => {
+  for (const id of ["display-tabs", "display-tab-add", "display-name", "stage-hint"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(html, /role="tablist"/);
+  assert.match(css, /\.display-tab\[data-active="true"\]/);
+  assert.match(css, /\.display-canvas\[hidden\]/);
+  assert.match(mainSource, /tabs: required<HTMLElement>\("#display-tabs"\)/);
+  assert.match(controllerSource, /#runtimes = new Map<string, DisplayRuntime>\(\)/);
+  assert.match(controllerSource, /activateRuntime\(sessionId: string\)/);
+  assert.match(controllerSource, /cleanupRuntime\(sessionId: string\)/);
+  assert.match(controllerSource, /value\.audioPlayer\.setMuted\(id === sessionId \? userMuted : true\)/);
+  assert.match(controllerSource, /while \(this\.#runtimes\.get\(sessionId\)\?\.protocolSession === session\)/);
+  assert.doesNotMatch(controllerSource, /if \(this\.#serverSession\) return;/);
+});
+
+test("tab input maps against the active runtime canvas", () => {
+  assert.match(controllerSource, /canvas !== runtime\.canvas/);
+  assert.match(controllerSource, /canvas\.getBoundingClientRect\(\)/);
+  assert.match(controllerSource, /canvas\.setPointerCapture\(event\.pointerId\)/);
+});

@@ -247,6 +247,9 @@
         </div></div>
           <div class="gb-drawer-slot" data-slot="display"><section class="help-card display-mode-card">
           <h2>Display mode</h2>
+          <label>Display name, optional
+            <input id="display-name" maxlength="80" placeholder="Automatic tab name">
+          </label>
           <label>Mode
             <select id="display-mode">
               <option value="physical">Phone screen</option>
@@ -408,10 +411,20 @@
         <div class="gb-drawer-footer"><button type="button" class="gb-drawer-action" data-action="close">Close</button></div>
       </aside>
     </div>
-    <section class="workspace native-workspace"><section id="stage" class="stage" aria-label="Android display">
-        <canvas id="screen" tabindex="0" aria-label="Mirrored Android screen"></canvas>
-        <div class="stage-hint">Connect an authorized Android phone over USB</div>
-      </section></section>
+    <section class="workspace native-workspace">
+      <div class="display-workspace">
+        <div class="display-tabbar" aria-label="Display sessions">
+          <div id="display-tabs" class="display-tabs" role="tablist" aria-label="Android display sessions">
+            <span class="display-tabs-empty">No active displays</span>
+          </div>
+          <button id="display-tab-add" type="button" class="display-tab-add" title="Create another display session">+ New display</button>
+        </div>
+        <section id="stage" class="stage" aria-label="Android display">
+          <canvas id="screen" class="display-canvas" tabindex="0" aria-label="Mirrored Android screen"></canvas>
+          <div id="stage-hint" class="stage-hint">Connect an authorized Android phone over USB</div>
+        </section>
+      </div>
+    </section>
   </main>
   <script type="module" src="/assets/main.js?v=0.11.2-native1"></script>
   <script defer src="./droidwebdisplay-main-drawer.js?v=0.11.2-native1"></script>

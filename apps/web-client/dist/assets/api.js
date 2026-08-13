@@ -102,6 +102,49 @@ export class BridgeApi {
     async sessions() {
         return this.request("/api/v1/sessions");
     }
+    async deviceSessions(serial) {
+        return this.request(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`);
+    }
+    async startDeviceSession(serial, request) {
+        return this.request(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                video: true,
+                audio: false,
+                control: true,
+                audioCodec: "opus",
+                audioBitRate: 128_000,
+                videoCodec: "h264",
+                maxSize: 1920,
+                videoBitRate: 8_000_000,
+                maxFps: 30,
+                displayMode: "physical",
+                ...request,
+                serial,
+            }),
+        });
+    }
+    async stopDeviceSession(serial, sessionId, keepalive = false) {
+        try {
+            return await this.request(`/api/v1/devices/${encodeURIComponent(serial)}/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE", keepalive });
+        }
+        catch (error) {
+            if (keepalive)
+                return null;
+            throw error;
+        }
+    }
+    async stopDeviceSessions(serial, keepalive = false) {
+        try {
+            return await this.request(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`, { method: "DELETE", keepalive });
+        }
+        catch (error) {
+            if (keepalive)
+                return null;
+            throw error;
+        }
+    }
     async startSession(request) {
         return this.request("/api/v1/sessions", {
             method: "POST",

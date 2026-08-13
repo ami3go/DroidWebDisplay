@@ -20,6 +20,7 @@ export class RunningAppController {
   #virtualSession: SessionDto | null = null;
   #refreshing = false;
   #timer: number | null = null;
+  #activeSessionId: string | null = null;
 
   public constructor(elements: Elements, api = new BridgeApi()) {
     this.#elements = elements;
@@ -28,6 +29,11 @@ export class RunningAppController {
     elements.move.addEventListener("click", () => void this.moveSelected());
     elements.select.addEventListener("change", () => this.updateControls());
     elements.device.addEventListener("change", () => void this.refresh());
+    globalThis.addEventListener("droidwebdisplay-active-session", (event) => {
+      const detail = (event as CustomEvent<{ sessionId: string | null }>).detail;
+      this.#activeSessionId = detail?.sessionId ?? null;
+      void this.refresh(true);
+    });
   }
 
   public async initialize(): Promise<void> {
@@ -55,14 +61,15 @@ export class RunningAppController {
     this.#refreshing = true;
     if (!silent) this.#elements.status.textContent = "Reading running Android applications…";
     try {
-      const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
+      const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.deviceSessions(serial)]);
       this.#apps = apps.apps;
-      this.#virtualSession = sessions.sessions.find((session) =>
-        session.serial === serial
-        && session.state === "running"
+      const virtualSessions = sessions.sessions.filter((session) =>
+        session.state === "running"
         && session.displayMode === "virtual"
         && typeof session.virtualDisplay.displayId === "number"
-      ) ?? null;
+      );
+      this.#virtualSession = virtualSessions.find((session) => session.sessionId === this.#activeSessionId)
+        ?? (this.#activeSessionId === null ? virtualSessions[0] ?? null : null);
       this.render();
       const displayId = this.#virtualSession?.virtualDisplay.displayId;
       this.#elements.status.textContent = displayId === null || displayId === undefined
