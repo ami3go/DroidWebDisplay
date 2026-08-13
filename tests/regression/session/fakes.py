@@ -47,6 +47,8 @@ class FakeAdb:
         self.server_args: list[tuple[str, tuple[str, ...]]] = []
         self.processes: list[FakeProcess] = []
         self.forward_server: asyncio.AbstractServer | None = None
+        self.forward_servers: dict[int, asyncio.AbstractServer] = {}
+        self.forward_connections: dict[int, int] = {}
         self.connections = 0
         self.connection_payloads = [
             b"\x00" + b"D" * 64 + b"VIDEO-PAYLOAD",
@@ -66,9 +68,11 @@ class FakeAdb:
 
     async def create_forward(self, serial: str, local_port: int, socket_name: str) -> None:
         self.forwards.append((serial, local_port, socket_name))
+        self.forward_connections[local_port] = 0
 
         async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-            index = self.connections
+            index = self.forward_connections[local_port]
+            self.forward_connections[local_port] = index + 1
             self.connections += 1
             payload = self.connection_payloads[index] if index < len(self.connection_payloads) else b"EXTRA"
             writer.write(payload)
@@ -82,14 +86,19 @@ class FakeAdb:
                 except Exception:
                     pass
 
-        self.forward_server = await asyncio.start_server(handle, "127.0.0.1", local_port)
+        server = await asyncio.start_server(handle, "127.0.0.1", local_port)
+        self.forward_servers[local_port] = server
+        self.forward_server = server
 
     async def remove_forward(self, serial: str, local_port: int) -> None:
         self.removed.append((serial, local_port))
-        if self.forward_server:
-            self.forward_server.close()
-            await self.forward_server.wait_closed()
-            self.forward_server = None
+        server = self.forward_servers.pop(local_port, None)
+        self.forward_connections.pop(local_port, None)
+        if server:
+            server.close()
+            await server.wait_closed()
+            if self.forward_server is server:
+                self.forward_server = next(iter(self.forward_servers.values()), None)
 
     async def spawn_server(self, serial: str, server_args: Sequence[str]) -> FakeProcess:
         self.server_args.append((serial, tuple(server_args)))

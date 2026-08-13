@@ -56,7 +56,7 @@ async def test_monitor_marks_session_disconnected_without_switching_device(tmp_p
 
     assert session.state == SessionState.DISCONNECTED
     assert session.stop_reason == "device_disconnected"
-    assert "OTHER" not in manager._serial_index
+    assert "PHONE" not in manager._device_sessions
     await manager.close()
 
 

@@ -15,7 +15,6 @@ from droid_web_display.errors import (
     DeviceNotFoundError,
     DeviceNotReadyError,
     MultipleDevicesError,
-    SessionConflictError,
     SessionError,
     SessionNotFoundError,
     TunnelError,
@@ -172,6 +171,7 @@ class ScrcpySession:
     ime_policy_fallback_applied: bool = False
     virtual_display_warnings: list[str] = field(default_factory=list)
     virtual_display_failure_classification: str | None = None
+    _lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     def to_dict(self) -> dict:
         virtual = self.options.virtual_display
@@ -248,7 +248,7 @@ class SessionManager:
         self.connect_retry_interval = connect_retry_interval
         self.monitor_interval = monitor_interval
         self._sessions: dict[str, ScrcpySession] = {}
-        self._serial_index: dict[str, str] = {}
+        self._device_sessions: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
         self._monitor_task: asyncio.Task[None] | None = None
         self._closed = False
@@ -317,26 +317,9 @@ class SessionManager:
             )
 
         async with self._lock:
-            existing_id = self._serial_index.get(selected.serial)
-            if existing_id:
-                existing = self._sessions.get(existing_id)
-                if existing and existing.state in {
-                    SessionState.PROBING,
-                    SessionState.STARTING,
-                    SessionState.CREATING_DISPLAY,
-                    SessionState.LAUNCHING_APP,
-                    SessionState.CONNECTING_VIDEO,
-                    SessionState.CONNECTING_CONTROL,
-                    SessionState.RUNNING,
-                    SessionState.RESIZING,
-                }:
-                    raise SessionConflictError(
-                        f"A session is already active for device {selected.serial}",
-                        details={"sessionId": existing.session_id, "serial": selected.serial},
-                    )
-            session_id = secrets.token_urlsafe(18)
-            scid = secrets.randbelow(0x80000000)
-            port = self._reserve_local_port()
+            session_id = self._allocate_session_id()
+            scid = self._allocate_scid()
+            port = self._allocate_local_port()
             session = ScrcpySession(
                 session_id=session_id,
                 serial=selected.serial,
@@ -350,7 +333,7 @@ class SessionManager:
                 session.application_launch_result = "pending-control-message" if session.application else "not-requested"
                 session.state = SessionState.CREATING_DISPLAY
             self._sessions[session_id] = session
-            self._serial_index[selected.serial] = session_id
+            self._index_session(session)
 
         try:
             await self._start_session_resources(session, artifact)
@@ -358,9 +341,13 @@ class SessionManager:
             session.state = SessionState.FAILED
             session.error = str(exc)
             session.stop_reason = "start_failed"
-            await self._cleanup_session_resources(session)
-            async with self._lock:
-                self._serial_index.pop(session.serial, None)
+            try:
+                await self._cleanup_session_resources(session)
+            except Exception as cleanup_exc:
+                session.error = f"{session.error}; cleanup failed: {cleanup_exc}"
+            finally:
+                async with self._lock:
+                    self._unindex_session(session)
             if isinstance(exc, SessionError):
                 raise
             raise SessionError(
@@ -556,25 +543,32 @@ class SessionManager:
         session = self._sessions.get(session_id)
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
-        if session.state in {
-            SessionState.STOPPING,
-            SessionState.STOPPED,
-            SessionState.DISCONNECTED,
-            SessionState.FAILED,
-        }:
+        async with session._lifecycle_lock:
+            if session.state in {
+                SessionState.STOPPING,
+                SessionState.STOPPED,
+                SessionState.DISCONNECTED,
+                SessionState.FAILED,
+            }:
+                return session
+            session.state = SessionState.STOPPING
+            session.stop_reason = reason
+            try:
+                await self._cleanup_session_resources(session)
+            except Exception as exc:
+                session.state = SessionState.FAILED
+                session.error = f"cleanup failed: {exc}" if not session.error else f"{session.error}; cleanup failed: {exc}"
+                raise
+            finally:
+                async with self._lock:
+                    self._unindex_session(session)
+            session.state = (
+                SessionState.DISCONNECTED
+                if reason in {"device_disconnected", "server_terminated"}
+                else SessionState.STOPPED
+            )
+            session.stopped_at = time.time()
             return session
-        session.state = SessionState.STOPPING
-        session.stop_reason = reason
-        await self._cleanup_session_resources(session)
-        session.state = (
-            SessionState.DISCONNECTED
-            if reason in {"device_disconnected", "server_terminated"}
-            else SessionState.STOPPED
-        )
-        session.stopped_at = time.time()
-        async with self._lock:
-            self._serial_index.pop(session.serial, None)
-        return session
 
     async def _cleanup_session_resources(self, session: ScrcpySession) -> None:
         if session.options.display_mode == DisplayMode.VIRTUAL:
@@ -729,6 +723,47 @@ class SessionManager:
 
     def list_sessions(self) -> list[ScrcpySession]:
         return sorted(self._sessions.values(), key=lambda item: item.created_at)
+
+    def list_sessions_for_device(self, serial: str) -> list[ScrcpySession]:
+        session_ids = self._device_sessions.get(serial, set())
+        return sorted(
+            (self._sessions[session_id] for session_id in session_ids if session_id in self._sessions),
+            key=lambda item: item.created_at,
+        )
+
+    def _index_session(self, session: ScrcpySession) -> None:
+        self._device_sessions.setdefault(session.serial, set()).add(session.session_id)
+
+    def _unindex_session(self, session: ScrcpySession) -> None:
+        session_ids = self._device_sessions.get(session.serial)
+        if not session_ids:
+            return
+        session_ids.discard(session.session_id)
+        if not session_ids:
+            self._device_sessions.pop(session.serial, None)
+
+    def _allocate_session_id(self) -> str:
+        for _ in range(64):
+            session_id = secrets.token_urlsafe(18)
+            if session_id not in self._sessions:
+                return session_id
+        raise SessionError("Unable to allocate a unique session ID")
+
+    def _allocate_scid(self) -> int:
+        used = {session.scid for session in self._sessions.values()}
+        for _ in range(64):
+            scid = secrets.randbelow(0x80000000)
+            if scid not in used:
+                return scid
+        raise SessionError("Unable to allocate a unique scrcpy SCID")
+
+    def _allocate_local_port(self) -> int:
+        used = {session.local_port for session in self._sessions.values()}
+        for _ in range(64):
+            port = self._reserve_local_port()
+            if port not in used:
+                return port
+        raise SessionError("Unable to allocate a unique local scrcpy port")
 
     def _resolve_artifact(self) -> ScrcpyArtifact:
         if self.artifact is not None:
