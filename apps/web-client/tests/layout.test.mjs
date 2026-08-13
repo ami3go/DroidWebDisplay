@@ -52,9 +52,9 @@ test("running applications are compact header controls with automatic relocation
   assert.equal(html.includes('data-group="apps"'), false);
   assert.equal(html.includes('data-slot="apps"'), false);
   assert.equal(html.includes('id="running-app-move"'), false);
-  assert.match(runningAppSource, /select\.addEventListener\("change", \(\) => void this\.moveSelected\(\)\)/);
-  assert.match(runningAppSource, /select\.addEventListener\("pointerdown", \(\) => void this\.refreshIfStale\(\)\)/);
-  assert.match(runningAppSource, /select\.addEventListener\("focus", \(\) => void this\.refreshIfStale\(\)\)/);
+  assert.match(runningAppSource, /select\.addEventListener\("change", \(\) => void this\.handleSelectionChange\(\)\)/);
+  assert.match(runningAppSource, /select\.addEventListener\("pointerdown", \(\) => this\.beginDropdownInteraction\(\)\)/);
+  assert.match(runningAppSource, /select\.addEventListener\("focus", \(\) => this\.beginDropdownInteraction\(\)\)/);
   assert.match(runningAppSource, /count\.textContent = String\(this\.#apps\.length\)/);
   assert.match(css, /\.running-app-header \{ height: 2\.12rem; min-height: 2\.12rem;/);
   assert.match(css, /\.running-app-count \{ position: absolute;/);

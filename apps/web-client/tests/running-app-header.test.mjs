@@ -24,9 +24,16 @@ test("GUI task counter is a digits-only badge on the app icon", () => {
   assert.match(source, /count\.textContent = String\(this\.#apps\.length\)/);
 });
 
-test("opening the app dropdown refreshes stale GUI tasks", () => {
+test("dropdown refresh never rebuilds options during native selection", () => {
   assert.match(source, /DROPDOWN_REFRESH_STALE_MS = 1500/);
-  assert.match(source, /select\.addEventListener\("pointerdown", \(\) => void this\.refreshIfStale\(\)\)/);
-  assert.match(source, /select\.addEventListener\("focus", \(\) => void this\.refreshIfStale\(\)\)/);
-  assert.match(source, /Date\.now\(\) - this\.#lastRefreshAt < DROPDOWN_REFRESH_STALE_MS/);
+  assert.match(source, /select\.addEventListener\("pointerdown", \(\) => this\.beginDropdownInteraction\(\)\)/);
+  assert.match(source, /select\.addEventListener\("blur", \(\) => void this\.finishDropdownInteraction\(\)\)/);
+  assert.match(source, /if \(silent && this\.#dropdownActive\)/);
+  assert.match(source, /this\.#refreshAfterDropdown = true/);
+});
+
+test("running app selector resets after each move action", () => {
+  assert.match(source, /select\.addEventListener\("change", \(\) => void this\.handleSelectionChange\(\)\)/);
+  assert.match(source, /this\.#elements\.select\.value = ""/);
+  assert.match(source, /await this\.finishDropdownInteraction\(\)/);
 });

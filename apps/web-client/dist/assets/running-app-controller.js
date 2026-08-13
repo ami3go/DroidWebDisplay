@@ -19,13 +19,20 @@ export class RunningAppController {
     #moving = false;
     #timer = null;
     #lastRefreshAt = 0;
+    #dropdownActive = false;
+    #refreshAfterDropdown = false;
     constructor(elements, api = new BridgeApi()) {
         this.#elements = elements;
         this.#api = api;
-        elements.select.addEventListener("pointerdown", () => void this.refreshIfStale());
-        elements.select.addEventListener("focus", () => void this.refreshIfStale());
-        elements.select.addEventListener("change", () => void this.moveSelected());
-        elements.device.addEventListener("change", () => void this.refresh());
+        elements.select.addEventListener("pointerdown", () => this.beginDropdownInteraction());
+        elements.select.addEventListener("focus", () => this.beginDropdownInteraction());
+        elements.select.addEventListener("change", () => void this.handleSelectionChange());
+        elements.select.addEventListener("blur", () => void this.finishDropdownInteraction());
+        elements.device.addEventListener("change", () => {
+            this.#dropdownActive = false;
+            this.#refreshAfterDropdown = false;
+            void this.refresh();
+        });
     }
     async initialize() {
         await this.refresh();
@@ -42,6 +49,10 @@ export class RunningAppController {
     async refresh(silent = false) {
         if (this.#refreshing)
             return;
+        if (silent && this.#dropdownActive) {
+            this.#refreshAfterDropdown = true;
+            return;
+        }
         const serial = this.#elements.device.value;
         if (!serial) {
             this.#apps = [];
@@ -83,12 +94,36 @@ export class RunningAppController {
             this.#refreshing = false;
         }
     }
-    async refreshIfStale() {
+    beginDropdownInteraction() {
+        this.#dropdownActive = true;
+        if (Date.now() - this.#lastRefreshAt >= DROPDOWN_REFRESH_STALE_MS) {
+            this.#refreshAfterDropdown = true;
+        }
+    }
+    async finishDropdownInteraction() {
+        this.#dropdownActive = false;
+        if (!this.#refreshAfterDropdown)
+            return;
+        if (Date.now() - this.#lastRefreshAt < DROPDOWN_REFRESH_STALE_MS) {
+            this.#refreshAfterDropdown = false;
+            return;
+        }
         if (this.#refreshing || this.#moving)
             return;
-        if (Date.now() - this.#lastRefreshAt < DROPDOWN_REFRESH_STALE_MS)
-            return;
+        this.#refreshAfterDropdown = false;
         await this.refresh(true);
+    }
+    async handleSelectionChange() {
+        this.#dropdownActive = false;
+        try {
+            await this.moveSelected();
+        }
+        finally {
+            // This dropdown is an action picker, not persistent state. Returning to
+            // the placeholder lets the same application be selected again later.
+            this.#elements.select.value = "";
+            await this.finishDropdownInteraction();
+        }
     }
     render() {
         const previous = this.#elements.select.value;
