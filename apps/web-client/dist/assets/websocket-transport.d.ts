@@ -9,6 +9,7 @@ export declare class WebSocketBridgeTransport implements BridgeTransport {
     openVideoChannel(): Promise<ReadableStream<Uint8Array>>;
     openAudioChannel(): Promise<ReadableStream<Uint8Array> | null>;
     openControlChannel(): Promise<ReadableWritablePair<Uint8Array, Uint8Array>>;
+    diagnostics(): Record<string, unknown>;
     close(): Promise<void>;
     private openReadableChannel;
     private openSocket;

@@ -236,7 +236,7 @@ test("Phase 5 enforces visible display capacity and per-display diagnostics", ()
 test("Phase 5 tab switching stays synchronous and browser-only with a 50 ms target", () => {
   assert.match(controllerSource, /const TAB_SWITCH_TARGET_MS = 50/);
   const start = controllerSource.indexOf("private activateRuntime");
-  const end = controllerSource.indexOf("private async refreshSessionCapacity", start);
+  const end = controllerSource.indexOf("private bindControlDebug", start);
   assert.ok(start >= 0 && end > start);
   const body = controllerSource.slice(start, end);
   assert.doesNotMatch(body, /await\s/);
@@ -270,6 +270,27 @@ test("clipboard polling cannot steal focus from an active Android display", () =
 
 test("display diagnostics distinguish focus loss from control transport failure", () => {
   assert.match(controllerSource, /control focus \$\{runtime\.canvas === document\.activeElement \? "canvas" : "lost"\}/);
-  assert.match(controllerSource, /canvas\.addEventListener\("focus", \(\) => this\.renderDisplayDiagnostics\(true\)\)/);
-  assert.match(controllerSource, /canvas\.addEventListener\("blur", \(\) => this\.renderDisplayDiagnostics\(true\)\)/);
+  assert.match(controllerSource, /canvas\.addEventListener\("focus", \(\) => \{[\s\S]{0,300}controlDebug\("focus", "canvas-focus"[\s\S]{0,300}renderDisplayDiagnostics\(true\)/);
+  assert.match(controllerSource, /canvas\.addEventListener\("blur", \(\) => \{[\s\S]{0,500}controlDebug\("focus", "canvas-blur"[\s\S]{0,500}renderDisplayDiagnostics\(true\)/);
+});
+
+
+test("control debug logging is downloadable and instruments the full pointer path", async () => {
+  const debugSource = await readFile(resolve(root, "src/control-debug.ts"), "utf8");
+  const transportSource = await readFile(resolve(root, "src/websocket-transport.ts"), "utf8");
+  for (const id of ["control-debug-summary", "control-debug-download", "control-debug-clear"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(mainSource, /controlDebugDownload: required<HTMLButtonElement>\("#control-debug-download"\)/);
+  assert.match(controllerSource, /controlDebug\("pointer", "event"/);
+  assert.match(controllerSource, /controlDebug\("pointer", "send-complete"/);
+  assert.match(controllerSource, /controlDebug\("pointer", "send-error"/);
+  assert.match(controllerSource, /recordControlHeartbeat/);
+  assert.match(controllerSource, /displayDiagnostics\(serial\)/);
+  assert.match(transportSource, /controlDebug\("websocket", "opened"/);
+  assert.match(transportSource, /controlDebug\("websocket", "closed"/);
+  assert.match(transportSource, /controlDebug\("control-writer", "write"/);
+  assert.match(debugSource, /MAX_CONTROL_DEBUG_EVENTS = 1500/);
+  assert.match(debugSource, /clipboard\|pin\|password\|token\|cookie/);
+  assert.doesNotMatch(controllerSource, /controlDebug\([^\n]*message\.text/);
 });

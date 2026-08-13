@@ -5,6 +5,7 @@ import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboa
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
+import { clearControlDebugLog, controlDebug, controlDebugEvents, downloadControlDebugBundle } from "./control-debug.js";
 const TAB_SWITCH_TARGET_MS = 50;
 export class DroidWebDisplayController {
     elements;
@@ -45,6 +46,7 @@ export class DroidWebDisplayController {
     #lastTabSwitchMs = 0;
     #tabSwitchCount = 0;
     #lastDiagnosticsRenderAt = 0;
+    #controlDebugHeartbeat = null;
     #clipboardAcks = new Map();
     constructor(elements) {
         this.elements = elements;
@@ -54,9 +56,11 @@ export class DroidWebDisplayController {
         this.populateProfiles();
         this.bindEvents();
         this.bindCanvasEvents(elements.canvas);
+        this.bindControlDebug();
         this.renderTabs();
     }
     async initialize() {
+        controlDebug("lifecycle", "initialize", { visibilityState: document.visibilityState, documentHasFocus: document.hasFocus() });
         this.applyProfile(localStorage.getItem("droidwebdisplay-virtual-profile-v1") ?? "chatgpt-desktop");
         this.restoreBrowserSettings();
         await this.refreshDevices();
@@ -100,6 +104,13 @@ export class DroidWebDisplayController {
         }
         const explicitDisplayName = this.elements.displayName.value.trim();
         const displayName = explicitDisplayName || this.automaticDisplayName(values);
+        controlDebug("session", "connect-requested", {
+            serial,
+            displayMode: values.displayMode,
+            displayName,
+            runtimeCount: this.#runtimes.size,
+            canvasFocus: this.activeDisplayOwnsKeyboardFocus(),
+        });
         let serverSession = null;
         let transport = null;
         let protocolSession = null;
@@ -117,6 +128,13 @@ export class DroidWebDisplayController {
                 audioBitRate: 128_000,
             };
             serverSession = await this.#api.startDeviceSession(serial, request);
+            controlDebug("session", "server-session-started", {
+                sessionId: serverSession.sessionId,
+                serial,
+                displayMode: serverSession.displayMode,
+                displayId: serverSession.display.displayId,
+                displayName: serverSession.display.name,
+            });
             runtimeCanvas = this.allocateRuntimeCanvas(serverSession.sessionId);
             renderer = runtimeCanvas === this.elements.canvas
                 ? this.#baseRenderer
@@ -130,6 +148,7 @@ export class DroidWebDisplayController {
                 audio: this.elements.audioEnabled.checked,
                 control: true,
             });
+            controlDebug("session", "protocol-connected", { sessionId: serverSession.sessionId, transport: transport.diagnostics() });
             const runtime = {
                 serverSession,
                 transport,
@@ -169,11 +188,13 @@ export class DroidWebDisplayController {
                 runtime.serverSession = await this.#api.recordApplicationLaunch(serverSession.sessionId, "sent");
             }
             this.activateRuntime(serverSession.sessionId);
+            controlDebug("session", "runtime-active", { sessionId: serverSession.sessionId, canvasFocus: runtimeCanvas === document.activeElement });
             this.#reconnectCount = 0;
             this.renderTabs();
             void this.refreshSessionCapacity().catch(() => undefined);
         }
         catch (error) {
+            controlDebug("session", "connect-error", { sessionId: serverSession?.sessionId ?? null, error });
             if (serverSession && this.#runtimes.has(serverSession.sessionId)) {
                 await this.cleanupRuntime(serverSession.sessionId);
             }
@@ -287,8 +308,19 @@ export class DroidWebDisplayController {
         canvas.addEventListener("pointercancel", (event) => void this.pointer(event, 3));
         canvas.addEventListener("wheel", (event) => void this.scroll(event), { passive: false });
         canvas.addEventListener("keydown", (event) => void this.keydown(event));
-        canvas.addEventListener("focus", () => this.renderDisplayDiagnostics(true));
-        canvas.addEventListener("blur", () => this.renderDisplayDiagnostics(true));
+        canvas.addEventListener("focus", () => {
+            controlDebug("focus", "canvas-focus", { sessionId: canvas.dataset.sessionId || null, documentHasFocus: document.hasFocus() });
+            this.renderDisplayDiagnostics(true);
+        });
+        canvas.addEventListener("blur", () => {
+            controlDebug("focus", "canvas-blur", {
+                sessionId: canvas.dataset.sessionId || null,
+                documentHasFocus: document.hasFocus(),
+                activeElement: document.activeElement?.tagName ?? null,
+                activeElementId: document.activeElement?.id || null,
+            });
+            this.renderDisplayDiagnostics(true);
+        });
         canvas.addEventListener("paste", (event) => {
             const text = event.clipboardData?.getData("text/plain") ?? "";
             if (!text)
@@ -360,6 +392,7 @@ export class DroidWebDisplayController {
         const runtime = this.#runtimes.get(sessionId);
         if (!runtime)
             return;
+        controlDebug("session", "activate-runtime", { sessionId, previousSessionId: this.#activeSessionId, transport: runtime.transport.diagnostics() });
         const previousSessionId = this.#activeSessionId;
         const switchStartedAt = performance.now();
         this.stopFlexResize();
@@ -406,12 +439,97 @@ export class DroidWebDisplayController {
         this.updateChannelStatus();
         void this.startClipboardPolling(false);
         runtime.canvas.focus();
+        controlDebug("focus", "canvas-focus-requested", {
+            sessionId,
+            focusSucceeded: runtime.canvas === document.activeElement,
+            documentHasFocus: document.hasFocus(),
+        });
         globalThis.dispatchEvent(new CustomEvent("droidwebdisplay-active-session", { detail: { sessionId } }));
         if (previousSessionId !== null && previousSessionId !== sessionId) {
             this.#lastTabSwitchMs = performance.now() - switchStartedAt;
             this.#tabSwitchCount += 1;
             this.renderDisplayDiagnostics(true);
         }
+    }
+    bindControlDebug() {
+        const updateSummary = () => {
+            const values = controlDebugEvents();
+            const last = values.at(-1);
+            this.elements.controlDebugSummary.textContent = last
+                ? `Control trace · ${values.length} events · last ${last.category}/${last.event}`
+                : "Control trace ready · 0 events.";
+        };
+        globalThis.addEventListener("droidwebdisplay-control-debug", updateSummary);
+        globalThis.addEventListener("droidwebdisplay-control-debug-cleared", updateSummary);
+        globalThis.addEventListener("focus", () => controlDebug("focus", "window-focus", { documentHasFocus: document.hasFocus() }));
+        globalThis.addEventListener("blur", () => controlDebug("focus", "window-blur", { documentHasFocus: document.hasFocus() }));
+        document.addEventListener("visibilitychange", () => controlDebug("focus", "visibility-change", { visibilityState: document.visibilityState, documentHasFocus: document.hasFocus() }));
+        globalThis.addEventListener("error", (event) => controlDebug("browser", "window-error", { message: event.message, filename: event.filename, line: event.lineno, column: event.colno }));
+        globalThis.addEventListener("unhandledrejection", (event) => controlDebug("browser", "unhandled-rejection", { reason: event.reason instanceof Error ? event.reason : String(event.reason ?? "") }));
+        this.elements.controlDebugClear.addEventListener("click", () => {
+            clearControlDebugLog();
+            controlDebug("debug", "log-cleared");
+        });
+        this.elements.controlDebugDownload.addEventListener("click", () => void this.downloadControlDebug());
+        this.#controlDebugHeartbeat = window.setInterval(() => this.recordControlHeartbeat(), 1000);
+        controlDebug("debug", "logger-ready", { maxEvents: 1500 });
+        updateSummary();
+    }
+    recordControlHeartbeat() {
+        if (!this.#runtimes.size)
+            return;
+        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        const metrics = globalThis.__dwdLatencyMetrics ?? {};
+        controlDebug("heartbeat", "control-state", {
+            activeSessionId: this.#activeSessionId,
+            runtimeCount: this.#runtimes.size,
+            documentHasFocus: document.hasFocus(),
+            visibilityState: document.visibilityState,
+            canvasFocus: runtime?.canvas === document.activeElement,
+            activeElement: document.activeElement?.tagName ?? null,
+            activeElementId: document.activeElement?.id || null,
+            protocolPresent: this.#protocolSession !== null,
+            transport: runtime?.transport.diagnostics() ?? null,
+            controlSocketBufferedBytes: metrics.controlSocketBufferedBytes ?? null,
+            controlPendingWrites: metrics.controlPendingWrites ?? null,
+            controlPendingMovePointers: metrics.controlPendingMovePointers ?? null,
+            controlQueueDelayMs: metrics.controlQueueDelayMs ?? null,
+            controlLastWriteMs: metrics.controlLastWriteMs ?? null,
+            controlMessagesSent: metrics.controlMessagesSent ?? null,
+            controlLastError: metrics.controlLastError ?? null,
+        });
+    }
+    async downloadControlDebug() {
+        const serial = this.elements.device.value;
+        let serverDiagnostics = null;
+        let serverDiagnosticsError = null;
+        if (serial) {
+            try {
+                serverDiagnostics = await this.#api.displayDiagnostics(serial);
+            }
+            catch (error) {
+                serverDiagnosticsError = errorMessage(error);
+            }
+        }
+        const runtimes = [...this.#runtimes.entries()].map(([sessionId, runtime]) => ({
+            sessionId,
+            active: sessionId === this.#activeSessionId,
+            displayName: runtime.serverSession.display.name,
+            displayMode: runtime.serverSession.displayMode,
+            displayId: runtime.serverSession.display.displayId,
+            canvasFocus: runtime.canvas === document.activeElement,
+            transport: runtime.transport.diagnostics(),
+            videoStatistics: runtime.latestStatistics,
+            audioStatistics: runtime.latestAudioStatistics,
+        }));
+        controlDebug("debug", "download-requested", { serial, activeSessionId: this.#activeSessionId, runtimeCount: runtimes.length });
+        downloadControlDebugBundle({
+            serial,
+            activeSessionId: this.#activeSessionId,
+            runtimes,
+            serverDiagnostics,
+            serverDiagnosticsError,
+        });
     }
     async refreshSessionCapacity() {
         const serial = this.elements.device.value;
@@ -789,12 +907,30 @@ export class DroidWebDisplayController {
         await this.#api.recordVirtualResize(server.sessionId, target.width, target.height);
     }
     async pointer(event, action) {
-        if (!this.#protocolSession || !this.#activeSessionId)
+        if (!this.#protocolSession || !this.#activeSessionId) {
+            if (action !== 2)
+                controlDebug("pointer", "ignored-no-active-session", { action, pointerId: event.pointerId });
             return;
-        const runtime = this.#runtimes.get(this.#activeSessionId);
+        }
+        const sessionId = this.#activeSessionId;
+        const protocolSession = this.#protocolSession;
+        const runtime = this.#runtimes.get(sessionId);
         const canvas = event.currentTarget instanceof HTMLCanvasElement ? event.currentTarget : runtime?.canvas;
-        if (!runtime || !canvas || canvas !== runtime.canvas)
+        if (!runtime || !canvas || canvas !== runtime.canvas) {
+            if (action !== 2)
+                controlDebug("pointer", "ignored-runtime-mismatch", { action, pointerId: event.pointerId, sessionId, canvasSessionId: canvas?.dataset.sessionId ?? null });
             return;
+        }
+        if (action !== 2)
+            controlDebug("pointer", "event", {
+                action,
+                pointerId: event.pointerId,
+                sessionId,
+                buttons: event.buttons,
+                canvasFocus: canvas === document.activeElement,
+                documentHasFocus: document.hasFocus(),
+                transport: runtime.transport.diagnostics(),
+            });
         event.preventDefault();
         if (action === 0) {
             canvas.setPointerCapture(event.pointerId);
@@ -804,15 +940,23 @@ export class DroidWebDisplayController {
         if (size.width <= 0 || size.height <= 0)
             return;
         const position = mapClientPoint(event.clientX, event.clientY, canvas.getBoundingClientRect(), size);
-        await this.#protocolSession.sendControl({
-            type: ControlMessageType.InjectTouchEvent,
-            action,
-            pointerId: BigInt(event.pointerId),
-            position,
-            pressure: action === 1 || action === 3 ? 0 : Math.max(0.01, event.pressure || 1),
-            actionButton: 0,
-            buttons: event.buttons,
-        });
+        try {
+            await protocolSession.sendControl({
+                type: ControlMessageType.InjectTouchEvent,
+                action,
+                pointerId: BigInt(event.pointerId),
+                position,
+                pressure: action === 1 || action === 3 ? 0 : Math.max(0.01, event.pressure || 1),
+                actionButton: 0,
+                buttons: event.buttons,
+            });
+            if (action !== 2)
+                controlDebug("pointer", "send-complete", { action, pointerId: event.pointerId, sessionId, activeSessionUnchanged: this.#activeSessionId === sessionId });
+        }
+        catch (error) {
+            controlDebug("pointer", "send-error", { action, pointerId: event.pointerId, sessionId, error, transport: runtime.transport.diagnostics() });
+            throw error;
+        }
         if ((action === 1 || action === 3) && canvas.hasPointerCapture(event.pointerId)) {
             canvas.releasePointerCapture(event.pointerId);
         }
@@ -973,10 +1117,20 @@ export class DroidWebDisplayController {
     }
     async sendMessages(messages) {
         const session = this.#protocolSession;
-        if (!session)
+        const sessionId = this.#activeSessionId;
+        if (!session || !sessionId)
             return;
-        for (const message of messages)
-            await session.sendControl(message);
+        for (const message of messages) {
+            controlDebug("control", "message-send", { sessionId, type: message.type });
+            try {
+                await session.sendControl(message);
+                controlDebug("control", "message-complete", { sessionId, type: message.type });
+            }
+            catch (error) {
+                controlDebug("control", "message-error", { sessionId, type: message.type, error });
+                throw error;
+            }
+        }
     }
     async consumeDeviceMessages(sessionId, session) {
         while (this.#runtimes.get(sessionId)?.protocolSession === session) {
@@ -1019,6 +1173,7 @@ export class DroidWebDisplayController {
         }
     }
     async handleRuntimeFailure(sessionId, error) {
+        controlDebug("session", "runtime-failure", { sessionId, error, closing: this.#closing, runtimePresent: this.#runtimes.has(sessionId) });
         if (this.#closing || !this.#runtimes.has(sessionId))
             return;
         const wasActive = sessionId === this.#activeSessionId;
@@ -1039,6 +1194,7 @@ export class DroidWebDisplayController {
         const runtime = this.#runtimes.get(sessionId);
         if (!runtime)
             return;
+        controlDebug("session", "cleanup-start", { sessionId, active: sessionId === this.#activeSessionId, transport: runtime.transport.diagnostics() });
         const wasActive = sessionId === this.#activeSessionId;
         if (wasActive) {
             this.stopFlexResize();
@@ -1068,6 +1224,7 @@ export class DroidWebDisplayController {
             // A closing WebSocket may already have stopped this isolated server session.
         }
         this.releaseRuntimeCanvas(runtime.canvas);
+        controlDebug("session", "cleanup-complete", { sessionId, remainingRuntimes: this.#runtimes.size });
         this.#availableDisplaySlots = Math.min(this.#maximumDisplaySessions, this.#availableDisplaySlots + 1);
         this.renderCapacity();
         void this.refreshSessionCapacity().catch(() => undefined);

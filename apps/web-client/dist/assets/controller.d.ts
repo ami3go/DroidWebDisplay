@@ -15,6 +15,9 @@ interface Elements {
     readonly details: HTMLElement;
     readonly statistics: HTMLElement;
     readonly displayDiagnostics: HTMLElement;
+    readonly controlDebugSummary: HTMLElement;
+    readonly controlDebugDownload: HTMLButtonElement;
+    readonly controlDebugClear: HTMLButtonElement;
     readonly back: HTMLButtonElement;
     readonly home: HTMLButtonElement;
     readonly recent: HTMLButtonElement;
@@ -78,6 +81,9 @@ export declare class DroidWebDisplayController {
     private bindCanvasEvents;
     private renderTabs;
     private activateRuntime;
+    private bindControlDebug;
+    private recordControlHeartbeat;
+    private downloadControlDebug;
     private refreshSessionCapacity;
     private renderCapacity;
     private renderDisplayDiagnostics;

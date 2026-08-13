@@ -1,3 +1,4 @@
+import { controlDebug } from "./control-debug.js";
 function latencyMetrics() {
     const root = globalThis;
     return root.__dwdLatencyMetrics ??= {};
@@ -10,6 +11,7 @@ export class WebSocketBridgeTransport {
     baseUrl;
     socketFactory;
     #sockets = new Set();
+    #socketChannels = new Map();
     #clientId = crypto.randomUUID();
     constructor(sessionId, baseUrl = websocketBaseUrl(), socketFactory = (url) => new WebSocket(url)) {
         this.sessionId = sessionId;
@@ -26,16 +28,29 @@ export class WebSocketBridgeTransport {
         const socket = await this.openSocket("control");
         return {
             readable: readableFromSocket(socket, "control"),
-            writable: writableToSocket(socket),
+            writable: writableToSocket(socket, this.sessionId),
+        };
+    }
+    diagnostics() {
+        return {
+            sessionId: this.sessionId,
+            clientId: this.#clientId,
+            sockets: [...this.#sockets].map((socket) => ({
+                channel: this.#socketChannels.get(socket) ?? "unknown",
+                readyState: socket.readyState,
+                bufferedAmount: socket.bufferedAmount,
+            })),
         };
     }
     async close() {
+        controlDebug("transport", "close-requested", this.diagnostics());
         for (const socket of this.#sockets) {
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
                 socket.close(1000, "transport closed");
             }
         }
         this.#sockets.clear();
+        this.#socketChannels.clear();
         const metrics = latencyMetrics();
         metrics.controlSocketBufferedBytes = 0;
         metrics.videoSocketQueuedBytes = 0;
@@ -50,8 +65,31 @@ export class WebSocketBridgeTransport {
         const socket = this.socketFactory(url);
         socket.binaryType = "arraybuffer";
         this.#sockets.add(socket);
-        await waitForOpen(socket);
-        socket.addEventListener("close", () => this.#sockets.delete(socket), { once: true });
+        this.#socketChannels.set(socket, channel);
+        controlDebug("websocket", "creating", { sessionId: this.sessionId, channel, readyState: socket.readyState });
+        try {
+            await waitForOpen(socket);
+        }
+        catch (error) {
+            controlDebug("websocket", "open-failed", { sessionId: this.sessionId, channel, error });
+            throw error;
+        }
+        controlDebug("websocket", "opened", { sessionId: this.sessionId, channel, readyState: socket.readyState });
+        socket.addEventListener("error", () => {
+            controlDebug("websocket", "error", { sessionId: this.sessionId, channel, readyState: socket.readyState, bufferedAmount: socket.bufferedAmount });
+        });
+        socket.addEventListener("close", (event) => {
+            controlDebug("websocket", "closed", {
+                sessionId: this.sessionId,
+                channel,
+                code: event.code,
+                reason: event.reason || "",
+                wasClean: event.wasClean,
+                bufferedAmount: socket.bufferedAmount,
+            });
+            this.#sockets.delete(socket);
+            this.#socketChannels.delete(socket);
+        }, { once: true });
         return socket;
     }
 }
@@ -226,12 +264,13 @@ function readableFromSocket(socket, channel) {
         },
     }, { highWaterMark: 1 });
 }
-function writableToSocket(socket) {
+function writableToSocket(socket, sessionId) {
     // Control frames are tiny. A megabyte-scale backlog is unacceptable for an
     // interactive pointer/keyboard path, so apply backpressure while the browser
     // has more than 64 KiB queued for the socket.
     const maximumBufferedBytes = 64 * 1024;
     let sampling = false;
+    let writeCount = 0;
     const sampleBufferedAmount = () => {
         const metrics = latencyMetrics();
         metrics.controlSocketBufferedBytes = socket.readyState === WebSocket.OPEN ? socket.bufferedAmount : 0;
@@ -251,6 +290,7 @@ function writableToSocket(socket) {
     return new WritableStream({
         async write(chunk) {
             if (socket.readyState !== WebSocket.OPEN) {
+                controlDebug("control-writer", "write-rejected", { sessionId, readyState: socket.readyState, bufferedAmount: socket.bufferedAmount });
                 throw new Error("Control WebSocket is not open");
             }
             while (socket.bufferedAmount > maximumBufferedBytes) {
@@ -260,17 +300,23 @@ function writableToSocket(socket) {
                     throw new Error("Control WebSocket closed during backpressure wait");
             }
             socket.send(chunk);
+            writeCount += 1;
+            if (writeCount <= 20 || writeCount % 100 === 0) {
+                controlDebug("control-writer", "write", { sessionId, writeCount, bytes: chunk.byteLength, bufferedAmount: socket.bufferedAmount });
+            }
             const metrics = latencyMetrics();
             metrics.controlSocketBufferedBytes = socket.bufferedAmount;
             metrics.controlSocketPeakBufferedBytes = Math.max(Number(metrics.controlSocketPeakBufferedBytes ?? 0), socket.bufferedAmount);
             startSampling();
         },
         close() {
+            controlDebug("control-writer", "close", { sessionId, writeCount, readyState: socket.readyState, bufferedAmount: socket.bufferedAmount });
             latencyMetrics().controlSocketBufferedBytes = 0;
             if (socket.readyState === WebSocket.OPEN)
                 socket.close(1000, "control writer closed");
         },
         abort(reason) {
+            controlDebug("control-writer", "abort", { sessionId, writeCount, readyState: socket.readyState, reason: String(reason ?? "") });
             latencyMetrics().controlSocketBufferedBytes = 0;
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
                 socket.close(1011, String(reason ?? "control writer aborted"));

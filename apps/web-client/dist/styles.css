@@ -408,3 +408,6 @@ body[data-layout="compact"] .statistics-card { padding: 0.75rem; }
 .display-diagnostic-heading span, .display-diagnostic-meta { color: #71869d; font-size: 0.68rem; }
 .display-diagnostic-meta { margin-top: 0.2rem; line-height: 1.35; }
 .display-switch-metric { margin: 0 0 0.45rem; color: #8fa4b8; font-size: 0.7rem; }
+
+
+.control-debug-note { margin: 0.45rem 0 0; color: #71869d; font-size: 0.68rem; line-height: 1.4; }
