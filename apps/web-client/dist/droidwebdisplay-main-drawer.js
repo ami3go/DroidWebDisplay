@@ -90,6 +90,17 @@
     root().querySelectorAll('[data-group]').forEach(button => button.setAttribute('aria-selected', 'false'));
     activeGroup = null;
   }
+  function bindStatusShortcut() {
+    const status = document.getElementById('connection-status');
+    if (!status) return;
+    const openDisplay = () => openGroup('display');
+    status.addEventListener('click', openDisplay);
+    status.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openDisplay();
+    });
+  }
   function loadAccordionState() { try { return JSON.parse(get(ACCORDION_KEY, '{}')) || {}; } catch (_) { return {}; } }
   function bindAccordions() {
     const state = loadAccordionState();
@@ -106,6 +117,7 @@
     removeLegacyHeaderText();
     ensureDisplayConnectionUi();
     applyRailOrder();
+    bindStatusShortcut();
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));
     ui.querySelector('.gb-drawer-pin')?.addEventListener('click', () => applyPinned(!pinned));
     ui.querySelectorAll('[data-action="close"], .gb-drawer-close').forEach(button => button.addEventListener('click', closeDrawer));

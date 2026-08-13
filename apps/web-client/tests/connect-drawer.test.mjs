@@ -40,3 +40,11 @@ test("readiness indicator stays in header and Connect rail item is absent", () =
   assert.match(header, /id="status-icon"/);
   assert.doesNotMatch(drawerSource, /label\.textContent = 'Connect'/);
 });
+
+test("connection status pill opens Display settings", () => {
+  assert.match(html, /id="connection-status"[^>]*role="button"[^>]*tabindex="0"/);
+  assert.match(drawerSource, /function bindStatusShortcut\(\)/);
+  assert.match(drawerSource, /status\.addEventListener\('click', openDisplay\)/);
+  assert.match(drawerSource, /openGroup\('display'\)/);
+});
+
