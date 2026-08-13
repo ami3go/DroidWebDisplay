@@ -1,0 +1,448 @@
+name: Running App Header Migration
+
+on:
+  push:
+    branches:
+      - agent/connect-drawer
+    paths:
+      - .github/workflows/header-running-app-ui.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/connect-drawer
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply running-app header UI and diagnostics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          # 1. Running app controller: header selector, auto-move, count, diagnostics.
+          path = Path('apps/web-client/src/running-app-controller.ts')
+          path.write_text(r'''import { BridgeApi } from "./api.js";
+import type { RunningGuiAppDto, SessionDto } from "./types.js";
+
+export interface RunningAppElements {
+  readonly select: HTMLSelectElement;
+  readonly refresh: HTMLButtonElement;
+  readonly count: HTMLElement;
+  readonly status: HTMLElement;
+  readonly diagnosticDisplay: HTMLElement;
+  readonly diagnosticRam: HTMLElement;
+}
+
+export class RunningAppController {
+  #serial: string | null = null;
+  #apps: RunningGuiAppDto[] = [];
+  #activeSession: SessionDto | null = null;
+  #virtualSession: SessionDto | null = null;
+  #refreshTimer: number | null = null;
+  #refreshing = false;
+  #moving = false;
+
+  public constructor(
+    private readonly api: BridgeApi,
+    private readonly elements: RunningAppElements,
+  ) {
+    this.elements.refresh.addEventListener("click", () => { void this.refresh(true); });
+    this.elements.select.addEventListener("change", () => { void this.moveSelected(); });
+    this.reset("Select a running application after starting a virtual display.");
+    globalThis.addEventListener("droidwebdisplay-auth-required", () => this.pause());
+  }
+
+  public setSerial(serial: string | null): void {
+    if (serial === this.#serial) return;
+    this.#serial = serial;
+    this.#apps = [];
+    this.#activeSession = null;
+    this.#virtualSession = null;
+    if (!serial) {
+      this.reset("Select an authorized device.");
+      this.stopPolling();
+      return;
+    }
+    this.reset("Start a virtual display to move running applications.");
+    void this.refresh(false);
+    this.startPolling();
+  }
+
+  public async refresh(manual = false): Promise<void> {
+    if (!this.#serial || this.#refreshing) return;
+    this.#refreshing = true;
+    this.elements.refresh.disabled = true;
+    if (manual) this.elements.status.textContent = "Refreshing running Android applications…";
+    try {
+      const [apps, sessions] = await Promise.all([
+        this.api.runningApps(this.#serial),
+        this.api.sessions(),
+      ]);
+      this.#apps = [...apps.apps];
+      const runningSessions = sessions.sessions.filter(
+        (session) => session.serial === this.#serial && session.state === "running",
+      );
+      this.#virtualSession = runningSessions.find(
+        (session) =>
+          session.displayMode === "virtual" &&
+          typeof session.virtualDisplay.displayId === "number",
+      ) ?? null;
+      this.#activeSession = this.#virtualSession ?? runningSessions[0] ?? null;
+      this.renderApps();
+      this.renderDiagnostics(apps.freeMemoryBytes);
+    } catch (error) {
+      this.elements.status.textContent = error instanceof Error ? error.message : String(error);
+      this.#apps = [];
+      this.renderApps();
+      this.renderDiagnostics(null);
+    } finally {
+      this.#refreshing = false;
+      this.elements.refresh.disabled = false;
+    }
+  }
+
+  public startPolling(): void {
+    this.stopPolling();
+    if (!this.#serial) return;
+    this.#refreshTimer = window.setInterval(() => { void this.refresh(false); }, 4000);
+  }
+
+  public stopPolling(): void {
+    if (this.#refreshTimer !== null) {
+      window.clearInterval(this.#refreshTimer);
+      this.#refreshTimer = null;
+    }
+  }
+
+  public pause(): void {
+    this.stopPolling();
+  }
+
+  private renderApps(): void {
+    const previous = this.elements.select.value;
+    this.elements.select.replaceChildren();
+    this.elements.count.textContent = String(this.#apps.length);
+    this.elements.refresh.title = `Refresh running applications (${this.#apps.length} found)`;
+    this.elements.refresh.setAttribute("aria-label", `Refresh running applications, ${this.#apps.length} found`);
+
+    if (this.#apps.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No GUI apps";
+      this.elements.select.append(option);
+      this.elements.select.disabled = true;
+      this.elements.status.textContent = this.#virtualSession
+        ? "No running GUI applications detected."
+        : "Start a virtual display to move running applications.";
+      return;
+    }
+
+    this.#apps.forEach((app) => {
+      const option = document.createElement("option");
+      option.value = String(app.taskId);
+      const display = app.displayId === null ? "display ?" : `display ${app.displayId}`;
+      option.textContent = `${app.label} · ${display}`;
+      this.elements.select.append(option);
+    });
+    if (this.#apps.some((app) => String(app.taskId) === previous)) {
+      this.elements.select.value = previous;
+    }
+    this.elements.select.disabled = false;
+    this.updateSelectionStatus();
+  }
+
+  private updateSelectionStatus(): void {
+    const selected = this.selectedApp();
+    const targetDisplay = this.#virtualSession?.virtualDisplay.displayId ?? null;
+    if (!selected || !this.#virtualSession || targetDisplay === null) {
+      this.elements.status.textContent = "Start a virtual display to move running applications.";
+      return;
+    }
+    if (selected.displayId === targetDisplay) {
+      this.elements.status.textContent = `${selected.label} is already on virtual display ${targetDisplay}.`;
+      return;
+    }
+    this.elements.status.textContent = `${selected.label} can be moved to virtual display ${targetDisplay}.`;
+  }
+
+  private selectedApp(): RunningGuiAppDto | null {
+    const taskId = Number(this.elements.select.value);
+    if (!Number.isInteger(taskId)) return null;
+    return this.#apps.find((app) => app.taskId === taskId) ?? null;
+  }
+
+  private async moveSelected(): Promise<void> {
+    if (this.#moving) return;
+    const app = this.selectedApp();
+    const session = this.#virtualSession;
+    const targetDisplay = session?.virtualDisplay.displayId ?? null;
+    if (!app || !session || targetDisplay === null) {
+      this.updateSelectionStatus();
+      return;
+    }
+    if (app.displayId === targetDisplay) {
+      this.updateSelectionStatus();
+      return;
+    }
+
+    this.#moving = true;
+    this.elements.select.disabled = true;
+    this.elements.refresh.disabled = true;
+    this.elements.status.textContent = `Moving ${app.label} to virtual display ${targetDisplay}…`;
+    try {
+      const result = await this.api.moveRunningApp({
+        sessionId: session.sessionId,
+        taskId: app.taskId,
+        componentName: app.componentName,
+      });
+      this.elements.status.textContent = result.status === "already-on-target"
+        ? `${result.app.label} is already on display ${result.displayId}.`
+        : result.verified
+          ? `${result.app.label} moved to display ${result.displayId}.`
+          : `${result.app.label}: launch sent to display ${result.displayId}; Android did not confirm the move yet.`;
+      await this.refresh(false);
+    } catch (error) {
+      this.elements.status.textContent = error instanceof Error ? error.message : String(error);
+    } finally {
+      this.#moving = false;
+      this.elements.select.disabled = this.#apps.length === 0;
+      this.elements.refresh.disabled = false;
+      this.updateSelectionStatus();
+    }
+  }
+
+  private renderDiagnostics(freeMemoryBytes: number | null): void {
+    const displayId = this.#virtualSession?.virtualDisplay.displayId
+      ?? (this.#activeSession?.displayMode === "physical" ? 0 : null);
+    this.elements.diagnosticDisplay.textContent = displayId === null ? "—" : String(displayId);
+    this.elements.diagnosticRam.textContent = freeMemoryBytes === null ? "—" : formatBytes(freeMemoryBytes);
+  }
+
+  private reset(message: string): void {
+    this.elements.select.replaceChildren();
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No GUI apps";
+    this.elements.select.append(option);
+    this.elements.select.disabled = true;
+    this.elements.count.textContent = "0";
+    this.elements.refresh.title = "Refresh running applications (0 found)";
+    this.elements.refresh.setAttribute("aria-label", "Refresh running applications, 0 found");
+    this.elements.diagnosticDisplay.textContent = "—";
+    this.elements.diagnosticRam.textContent = "—";
+    this.elements.status.textContent = message;
+  }
+}
+
+function formatBytes(value: number): string {
+  const gib = value / (1024 ** 3);
+  if (gib >= 1) return `${gib.toFixed(2)} GiB`;
+  return `${(value / (1024 ** 2)).toFixed(0)} MiB`;
+}
+''', encoding='utf-8')
+
+          # 2. Type returned by running-app API.
+          path = Path('apps/web-client/src/types.ts')
+          text = path.read_text(encoding='utf-8')
+          old = '''export interface RunningAppsResponse {\n  readonly serial: string;\n  readonly apps: readonly RunningGuiAppDto[];\n  readonly moveStrategy: "start-activity-on-display";\n}'''
+          new = '''export interface RunningAppsResponse {\n  readonly serial: string;\n  readonly apps: readonly RunningGuiAppDto[];\n  readonly moveStrategy: "start-activity-on-display";\n  readonly freeMemoryBytes: number | null;\n}'''
+          if old not in text:
+              raise SystemExit('RunningAppsResponse block not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          # 3. Main controller wiring.
+          path = Path('apps/web-client/src/main.ts')
+          text = path.read_text(encoding='utf-8')
+          old = '''const runningAppController = new RunningAppController(api, {\n  select: element<HTMLSelectElement>("running-app-select"),\n  refresh: element<HTMLButtonElement>("running-app-refresh"),\n  move: element<HTMLButtonElement>("running-app-move"),\n  status: element("running-app-status"),\n});'''
+          new = '''const runningAppController = new RunningAppController(api, {\n  select: element<HTMLSelectElement>("running-app-select"),\n  refresh: element<HTMLButtonElement>("running-app-refresh"),\n  count: element("running-app-count"),\n  status: element("running-app-status"),\n  diagnosticDisplay: element("diagnostic-display"),\n  diagnosticRam: element("diagnostic-ram"),\n});'''
+          if old not in text:
+              raise SystemExit('runningAppController wiring not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          # 4. ADB available-memory probe.
+          path = Path('droid_web_display/adb/client.py')
+          text = path.read_text(encoding='utf-8')
+          marker = '''    async def list_running_gui_apps(self, serial: str) -> list[RunningGuiApp]:\n'''
+          if marker not in text:
+              raise SystemExit('list_running_gui_apps marker not found')
+          method = '''    async def free_memory_bytes(self, serial: str) -> int | None:\n        result = await self.shell(serial, "cat", "/proc/meminfo", check=False, timeout=10.0)\n        if result.returncode != 0:\n            return None\n        for raw in result.stdout.splitlines():\n            match = re.match(r"^MemAvailable:\\s+(\\d+)\\s+kB$", raw.strip(), re.IGNORECASE)\n            if match:\n                return int(match.group(1)) * 1024\n        return None\n\n'''
+          text = text.replace(marker, method + marker)
+          path.write_text(text, encoding='utf-8')
+
+          # 5. Running-app endpoint also returns free phone RAM.
+          path = Path('droid_web_display/api/app.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        await container.manager.select_device(serial)\n        values = await container.adb.list_running_gui_apps(serial)\n        return {\n            "serial": serial,\n            "apps": [item.to_dict() for item in values],\n            "moveStrategy": "start-activity-on-display",\n        }'''
+          new = '''        await container.manager.select_device(serial)\n        values = await container.adb.list_running_gui_apps(serial)\n        free_memory_bytes = await container.adb.free_memory_bytes(serial)\n        return {\n            "serial": serial,\n            "apps": [item.to_dict() for item in values],\n            "moveStrategy": "start-activity-on-display",\n            "freeMemoryBytes": free_memory_bytes,\n        }'''
+          if old not in text:
+              raise SystemExit('running_apps endpoint body not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          # 6. Header UI, remove Apps rail/drawer, add diagnostics fields.
+          path = Path('apps/web-client/static/index.html')
+          text = path.read_text(encoding='utf-8')
+          android_end = '''          <button id="fullscreen" class="secondary compact" disabled>Fullscreen</button>\n        </div>'''
+          app_header = '''          <button id="fullscreen" class="secondary compact" disabled>Fullscreen</button>\n        </div>\n        <div class="running-app-header" aria-label="Running Android applications">\n          <span class="running-app-header-icon" aria-hidden="true" title="Running application">\n            <svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>\n          </span>\n          <select id="running-app-select" aria-label="Running Android application" title="Selecting an application moves it to the active virtual display" disabled>\n            <option value="">No GUI apps</option>\n          </select>\n          <button id="running-app-refresh" type="button" class="secondary compact running-app-refresh" aria-label="Refresh running applications, 0 found" title="Refresh running applications (0 found)"><span aria-hidden="true">↻</span><span id="running-app-count">0</span></button>\n          <span id="running-app-status" class="visually-hidden" aria-live="polite">Start a virtual display to move applications.</span>\n        </div>'''
+          if android_end not in text:
+              raise SystemExit('fullscreen/header insertion point not found')
+          text = text.replace(android_end, app_header, 1)
+          text = re.sub(r'\n\s*<button type="button" class="gb-rail-button" data-group="apps"[^\n]*</button>', '', text, count=1)
+          text, count = re.subn(r'\n\s*<div class="gb-drawer-slot" data-slot="apps">.*?</section></div>', '', text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'Apps drawer slot removal count={count}')
+          old_diag = '''          <div class="gb-drawer-slot" data-slot="diagnostics"><section class="help-card statistics-card">\n          <h2>Mode statistic</h2>\n          <div id="statistics" class="statistics">No video statistics</div>\n        </section></div>'''
+          new_diag = '''          <div class="gb-drawer-slot" data-slot="diagnostics"><section class="help-card statistics-card">\n          <h2>Mode statistic</h2>\n          <div class="device-diagnostic-summary" aria-label="Android device diagnostics">\n            <div><span>Display</span><strong id="diagnostic-display">—</strong></div>\n            <div><span>Free RAM</span><strong id="diagnostic-ram">—</strong></div>\n          </div>\n          <div id="statistics" class="statistics">No video statistics</div>\n        </section></div>'''
+          if old_diag not in text:
+              raise SystemExit('diagnostics card block not found')
+          text = text.replace(old_diag, new_diag)
+          path.write_text(text, encoding='utf-8')
+
+          # 7. Keep Apps out of drawer order.
+          path = Path('apps/web-client/static/droidwebdisplay-main-drawer.js')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('controller v1.3.0', 'controller v1.4.0')
+          old = "const GROUPS = ['display','clipboard','files','apps','audio','access','network','diagnostics','settings'];"
+          new = "const GROUPS = ['display','clipboard','files','audio','access','network','diagnostics','settings'];"
+          if old not in text:
+              raise SystemExit('drawer GROUPS with apps not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          # 8. Header and diagnostics CSS. Height remains the existing 2.12rem.
+          path = Path('apps/web-client/static/styles.css')
+          text = path.read_text(encoding='utf-8')
+          marker = '.android-control-row button { background: #202838; }\n'
+          css = r'''.running-app-header { height: 2.12rem; min-height: 2.12rem; margin-left: auto; display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
+.running-app-header-icon { width: 2.12rem; height: 2.12rem; flex: 0 0 2.12rem; display: grid; place-items: center; color: #9fb0c2; }
+.running-app-header-icon svg { width: 1.12rem; height: 1.12rem; fill: currentColor; }
+.connection-row .running-app-header select { width: clamp(10rem, 18vw, 16rem); min-width: 10rem; max-width: 16rem; height: 2.12rem; min-height: 2.12rem; flex: 0 1 16rem; padding: 0.42rem 1.8rem 0.42rem 0.58rem; border-radius: 8px; font-size: 0.76rem; }
+.connection-row .running-app-refresh { min-width: 3.05rem; width: auto; height: 2.12rem; min-height: 2.12rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.52rem; }
+#running-app-count { min-width: 1ch; font-variant-numeric: tabular-nums; text-align: right; }
+.device-diagnostic-summary { margin: 0.65rem 0 0.45rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
+.device-diagnostic-summary > div { min-width: 0; padding: 0.5rem 0.58rem; border: 1px solid #30394b; border-radius: 9px; background: #101620; display: grid; gap: 0.18rem; }
+.device-diagnostic-summary span { color: #8f9bb0; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.device-diagnostic-summary strong { color: #e4eaf5; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+'''
+          if marker not in text:
+              raise SystemExit('android-control-row CSS marker not found')
+          text = text.replace(marker, marker + css, 1)
+          path.write_text(text, encoding='utf-8')
+
+          # 9. Web-client layout regression now asserts header app controls and no Apps drawer.
+          path = Path('apps/web-client/tests/layout.test.mjs')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");', 'const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");\nconst runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");')
+          old_test = r'''test("running applications panel is native to the Apps drawer", () => {
+  const appsSlot = html.indexOf('data-slot="apps"');
+  const filesSlot = html.indexOf('data-slot="files"');
+  const panel = html.indexOf('id="running-app-select"');
+  assert.ok(appsSlot >= 0 && panel > appsSlot && panel < filesSlot);
+  assert.match(html, /id="running-app-move"/);
+});'''
+          new_test = r'''test("running applications are compact header controls with automatic relocation", () => {
+  const headerStart = html.indexOf('<header class="topbar">');
+  const headerEnd = html.indexOf('</header>', headerStart);
+  const header = html.slice(headerStart, headerEnd);
+  const fullscreen = header.indexOf('id="fullscreen"');
+  const icon = header.indexOf('class="running-app-header-icon"');
+  const select = header.indexOf('id="running-app-select"');
+  const refresh = header.indexOf('id="running-app-refresh"');
+  assert.ok(fullscreen >= 0 && icon > fullscreen && select > icon && refresh > select);
+  assert.match(header, /id="running-app-count">0<\/span>/);
+  assert.equal(html.includes('data-group="apps"'), false);
+  assert.equal(html.includes('data-slot="apps"'), false);
+  assert.equal(html.includes('id="running-app-move"'), false);
+  assert.match(runningAppSource, /select\.addEventListener\("change", \(\) => \{ void this\.moveSelected\(\); \}\)/);
+  assert.match(runningAppSource, /count\.textContent = String\(this\.#apps\.length\)/);
+  assert.match(css, /\.running-app-header \{ height: 2\.12rem; min-height: 2\.12rem;/);
+});'''
+          if old_test not in text:
+              raise SystemExit('old running apps layout test not found')
+          text = text.replace(old_test, new_test)
+          path.write_text(text, encoding='utf-8')
+
+          # 10. Drawer release order no longer includes Apps.
+          path = Path('tests/release/test_drawer_icon_order.py')
+          text = path.read_text(encoding='utf-8')
+          old = "EXPECTED_ORDER = \"['display','clipboard','files','apps','audio','access','network','diagnostics','settings']\""
+          new = "EXPECTED_ORDER = \"['display','clipboard','files','audio','access','network','diagnostics','settings']\""
+          if old not in text:
+              raise SystemExit('release drawer order expectation not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          # 11. Backend regression checks free RAM is exposed alongside GUI tasks.
+          path = Path('tests/regression/automation/test_running_apps.py')
+          text = path.read_text(encoding='utf-8')
+          marker = '''    async def list_running_gui_apps(self, serial: str) -> list[RunningGuiApp]:\n        return list(self.apps)\n'''
+          replacement = marker + '''\n    async def free_memory_bytes(self, serial: str) -> int | None:\n        return 3 * 1024 * 1024 * 1024\n'''
+          if marker not in text:
+              raise SystemExit('RunningAppsFakeAdb list method not found')
+          text = text.replace(marker, replacement, 1)
+          assertion = '''        assert listed.json()["apps"][0]["taskId"] == 42\n'''
+          replacement = assertion + '''        assert listed.json()["freeMemoryBytes"] == 3 * 1024 * 1024 * 1024\n'''
+          if assertion not in text:
+              raise SystemExit('running apps API assertion marker not found')
+          path.write_text(text.replace(assertion, replacement, 1), encoding='utf-8')
+
+          # 12. Add focused source regression for diagnostics IDs and typed telemetry.
+          path = Path('apps/web-client/tests/running-app-header.test.mjs')
+          path.write_text(r'''import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const html = await readFile(resolve(root, "static/index.html"), "utf8");
+const source = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");
+const types = await readFile(resolve(root, "src/types.ts"), "utf8");
+
+test("Diagnostics expose active display and available Android RAM", () => {
+  assert.match(html, /id="diagnostic-display">—<\/strong>/);
+  assert.match(html, /id="diagnostic-ram">—<\/strong>/);
+  assert.match(source, /diagnosticDisplay\.textContent/);
+  assert.match(source, /diagnosticRam\.textContent/);
+  assert.match(types, /readonly freeMemoryBytes: number \| null;/);
+});
+
+test("GUI task counter remains digits only", () => {
+  assert.match(html, /id="running-app-count">0<\/span>/);
+  assert.match(source, /count\.textContent = String\(this\.#apps\.length\)/);
+  assert.match(source, /count\.textContent = "0"/);
+});
+''', encoding='utf-8')
+          PY
+      - name: Build protocol
+        working-directory: packages/scrcpy-protocol
+        run: npm ci && npm run build
+      - name: Build and test web client
+        working-directory: apps/web-client
+        run: npm ci && npm test
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+      - name: Run full release gate
+        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-header-running-app.json
+      - name: Commit verified UI and generated assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/header-running-app-ui.yml
+          git add -u
+          git add apps/web-client/tests/running-app-header.test.mjs
+          git add -f apps/web-client/dist
+          git add apps/web-client/dist-manifest.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Move running app controls to header"
+          git push origin HEAD:agent/connect-drawer
