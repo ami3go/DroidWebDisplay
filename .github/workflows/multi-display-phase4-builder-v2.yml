@@ -39,7 +39,7 @@ jobs:
           start = workflow.index(marker) + len(marker)
           end = workflow.index("\n          PY", start)
           script = textwrap.dedent(workflow[start:end])
-          script = script.replace('readonly displayMode: \\"physical\\" | \\"virtual\\";', 'readonly displayMode: DisplayMode;')
+          script = script.replace('"physical" | "virtual"', 'DisplayMode')
           script = script.replace('readonly sessions: SessionDto[];', 'readonly sessions: readonly SessionDto[];')
           exec(compile(script, 'phase4-builder.py', 'exec'))
           PY
