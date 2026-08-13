@@ -337,6 +337,18 @@ class SessionManager:
 
         try:
             await self._start_session_resources(session, artifact)
+            process = session.process
+            if process and process.returncode is not None:
+                await self._drain_process_log(session, timeout=1.0)
+                raise SessionError(
+                    "scrcpy server exited during session startup",
+                    details={
+                        "sessionId": session.session_id,
+                        "serial": session.serial,
+                        "returncode": process.returncode,
+                        "serverLog": list(session.server_log),
+                    },
+                )
         except Exception as exc:
             session.state = SessionState.FAILED
             session.error = str(exc)
@@ -363,6 +375,11 @@ class SessionManager:
 
         session.state = SessionState.RUNNING
         session.started_at = time.time()
+        if session.process:
+            session.process_watch_task = asyncio.create_task(
+                self._watch_server_process(session),
+                name=f"droidwebdisplay-server-watch-{session.session_id}",
+            )
         await self.start_monitor()
         return session
 
@@ -376,10 +393,6 @@ class SessionManager:
         session.server_arguments = tuple(args)
         session.process = await self.adb.spawn_server(session.serial, args)
         session.log_task = asyncio.create_task(self._collect_process_log(session))
-        session.process_watch_task = asyncio.create_task(
-            self._watch_server_process(session),
-            name=f"droidwebdisplay-server-watch-{session.session_id}",
-        )
 
         deadline = asyncio.get_running_loop().time() + self.connect_timeout
         ordered_channels = session.options.ordered_channels()

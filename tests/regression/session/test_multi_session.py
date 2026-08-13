@@ -120,3 +120,31 @@ async def test_device_disconnect_stops_all_sessions_for_that_serial_only(tmp_pat
     assert "PHONE" not in manager._device_sessions
     assert [item.session_id for item in manager.list_sessions_for_device("OTHER")] == [other.session_id]
     await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_server_exit_during_startup_cleans_only_new_session(tmp_path: Path) -> None:
+    class ExitOnSpawnAdb(FakeAdb):
+        async def spawn_server(self, serial, server_args):
+            process = await super().spawn_server(serial, server_args)
+            process.exit(23)
+            return process
+
+    adb = ExitOnSpawnAdb([AndroidDevice("PHONE", "device")])
+    manager = SessionManager(
+        adb,
+        artifact(tmp_path),
+        connect_timeout=0.2,
+        connect_retry_interval=0.01,
+        monitor_interval=10,
+    )
+
+    with pytest.raises(Exception):
+        await manager.start_session(serial="PHONE", options=SessionOptions(audio=False))
+
+    assert "PHONE" not in manager._device_sessions
+    assert not adb.forward_servers
+    failed = manager.list_sessions()[-1]
+    assert failed.state == SessionState.FAILED
+    assert failed.stop_reason == "start_failed"
+    await manager.close()
