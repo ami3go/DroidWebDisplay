@@ -258,9 +258,10 @@ export class DroidWebDisplayController {
         if (canvas !== this.elements.canvas)
             canvas.remove();
         else if (this.#runtimes.size === 0) {
+            // The base canvas may already have been transferred to OffscreenCanvas.
+            // Querying a context after transfer throws InvalidStateError in Chromium,
+            // so renderer/worker code remains the sole owner of the canvas context.
             canvas.hidden = false;
-            const context = canvas.getContext?.("2d");
-            context?.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
     bindCanvasEvents(canvas) {
@@ -357,9 +358,14 @@ export class DroidWebDisplayController {
         this.#lastAndroidClipboard = runtime.lastAndroidClipboard;
         this.#lastSentClipboard = runtime.lastSentClipboard;
         this.#lastConnectValues = runtime.values;
+        // A pending Ctrl+C belongs to the tab that owned focus when it was sent.
+        // Do not let a late clipboard message from another tab satisfy it.
+        this.#copyShortcutPending = false;
         const userMuted = this.elements.audioMute.textContent === "Unmute";
+        const volume = Number(this.elements.audioVolume.value) / 100;
         for (const [id, value] of this.#runtimes) {
             value.canvas.hidden = id !== sessionId;
+            value.audioPlayer.setVolume(volume);
             value.audioPlayer.setMuted(id === sessionId ? userMuted : true);
         }
         this.elements.stageHint.hidden = true;
@@ -771,7 +777,9 @@ export class DroidWebDisplayController {
         this.elements.power.textContent = this.#powerOn ? "Screen off" : "Screen on";
     }
     async pasteClipboard(source = "PC clipboard") {
-        if (!this.#protocolSession)
+        const sessionId = this.#activeSessionId;
+        const session = this.#protocolSession;
+        if (!sessionId || !session)
             return;
         let text = "";
         try {
@@ -782,12 +790,16 @@ export class DroidWebDisplayController {
             if (!text)
                 throw new Error("Browser clipboard permission was denied. Paste text into the fallback box, then press Paste typed text.");
         }
+        // Clipboard reads may wait for a browser permission prompt. If focus moved to
+        // another display meanwhile, abandon the operation rather than paste there.
+        if (this.#activeSessionId !== sessionId || this.#protocolSession !== session)
+            return;
         if (!text)
             text = this.elements.clipboardText.value;
         if (!text)
             throw new Error("The PC clipboard is empty. Click the Android input field first, then copy text or use the fallback box.");
         this.elements.clipboardText.value = text;
-        await this.pasteText(text, source);
+        await this.pasteText(text, source, sessionId, session);
     }
     async pasteTypedText() {
         const text = this.elements.clipboardText.value;
@@ -795,27 +807,35 @@ export class DroidWebDisplayController {
             throw new Error("Enter or paste text into the fallback box first");
         await this.pasteText(text, "typed text");
     }
-    async pasteText(text, source) {
-        const session = this.#protocolSession;
+    async pasteText(text, source, sessionId = this.#activeSessionId, session = this.#protocolSession) {
+        if (!sessionId || !session)
+            return;
         const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
         if (new TextEncoder().encode(text).byteLength > maximum)
             throw new Error(`Clipboard text exceeds the configured ${maximum / 1024} KiB limit`);
         this.#lastSentClipboard = text;
-        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        const runtime = this.#runtimes.get(sessionId);
         if (runtime)
             runtime.lastSentClipboard = text;
-        if (!session)
-            return;
+        const stillActive = () => this.#activeSessionId === sessionId && this.#protocolSession === session;
         const sequence = this.#clipboardSequence++;
-        this.setStatus("Pasting", `Sending ${source} to the focused Android input field…`);
+        if (stillActive())
+            this.setStatus("Pasting", `Sending ${source} to the focused Android input field…`);
         const acknowledgement = this.waitForClipboardAcknowledgement(sequence);
         try {
             await session.sendControl(clipboardMessage(text, sequence, true));
             if (await acknowledgement) {
-                this.setStatus("Clipboard pasted", `${source} was acknowledged by Android.`);
+                if (stillActive())
+                    this.setStatus("Clipboard pasted", `${source} was acknowledged by Android.`);
                 return;
             }
-            await this.sendMessages(textInjectionMessages(text));
+            // Direct text injection is a fallback, not a continuation token. If the
+            // user switched tabs while Android was deciding whether to acknowledge
+            // the paste, do not inject into either display in the background.
+            if (!stillActive())
+                return;
+            for (const message of textInjectionMessages(text))
+                await session.sendControl(message);
             this.setStatus("Text fallback used", "Android did not acknowledge clipboard paste, so the text was injected directly.");
         }
         catch (error) {
@@ -1052,8 +1072,11 @@ export class DroidWebDisplayController {
     async startClipboardPolling(requestPermission) {
         this.stopClipboardPolling();
         this.#clipboardReadAllowed = false;
-        if (!this.#protocolSession || !this.elements.clipboardAutoSync.checked)
+        const sessionId = this.#activeSessionId;
+        const session = this.#protocolSession;
+        if (!sessionId || !session || !this.elements.clipboardAutoSync.checked)
             return;
+        const stillActive = () => this.#activeSessionId === sessionId && this.#protocolSession === session;
         if (!navigator.clipboard?.readText) {
             this.setStatus("Clipboard sync limited", "This browser cannot read the PC clipboard automatically. Android → PC synchronization remains available.");
             return;
@@ -1082,11 +1105,14 @@ export class DroidWebDisplayController {
             // This read is either already permission-granted or is called directly from the user's
             // checkbox gesture. It is the only place allowed to request clipboard-read permission.
             const initial = await navigator.clipboard.readText();
+            if (!stillActive())
+                return;
             this.#clipboardReadAllowed = true;
             if (initial && initial !== this.#lastSentClipboard && initial !== this.#lastAndroidClipboard) {
-                await this.synchronizePcClipboard(initial);
+                await this.synchronizePcClipboard(initial, sessionId, session);
             }
-            this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);
+            if (stillActive())
+                this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);
         }
         catch {
             this.#clipboardReadAllowed = false;
@@ -1100,14 +1126,18 @@ export class DroidWebDisplayController {
         this.#clipboardPollBusy = false;
     }
     async pollPcClipboard() {
-        if (!document.hasFocus() || !this.#protocolSession || !this.elements.clipboardAutoSync.checked || !this.#clipboardReadAllowed || this.#clipboardPollBusy)
+        const sessionId = this.#activeSessionId;
+        const session = this.#protocolSession;
+        if (!document.hasFocus() || !sessionId || !session || !this.elements.clipboardAutoSync.checked || !this.#clipboardReadAllowed || this.#clipboardPollBusy)
             return;
         this.#clipboardPollBusy = true;
         try {
             const text = await navigator.clipboard.readText();
+            if (this.#activeSessionId !== sessionId || this.#protocolSession !== session)
+                return;
             if (!text || text === this.#lastSentClipboard || text === this.#lastAndroidClipboard)
                 return;
-            await this.synchronizePcClipboard(text);
+            await this.synchronizePcClipboard(text, sessionId, session);
         }
         catch {
             // Stop polling after the first runtime permission failure instead of repeatedly opening
@@ -1120,9 +1150,8 @@ export class DroidWebDisplayController {
             this.#clipboardPollBusy = false;
         }
     }
-    async synchronizePcClipboard(text) {
-        const session = this.#protocolSession;
-        if (!session)
+    async synchronizePcClipboard(text, sessionId = this.#activeSessionId, session = this.#protocolSession) {
+        if (!sessionId || !session || this.#activeSessionId !== sessionId || this.#protocolSession !== session)
             return;
         const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
         if (new TextEncoder().encode(text).byteLength > maximum) {
@@ -1130,7 +1159,7 @@ export class DroidWebDisplayController {
             return;
         }
         this.#lastSentClipboard = text;
-        const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;
+        const runtime = this.#runtimes.get(sessionId);
         if (runtime)
             runtime.lastSentClipboard = text;
         const sequence = this.#clipboardSequence++;

@@ -156,7 +156,7 @@ test("optional LAN access is explicit, authenticated and recoverable", () => {
 
 
 test("automatic clipboard sync never triggers Android paste", () => {
-  assert.match(controllerSource, /pollPcClipboard[\s\S]*synchronizePcClipboard\(text\)/);
+  assert.match(controllerSource, /pollPcClipboard[\s\S]*synchronizePcClipboard\(text, sessionId, session\)/);
   assert.match(controllerSource, /synchronizePcClipboard[\s\S]*clipboardMessage\(text, sequence, false\)/);
   assert.doesNotMatch(controllerSource, /pollPcClipboard[\s\S]{0,700}pasteText\(text/);
 });
@@ -199,4 +199,23 @@ test("tab input maps against the active runtime canvas", () => {
   assert.match(controllerSource, /canvas !== runtime\.canvas/);
   assert.match(controllerSource, /canvas\.getBoundingClientRect\(\)/);
   assert.match(controllerSource, /canvas\.setPointerCapture\(event\.pointerId\)/);
+});
+
+
+test("tab canvas cleanup never reacquires a transferred OffscreenCanvas context", () => {
+  const start = controllerSource.indexOf("private releaseRuntimeCanvas");
+  const end = controllerSource.indexOf("private bindCanvasEvents", start);
+  const cleanup = controllerSource.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.doesNotMatch(cleanup, /getContext/);
+  assert.match(cleanup, /renderer\/worker code remains the sole owner/);
+});
+
+test("clipboard async fallbacks stay bound to the initiating display tab", () => {
+  assert.match(controllerSource, /this\.#activeSessionId !== sessionId \|\| this\.#protocolSession !== session/);
+  assert.match(controllerSource, /for \(const message of textInjectionMessages\(text\)\) await session\.sendControl\(message\)/);
+  assert.doesNotMatch(controllerSource, /await this\.sendMessages\(textInjectionMessages\(text\)\)/);
+  assert.match(controllerSource, /synchronizePcClipboard\(initial, sessionId, session\)/);
+  assert.match(controllerSource, /synchronizePcClipboard\(text, sessionId, session\)/);
+  assert.match(controllerSource, /this\.#copyShortcutPending = false;[\s\S]{0,400}const userMuted/);
 });
