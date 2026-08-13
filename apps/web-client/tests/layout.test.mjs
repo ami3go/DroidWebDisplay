@@ -196,6 +196,12 @@ test("optional LAN access is explicit, authenticated and recoverable", () => {
 });
 
 
+test("Clipboard drawer supports focused Ctrl+Enter Type", () => {
+  assert.match(controllerSource, /clipboardText\.focus\(\)/);
+  assert.match(controllerSource, /updateClipboardUi/);
+  assert.match(html, /id="clipboard-card"/);
+});
+
 test("automatic clipboard sync never triggers Android paste", () => {
   assert.match(controllerSource, /pollPcClipboard[\s\S]*synchronizePcClipboard\(text\)/);
   assert.match(controllerSource, /synchronizePcClipboard[\s\S]*clipboardMessage\(text, sequence, false\)/);

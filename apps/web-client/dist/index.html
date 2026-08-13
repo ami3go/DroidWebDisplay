@@ -228,19 +228,19 @@
 <span id="transfer-status">Ready</span></div>
           <div id="transfer-list" class="transfer-list"><p class="empty-state">No transfers yet.</p></div></div>
 </details></div>
-          <div class="gb-drawer-slot" data-slot="clipboard"><div class="help-card clipboard-card">
+          <div class="gb-drawer-slot" data-slot="clipboard"><div id="clipboard-card" class="help-card clipboard-card">
           <h2>Clipboard and text</h2>
           <p>First click the text field inside the mirrored Android screen. The primary button reads the PC clipboard. If browser permission is blocked, paste text into the box below.</p>
           <textarea id="clipboard-text" rows="4" placeholder="Clipboard text" disabled></textarea>
           <div class="clipboard-actions">
-            <button id="clipboard" aria-label="Paste PC clipboard to Android" title="Paste PC clipboard" disabled>Paste</button>
+            <button id="clipboard" class="clipboard-sync-fallback" aria-label="Paste PC clipboard to Android" title="Paste PC clipboard" disabled>Paste</button>
             <button id="clipboard-text-paste" class="secondary" aria-label="Type text into Android" title="Type text into Android" disabled>Type</button>
-            <button id="clipboard-copy-android" class="secondary" aria-label="Copy Android clipboard to PC" title="Copy Android clipboard" disabled>Copy</button>
+            <button id="clipboard-copy-android" class="secondary clipboard-sync-fallback" aria-label="Copy Android clipboard to PC" title="Copy Android clipboard" disabled>Copy</button>
           </div>
           <label class="toggle-row"><input id="clipboard-auto-sync" type="checkbox"> Automatic clipboard synchronization</label>
           <p class="clipboard-sync-note">Automatic sync mirrors clipboard content only; it never pastes into the focused Android field.</p>
           <label>Maximum clipboard size, KiB<input id="clipboard-max-kib" type="number" min="1" max="256" value="256"></label>
-          <p>With the Android screen focused, Ctrl+V pastes and Ctrl+C copies the Android selection. Clipboard text is never written to diagnostics.</p>
+          <p>With the Android screen focused, Ctrl+V pastes and Ctrl+C copies the Android selection. In this drawer, Ctrl+Enter types the text box into Android. Clipboard text is never written to diagnostics.</p>
         </div></div>
           <div class="gb-drawer-slot" data-slot="display"><section class="help-card display-mode-card">
           <h2>Display mode</h2>

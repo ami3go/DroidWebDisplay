@@ -63,6 +63,7 @@ export declare class DroidWebDisplayController {
     disconnect(): Promise<void>;
     stopOnUnload(): void;
     private bindEvents;
+    private updateClipboardUi;
     private populateProfiles;
     private applyProfile;
     private onCustomDisplayChange;

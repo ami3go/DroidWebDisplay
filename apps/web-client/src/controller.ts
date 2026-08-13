@@ -125,6 +125,7 @@ export class DroidWebDisplayController {
   public async initialize(): Promise<void> {
     this.applyProfile(localStorage.getItem("droidwebdisplay-virtual-profile-v1") ?? "chatgpt-desktop");
     this.restoreBrowserSettings();
+    this.updateClipboardUi();
     await this.refreshDevices();
     await this.refreshVirtualCapabilities();
     this.updateDisplayUi();
@@ -276,6 +277,8 @@ export class DroidWebDisplayController {
     this.elements.power.addEventListener("click", () => void this.togglePower());
     this.elements.clipboard.addEventListener("click", () => void this.runUiAction(() => this.pasteClipboard()));
     this.elements.clipboardTextPaste.addEventListener("click", () => void this.runUiAction(() => this.pasteTypedText()));
+    this.elements.clipboardText.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void this.runUiAction(() => this.pasteTypedText()); } });
+    document.querySelector<HTMLButtonElement>('[data-group="clipboard"]')?.addEventListener("click", () => window.requestAnimationFrame(() => { if (!this.elements.clipboardText.disabled) this.elements.clipboardText.focus(); }));
     this.elements.fullscreen.addEventListener("click", () => void this.toggleFullscreen());
     this.elements.audioMute.addEventListener("click", () => this.toggleAudioMute());
     this.elements.audioVolume.addEventListener("input", () => this.setAudioVolume());
@@ -285,6 +288,7 @@ export class DroidWebDisplayController {
     this.elements.reconnect.addEventListener("click", () => void this.runUiAction(() => this.reconnectNow()));
     this.elements.clipboardAutoSync.addEventListener("change", () => void this.runUiAction(async () => {
       this.saveBrowserSettings();
+      this.updateClipboardUi();
       await this.startClipboardPolling(true);
     }));
     this.elements.clipboardMaxKib.addEventListener("change", () => this.saveBrowserSettings());
@@ -311,6 +315,8 @@ export class DroidWebDisplayController {
       void this.runUiAction(() => this.pasteText(text, "Ctrl+V"));
     });
   }
+
+  private updateClipboardUi(): void { document.querySelector<HTMLElement>("#clipboard-card")?.classList.toggle("auto-sync-enabled", this.elements.clipboardAutoSync.checked); }
 
   private populateProfiles(): void {
     this.elements.displayProfile.replaceChildren();

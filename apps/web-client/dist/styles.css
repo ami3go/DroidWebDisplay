@@ -111,6 +111,7 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .clipboard-card { display: grid; gap: 0.65rem; }
 .clipboard-card textarea { width: 100%; resize: vertical; min-height: 5rem; color: #f3f6fb; background: #101620; border: 1px solid #343d50; border-radius: 10px; padding: 0.7rem; }
 .clipboard-card textarea:disabled { opacity: 0.5; }
+.clipboard-card.auto-sync-enabled .clipboard-sync-fallback { opacity: 0.62; filter: saturate(0.65); }
 .clipboard-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
 .clipboard-actions button { padding-inline: 0.65rem; }
 
