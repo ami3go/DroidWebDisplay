@@ -34,14 +34,54 @@ jobs:
           from pathlib import Path
           import textwrap
 
+          types_path = Path('apps/web-client/src/types.ts')
+          types_text = types_path.read_text(encoding='utf-8')
+          old_session_shape = (
+              '  readonly options: SessionOptionsDto;\n'
+              '  readonly displayMode: DisplayMode;\n'
+              '  readonly virtualDisplay: VirtualDisplayDiagnosticDto;\n'
+          )
+          normalized_session_shape = (
+              '  readonly options: SessionOptionsDto;\n'
+              '  readonly displayMode: "physical" | "virtual";\n'
+              '  readonly virtualDisplay: VirtualDisplayDiagnosticDto;\n'
+          )
+          if types_text.count(old_session_shape) != 1:
+              raise SystemExit('SessionDto displayMode context changed unexpectedly')
+          types_text = types_text.replace(old_session_shape, normalized_session_shape, 1)
+          old_list = 'export interface SessionListResponse {\n  readonly sessions: readonly SessionDto[];\n}\n'
+          normalized_list = 'export interface SessionListResponse {\n  readonly sessions: SessionDto[];\n}\n'
+          if types_text.count(old_list) != 1:
+              raise SystemExit('SessionListResponse context changed unexpectedly')
+          types_text = types_text.replace(old_list, normalized_list, 1)
+          types_path.write_text(types_text, encoding='utf-8')
+
           workflow = Path('.github/workflows/multi-display-phase4-builder.yml').read_text(encoding='utf-8')
           marker = "          python - <<'PY'\n"
           start = workflow.index(marker) + len(marker)
           end = workflow.index("\n          PY", start)
           script = textwrap.dedent(workflow[start:end])
-          script = script.replace('"physical" | "virtual"', 'DisplayMode')
-          script = script.replace('readonly sessions: SessionDto[];', 'readonly sessions: readonly SessionDto[];')
           exec(compile(script, 'phase4-builder.py', 'exec'))
+
+          # Restore the branch's stronger shared DisplayMode and readonly-array typing.
+          types_text = types_path.read_text(encoding='utf-8')
+          patched_session_shape = (
+              '  readonly options: SessionOptionsDto;\n'
+              '  readonly displayMode: "physical" | "virtual";\n'
+              '  readonly display: DisplayIdentityDto;\n'
+              '  readonly virtualDisplay: VirtualDisplayDiagnosticDto;\n'
+          )
+          restored_session_shape = (
+              '  readonly options: SessionOptionsDto;\n'
+              '  readonly displayMode: DisplayMode;\n'
+              '  readonly display: DisplayIdentityDto;\n'
+              '  readonly virtualDisplay: VirtualDisplayDiagnosticDto;\n'
+          )
+          if types_text.count(patched_session_shape) != 1:
+              raise SystemExit('Patched SessionDto context changed unexpectedly')
+          types_text = types_text.replace(patched_session_shape, restored_session_shape, 1)
+          types_text = types_text.replace('readonly sessions: SessionDto[];', 'readonly sessions: readonly SessionDto[];')
+          types_path.write_text(types_text, encoding='utf-8')
           PY
 
       - name: Install uv
