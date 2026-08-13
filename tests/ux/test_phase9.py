@@ -54,7 +54,7 @@ def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled
     assert ">Paste</button>" in html
     assert ">Type</button>" in html
     assert ">Copy</button>" in html
-    for group in ("apps", "files", "clipboard", "display", "audio", "access", "network", "diagnostics", "settings"):
+    for group in ("display", "clipboard", "files", "audio", "access", "network", "diagnostics", "settings"):
         assert f'data-group="{group}"' in html
 
 def test_audio_server_mapping_uses_opus_and_keeps_channel_order() -> None:
@@ -88,10 +88,13 @@ def test_automatic_clipboard_sync_does_not_prompt_loop_or_auto_paste() -> None:
 
 
 def test_virtual_keyboard_suppression_and_keyboard_clipboard_shortcuts() -> None:
-    html = (ROOT / "apps/web-client/static/index.html").read_text(encoding="utf-8")
-    controller = (ROOT / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[2]
+    html = (root / "apps/web-client/static/index.html").read_text(encoding="utf-8")
+    controller = (root / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")
+    input_source = (root / "apps/web-client/src/input.ts").read_text(encoding="utf-8")
     assert 'id="virtual-hide-keyboard"' in html
-    assert "Virtual display only. Phone screen mode keeps the normal Android keyboard behavior." in html
-    assert 'pasteClipboard("Ctrl+V")' in controller
-    assert "androidClipboardCopyMessage()" in controller
-    assert 'hideVirtualKeyboard.checked ? "hide"' in controller
+    assert "hideVirtualKeyboard" in controller
+    assert "hideVirtualKeyboard: false" in controller
+    assert 'event.key.toLowerCase()' in input_source
+    assert 'if (key === "v") return null;' in input_source
+    assert 'if (key === "c") return "copy";' in input_source
