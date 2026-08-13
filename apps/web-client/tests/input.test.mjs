@@ -62,8 +62,9 @@ test("automatic clipboard synchronization can update Android without requesting 
 });
 
 
-test("Ctrl+C and Ctrl+V use explicit remote clipboard shortcuts", () => {
-  assert.equal(clipboardShortcut({ key: "v", ctrlKey: true, metaKey: false, altKey: false }), "paste");
+test("Ctrl+C stays explicit while Ctrl/Cmd+V is left to the native paste event", () => {
+  assert.equal(clipboardShortcut({ key: "v", ctrlKey: true, metaKey: false, altKey: false }), null);
+  assert.equal(clipboardShortcut({ key: "V", ctrlKey: false, metaKey: true, altKey: false }), null);
   assert.equal(clipboardShortcut({ key: "C", ctrlKey: true, metaKey: false, altKey: false }), "copy");
   assert.equal(clipboardShortcut({ key: "v", ctrlKey: false, metaKey: false, altKey: false }), null);
   assert.deepEqual(androidClipboardCopyMessage(), { type: 8, copyKey: 1 });
