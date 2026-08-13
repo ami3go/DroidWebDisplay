@@ -150,7 +150,7 @@ async function bootstrap(): Promise<void> {
     const runningAppController = new RunningAppController({
       device: required<HTMLSelectElement>("#device"),
       select: required<HTMLSelectElement>("#running-app-select"),
-      refresh: required<HTMLButtonElement>("#running-app-refresh"),
+      icon: required<HTMLElement>("#running-app-icon"),
       count: required<HTMLElement>("#running-app-count"),
       status: required<HTMLElement>("#running-app-status"),
       diagnosticDisplay: required<HTMLElement>("#diagnostic-display"),

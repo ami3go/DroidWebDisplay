@@ -86,13 +86,13 @@
           <button id="fullscreen" class="secondary compact" disabled>Fullscreen</button>
         </div>
         <div class="running-app-header" aria-label="Running Android applications">
-          <span class="running-app-header-icon" aria-hidden="true" title="Running application">
+          <span id="running-app-icon" class="running-app-header-icon" aria-hidden="true" title="0 running GUI task(s)">
             <svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>
+            <span id="running-app-count" class="running-app-count">0</span>
           </span>
-          <select id="running-app-select" aria-label="Running Android application" title="Selecting an application moves it to the active virtual display" disabled>
+          <select id="running-app-select" aria-label="Running Android application" title="Open to refresh running apps; selecting one moves it to the active virtual display" disabled>
             <option value="">No GUI apps</option>
           </select>
-          <button id="running-app-refresh" type="button" class="secondary compact running-app-refresh" aria-label="Refresh running applications, 0 found" title="Refresh running applications (0 found)"><span aria-hidden="true">↻</span><span id="running-app-count">0</span></button>
           <span id="running-app-status" class="visually-hidden" aria-live="polite">Start a virtual display to move applications.</span>
         </div>
       </div>

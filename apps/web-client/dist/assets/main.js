@@ -146,7 +146,7 @@ async function bootstrap() {
         const runningAppController = new RunningAppController({
             device: required("#device"),
             select: required("#running-app-select"),
-            refresh: required("#running-app-refresh"),
+            icon: required("#running-app-icon"),
             count: required("#running-app-count"),
             status: required("#running-app-status"),
             diagnosticDisplay: required("#diagnostic-display"),

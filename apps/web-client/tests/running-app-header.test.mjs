@@ -17,7 +17,16 @@ test("Diagnostics expose active display and available Android RAM", () => {
   assert.match(types, /readonly freeMemoryBytes: number \| null;/);
 });
 
-test("GUI task counter remains digits only", () => {
-  assert.match(html, /id="running-app-count">0<\/span>/);
+test("GUI task counter is a digits-only badge on the app icon", () => {
+  assert.match(html, /id="running-app-icon" class="running-app-header-icon"/);
+  assert.match(html, /id="running-app-count" class="running-app-count">0<\/span>/);
+  assert.equal(html.includes('id="running-app-refresh"'), false);
   assert.match(source, /count\.textContent = String\(this\.#apps\.length\)/);
+});
+
+test("opening the app dropdown refreshes stale GUI tasks", () => {
+  assert.match(source, /DROPDOWN_REFRESH_STALE_MS = 1500/);
+  assert.match(source, /select\.addEventListener\("pointerdown", \(\) => void this\.refreshIfStale\(\)\)/);
+  assert.match(source, /select\.addEventListener\("focus", \(\) => void this\.refreshIfStale\(\)\)/);
+  assert.match(source, /Date\.now\(\) - this\.#lastRefreshAt < DROPDOWN_REFRESH_STALE_MS/);
 });

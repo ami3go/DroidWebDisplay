@@ -2,7 +2,7 @@ import { BridgeApi } from "./api.js";
 interface Elements {
     readonly device: HTMLSelectElement;
     readonly select: HTMLSelectElement;
-    readonly refresh: HTMLButtonElement;
+    readonly icon: HTMLElement;
     readonly count: HTMLElement;
     readonly status: HTMLElement;
     readonly diagnosticDisplay: HTMLElement;
@@ -14,6 +14,7 @@ export declare class RunningAppController {
     initialize(): Promise<void>;
     close(): void;
     refresh(silent?: boolean): Promise<void>;
+    private refreshIfStale;
     private render;
     private selectedApp;
     private updateSelectionStatus;

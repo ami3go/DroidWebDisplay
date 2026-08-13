@@ -44,15 +44,18 @@ test("running applications are compact header controls with automatic relocation
   const fullscreen = header.indexOf('id="fullscreen"');
   const icon = header.indexOf('class="running-app-header-icon"');
   const select = header.indexOf('id="running-app-select"');
-  const refresh = header.indexOf('id="running-app-refresh"');
-  assert.ok(fullscreen >= 0 && icon > fullscreen && select > icon && refresh > select);
-  assert.match(header, /id="running-app-count">0<\/span>/);
+  assert.ok(fullscreen >= 0 && icon > fullscreen && select > icon);
+  assert.match(header, /id="running-app-count" class="running-app-count">0<\/span>/);
+  assert.equal(header.includes('id="running-app-refresh"'), false);
   assert.equal(html.includes('data-group="apps"'), false);
   assert.equal(html.includes('data-slot="apps"'), false);
   assert.equal(html.includes('id="running-app-move"'), false);
   assert.match(runningAppSource, /select\.addEventListener\("change", \(\) => void this\.moveSelected\(\)\)/);
+  assert.match(runningAppSource, /select\.addEventListener\("pointerdown", \(\) => void this\.refreshIfStale\(\)\)/);
+  assert.match(runningAppSource, /select\.addEventListener\("focus", \(\) => void this\.refreshIfStale\(\)\)/);
   assert.match(runningAppSource, /count\.textContent = String\(this\.#apps\.length\)/);
   assert.match(css, /\.running-app-header \{ height: 2\.12rem; min-height: 2\.12rem;/);
+  assert.match(css, /\.running-app-count \{ position: absolute;/);
 });
 
 test("PIN gate and PC-local trust wording are present", () => {
