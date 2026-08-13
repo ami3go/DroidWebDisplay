@@ -90,7 +90,7 @@ export class WebCodecsVideoRenderer {
   public waitForScreenSizeChange(
     previous: { width: number; height: number },
     timeoutMs = 8_000,
-  ): Promise<{ width: number; height: number > {
+  ): Promise<{ width: number; height: number }> {
     if (this.#width !== previous.width || this.#height !== previous.height) {
       return Promise.resolve(this.screenSize);
     }
