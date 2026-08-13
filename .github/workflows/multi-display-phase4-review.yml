@@ -1,0 +1,106 @@
+name: Multi-display Phase 4 Review
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  review-phase4:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web-client/package-lock.json
+
+      - name: Apply Phase 4 review fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web-client/src/controller.ts')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''  private releaseRuntimeCanvas(canvas: HTMLCanvasElement): void {\n    canvas.dataset.sessionId = "";\n    canvas.hidden = true;\n    if (canvas !== this.elements.canvas) canvas.remove();\n    else if (this.#runtimes.size === 0) {\n      canvas.hidden = false;\n      const context = canvas.getContext?.("2d");\n      context?.clearRect(0, 0, canvas.width, canvas.height);\n    }\n  }\n'''
+          new = '''  private releaseRuntimeCanvas(canvas: HTMLCanvasElement): void {\n    canvas.dataset.sessionId = "";\n    canvas.hidden = true;\n    if (canvas !== this.elements.canvas) canvas.remove();\n    else if (this.#runtimes.size === 0) {\n      // The base canvas may already have been transferred to OffscreenCanvas.\n      // Querying a context after transfer throws InvalidStateError in Chromium,\n      // so renderer/worker code remains the sole owner of the canvas context.\n      canvas.hidden = false;\n    }\n  }\n'''
+          if text.count(old) != 1:
+              raise SystemExit('releaseRuntimeCanvas shape changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''    this.#lastAndroidClipboard = runtime.lastAndroidClipboard;\n    this.#lastSentClipboard = runtime.lastSentClipboard;\n    this.#lastConnectValues = runtime.values;\n\n    const userMuted = this.elements.audioMute.textContent === "Unmute";\n    for (const [id, value] of this.#runtimes) {\n      value.canvas.hidden = id !== sessionId;\n      value.audioPlayer.setMuted(id === sessionId ? userMuted : true);\n    }\n'''
+          new = '''    this.#lastAndroidClipboard = runtime.lastAndroidClipboard;\n    this.#lastSentClipboard = runtime.lastSentClipboard;\n    this.#lastConnectValues = runtime.values;\n    // A pending Ctrl+C belongs to the tab that owned focus when it was sent.\n    // Do not let a late clipboard message from another tab satisfy it.\n    this.#copyShortcutPending = false;\n\n    const userMuted = this.elements.audioMute.textContent === "Unmute";\n    const volume = Number(this.elements.audioVolume.value) / 100;\n    for (const [id, value] of this.#runtimes) {\n      value.canvas.hidden = id !== sessionId;\n      value.audioPlayer.setVolume(volume);\n      value.audioPlayer.setMuted(id === sessionId ? userMuted : true);\n    }\n'''
+          if text.count(old) != 1:
+              raise SystemExit('activateRuntime audio/clipboard shape changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''  private async pasteClipboard(source = "PC clipboard"): Promise<void> {\n    if (!this.#protocolSession) return;\n    let text = "";\n    try {\n      text = await navigator.clipboard.readText();\n    } catch {\n      text = this.elements.clipboardText.value;\n      if (!text) throw new Error("Browser clipboard permission was denied. Paste text into the fallback box, then press Paste typed text.");\n    }\n    if (!text) text = this.elements.clipboardText.value;\n    if (!text) throw new Error("The PC clipboard is empty. Click the Android input field first, then copy text or use the fallback box.");\n    this.elements.clipboardText.value = text;\n    await this.pasteText(text, source);\n  }\n\n  private async pasteTypedText(): Promise<void> {\n    const text = this.elements.clipboardText.value;\n    if (!text) throw new Error("Enter or paste text into the fallback box first");\n    await this.pasteText(text, "typed text");\n  }\n\n  private async pasteText(text: string, source: string): Promise<void> {\n    const session = this.#protocolSession;\n    const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;\n    if (new TextEncoder().encode(text).byteLength > maximum) throw new Error(`Clipboard text exceeds the configured ${maximum / 1024} KiB limit`);\n    this.#lastSentClipboard = text;\n    const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;\n    if (runtime) runtime.lastSentClipboard = text;\n    if (!session) return;\n    const sequence = this.#clipboardSequence++;\n    this.setStatus("Pasting", `Sending ${source} to the focused Android input field…`);\n    const acknowledgement = this.waitForClipboardAcknowledgement(sequence);\n    try {\n      await session.sendControl(clipboardMessage(text, sequence, true));\n      if (await acknowledgement) {\n        this.setStatus("Clipboard pasted", `${source} was acknowledged by Android.`);\n        return;\n      }\n      await this.sendMessages(textInjectionMessages(text));\n      this.setStatus("Text fallback used", "Android did not acknowledge clipboard paste, so the text was injected directly.");\n    } catch (error) {\n      this.resolveClipboardAcknowledgement(sequence, false);\n      throw error;\n    }\n  }\n'''
+          new = '''  private async pasteClipboard(source = "PC clipboard"): Promise<void> {\n    const sessionId = this.#activeSessionId;\n    const session = this.#protocolSession;\n    if (!sessionId || !session) return;\n    let text = "";\n    try {\n      text = await navigator.clipboard.readText();\n    } catch {\n      text = this.elements.clipboardText.value;\n      if (!text) throw new Error("Browser clipboard permission was denied. Paste text into the fallback box, then press Paste typed text.");\n    }\n    // Clipboard reads may wait for a browser permission prompt. If focus moved to\n    // another display meanwhile, abandon the operation rather than paste there.\n    if (this.#activeSessionId !== sessionId || this.#protocolSession !== session) return;\n    if (!text) text = this.elements.clipboardText.value;\n    if (!text) throw new Error("The PC clipboard is empty. Click the Android input field first, then copy text or use the fallback box.");\n    this.elements.clipboardText.value = text;\n    await this.pasteText(text, source, sessionId, session);\n  }\n\n  private async pasteTypedText(): Promise<void> {\n    const text = this.elements.clipboardText.value;\n    if (!text) throw new Error("Enter or paste text into the fallback box first");\n    await this.pasteText(text, "typed text");\n  }\n\n  private async pasteText(\n    text: string,\n    source: string,\n    sessionId = this.#activeSessionId,\n    session = this.#protocolSession,\n  ): Promise<void> {\n    if (!sessionId || !session) return;\n    const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;\n    if (new TextEncoder().encode(text).byteLength > maximum) throw new Error(`Clipboard text exceeds the configured ${maximum / 1024} KiB limit`);\n    this.#lastSentClipboard = text;\n    const runtime = this.#runtimes.get(sessionId);\n    if (runtime) runtime.lastSentClipboard = text;\n    const stillActive = () => this.#activeSessionId === sessionId && this.#protocolSession === session;\n    const sequence = this.#clipboardSequence++;\n    if (stillActive()) this.setStatus("Pasting", `Sending ${source} to the focused Android input field…`);\n    const acknowledgement = this.waitForClipboardAcknowledgement(sequence);\n    try {\n      await session.sendControl(clipboardMessage(text, sequence, true));\n      if (await acknowledgement) {\n        if (stillActive()) this.setStatus("Clipboard pasted", `${source} was acknowledged by Android.`);\n        return;\n      }\n      // Direct text injection is a fallback, not a continuation token. If the\n      // user switched tabs while Android was deciding whether to acknowledge\n      // the paste, do not inject into either display in the background.\n      if (!stillActive()) return;\n      for (const message of textInjectionMessages(text)) await session.sendControl(message);\n      this.setStatus("Text fallback used", "Android did not acknowledge clipboard paste, so the text was injected directly.");\n    } catch (error) {\n      this.resolveClipboardAcknowledgement(sequence, false);\n      throw error;\n    }\n  }\n'''
+          if text.count(old) != 1:
+              raise SystemExit('paste methods shape changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''  private async startClipboardPolling(requestPermission: boolean): Promise<void> {\n    this.stopClipboardPolling();\n    this.#clipboardReadAllowed = false;\n    if (!this.#protocolSession || !this.elements.clipboardAutoSync.checked) return;\n\n    if (!navigator.clipboard?.readText) {\n'''
+          new = '''  private async startClipboardPolling(requestPermission: boolean): Promise<void> {\n    this.stopClipboardPolling();\n    this.#clipboardReadAllowed = false;\n    const sessionId = this.#activeSessionId;\n    const session = this.#protocolSession;\n    if (!sessionId || !session || !this.elements.clipboardAutoSync.checked) return;\n    const stillActive = () => this.#activeSessionId === sessionId && this.#protocolSession === session;\n\n    if (!navigator.clipboard?.readText) {\n'''
+          if text.count(old) != 1:
+              raise SystemExit('startClipboardPolling prefix changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''      const initial = await navigator.clipboard.readText();\n      this.#clipboardReadAllowed = true;\n      if (initial && initial !== this.#lastSentClipboard && initial !== this.#lastAndroidClipboard) {\n        await this.synchronizePcClipboard(initial);\n      }\n      this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);\n'''
+          new = '''      const initial = await navigator.clipboard.readText();\n      if (!stillActive()) return;\n      this.#clipboardReadAllowed = true;\n      if (initial && initial !== this.#lastSentClipboard && initial !== this.#lastAndroidClipboard) {\n        await this.synchronizePcClipboard(initial, sessionId, session);\n      }\n      if (stillActive()) this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);\n'''
+          if text.count(old) != 1:
+              raise SystemExit('startClipboardPolling initial-read shape changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''  private async pollPcClipboard(): Promise<void> {\n    if (!document.hasFocus() || !this.#protocolSession || !this.elements.clipboardAutoSync.checked || !this.#clipboardReadAllowed || this.#clipboardPollBusy) return;\n    this.#clipboardPollBusy = true;\n    try {\n      const text = await navigator.clipboard.readText();\n      if (!text || text === this.#lastSentClipboard || text === this.#lastAndroidClipboard) return;\n      await this.synchronizePcClipboard(text);\n'''
+          new = '''  private async pollPcClipboard(): Promise<void> {\n    const sessionId = this.#activeSessionId;\n    const session = this.#protocolSession;\n    if (!document.hasFocus() || !sessionId || !session || !this.elements.clipboardAutoSync.checked || !this.#clipboardReadAllowed || this.#clipboardPollBusy) return;\n    this.#clipboardPollBusy = true;\n    try {\n      const text = await navigator.clipboard.readText();\n      if (this.#activeSessionId !== sessionId || this.#protocolSession !== session) return;\n      if (!text || text === this.#lastSentClipboard || text === this.#lastAndroidClipboard) return;\n      await this.synchronizePcClipboard(text, sessionId, session);\n'''
+          if text.count(old) != 1:
+              raise SystemExit('pollPcClipboard shape changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''  private async synchronizePcClipboard(text: string): Promise<void> {\n    const session = this.#protocolSession;\n    if (!session) return;\n    const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;\n'''
+          new = '''  private async synchronizePcClipboard(\n    text: string,\n    sessionId = this.#activeSessionId,\n    session = this.#protocolSession,\n  ): Promise<void> {\n    if (!sessionId || !session || this.#activeSessionId !== sessionId || this.#protocolSession !== session) return;\n    const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;\n'''
+          if text.count(old) != 1:
+              raise SystemExit('synchronizePcClipboard signature changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          old = '''    this.#lastSentClipboard = text;\n    const runtime = this.#activeSessionId ? this.#runtimes.get(this.#activeSessionId) : null;\n    if (runtime) runtime.lastSentClipboard = text;\n    const sequence = this.#clipboardSequence++;\n    // Automatic synchronization updates Android's clipboard only.  It MUST NOT\n'''
+          new = '''    this.#lastSentClipboard = text;\n    const runtime = this.#runtimes.get(sessionId);\n    if (runtime) runtime.lastSentClipboard = text;\n    const sequence = this.#clipboardSequence++;\n    // Automatic synchronization updates Android's clipboard only.  It MUST NOT\n'''
+          if text.count(old) != 1:
+              raise SystemExit('synchronizePcClipboard runtime shape changed unexpectedly')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+          test_path = Path('apps/web-client/tests/layout.test.mjs')
+          tests = test_path.read_text(encoding='utf-8')
+          tests += '''\n\ntest("tab canvas cleanup never reacquires a transferred OffscreenCanvas context", () => {\n  const start = controllerSource.indexOf("private releaseRuntimeCanvas");\n  const end = controllerSource.indexOf("private bindCanvasEvents", start);\n  const cleanup = controllerSource.slice(start, end);\n  assert.ok(start >= 0 && end > start);\n  assert.doesNotMatch(cleanup, /getContext/);\n  assert.match(cleanup, /renderer\/worker code remains the sole owner/);\n});\n\ntest("clipboard async fallbacks stay bound to the initiating display tab", () => {\n  assert.match(controllerSource, /this\.#activeSessionId !== sessionId \|\| this\.#protocolSession !== session/);\n  assert.match(controllerSource, /for \(const message of textInjectionMessages\(text\)\) await session\.sendControl\(message\)/);\n  assert.doesNotMatch(controllerSource, /await this\.sendMessages\(textInjectionMessages\(text\)\)/);\n  assert.match(controllerSource, /synchronizePcClipboard\(initial, sessionId, session\)/);\n  assert.match(controllerSource, /synchronizePcClipboard\(text, sessionId, session\)/);\n  assert.match(controllerSource, /this\.#copyShortcutPending = false;[\s\S]{0,400}const userMuted/);\n});\n'''
+          test_path.write_text(tests, encoding='utf-8')
+          PY
+
+      - run: npm ci
+        working-directory: apps/web-client
+      - name: Build web client
+        run: node tools/build.mjs
+        working-directory: apps/web-client
+      - name: Run web client tests
+        run: node tools/run-tests.mjs
+        working-directory: apps/web-client
+      - name: Commit review fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web-client/src/controller.ts apps/web-client/tests/layout.test.mjs
+          git add -f apps/web-client/dist
+          git commit -m "Isolate multi-display canvas and clipboard lifecycles"
+          git push origin HEAD:multi-display-tabs
