@@ -635,10 +635,12 @@ def create_app(
     ) -> dict:
         await container.manager.select_device(serial)
         values = await container.adb.list_running_gui_apps(serial)
+        free_memory_bytes = await container.adb.free_memory_bytes(serial)
         return {
             "serial": serial,
             "apps": [item.to_dict() for item in values],
             "moveStrategy": "start-activity-on-display",
+            "freeMemoryBytes": free_memory_bytes,
         }
 
     @app.get("/api/v1/virtual-display-profiles")

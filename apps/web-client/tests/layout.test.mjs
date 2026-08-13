@@ -9,6 +9,7 @@ const css = await readFile(resolve(root, "static/styles.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 const mainSource = await readFile(resolve(root, "src/main.ts"), "utf8");
 const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");
+const runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");
 
 
 
@@ -36,12 +37,22 @@ test("Display Mode numeric fields collapse safely on narrow viewports", () => {
   assert.match(html, /id="virtual-dpi"/);
 });
 
-test("running applications panel is native to the Apps drawer", () => {
-  const appsSlot = html.indexOf('data-slot="apps"');
-  const filesSlot = html.indexOf('data-slot="files"');
-  const panel = html.indexOf('id="running-app-select"');
-  assert.ok(appsSlot >= 0 && panel > appsSlot && panel < filesSlot);
-  assert.match(html, /id="running-app-move"/);
+test("running applications are compact header controls with automatic relocation", () => {
+  const headerStart = html.indexOf('<header class="topbar">');
+  const headerEnd = html.indexOf('</header>', headerStart);
+  const header = html.slice(headerStart, headerEnd);
+  const fullscreen = header.indexOf('id="fullscreen"');
+  const icon = header.indexOf('class="running-app-header-icon"');
+  const select = header.indexOf('id="running-app-select"');
+  const refresh = header.indexOf('id="running-app-refresh"');
+  assert.ok(fullscreen >= 0 && icon > fullscreen && select > icon && refresh > select);
+  assert.match(header, /id="running-app-count">0<\/span>/);
+  assert.equal(html.includes('data-group="apps"'), false);
+  assert.equal(html.includes('data-slot="apps"'), false);
+  assert.equal(html.includes('id="running-app-move"'), false);
+  assert.match(runningAppSource, /select\.addEventListener\("change", \(\) => void this\.moveSelected\(\)\)/);
+  assert.match(runningAppSource, /count\.textContent = String\(this\.#apps\.length\)/);
+  assert.match(css, /\.running-app-header \{ height: 2\.12rem; min-height: 2\.12rem;/);
 });
 
 test("PIN gate and PC-local trust wording are present", () => {

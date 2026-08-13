@@ -28,6 +28,16 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .connection-row select { min-width: 12rem; padding-block: 0.48rem; }
 .android-control-row { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
 .android-control-row button { background: #202838; }
+.running-app-header { height: 2.12rem; min-height: 2.12rem; margin-left: auto; display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
+.running-app-header-icon { width: 2.12rem; height: 2.12rem; flex: 0 0 2.12rem; display: grid; place-items: center; color: #9fb0c2; }
+.running-app-header-icon svg { width: 1.12rem; height: 1.12rem; fill: currentColor; }
+.connection-row .running-app-header select { width: clamp(10rem, 18vw, 16rem); min-width: 10rem; max-width: 16rem; height: 2.12rem; min-height: 2.12rem; flex: 0 1 16rem; padding: 0.42rem 1.8rem 0.42rem 0.58rem; border-radius: 8px; font-size: 0.76rem; }
+.connection-row .running-app-refresh { min-width: 3.05rem; width: auto; height: 2.12rem; min-height: 2.12rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; padding-inline: 0.52rem; }
+#running-app-count { min-width: 1ch; font-variant-numeric: tabular-nums; text-align: right; }
+.device-diagnostic-summary { margin: 0.65rem 0 0.45rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
+.device-diagnostic-summary > div { min-width: 0; padding: 0.5rem 0.58rem; border: 1px solid #30394b; border-radius: 9px; background: #101620; display: grid; gap: 0.18rem; }
+.device-diagnostic-summary span { color: #8f9bb0; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.device-diagnostic-summary strong { color: #e4eaf5; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toolbar-layout-control { display: inline-flex; align-items: center; flex: 0 0 auto; }
 .toolbar-layout-control select { width: 9.6rem; min-width: 9.6rem; height: 2.12rem; padding: 0.42rem 1.8rem 0.42rem 0.58rem; border-radius: 8px; font-size: 0.76rem; }
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px 1fr; align-items: start; gap: 1rem; padding: 1rem; }

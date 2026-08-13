@@ -270,6 +270,7 @@ export interface RunningAppsResponse {
     readonly serial: string;
     readonly apps: readonly RunningGuiAppDto[];
     readonly moveStrategy: "start-activity-on-display";
+    readonly freeMemoryBytes: number | null;
 }
 export interface MoveRunningAppResponse {
     readonly status: "already-on-target" | "moved" | "launch-sent-unverified";

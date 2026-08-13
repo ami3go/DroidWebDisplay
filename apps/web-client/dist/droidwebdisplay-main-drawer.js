@@ -1,4 +1,4 @@
-/* DroidWebDisplay native single-drawer controller v1.3.0 */
+/* DroidWebDisplay native single-drawer controller v1.4.0 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
@@ -6,7 +6,7 @@
   const ACCORDION_KEY = 'droidwebdisplay.ui.drawer.accordions.v1';
   const ROOT_ID = 'gb-single-drawer-root';
   const CONNECTION_STYLE_ID = 'droidwebdisplay-connect-drawer-css';
-  const GROUPS = ['display','clipboard','files','apps','audio','access','network','diagnostics','settings'];
+  const GROUPS = ['display','clipboard','files','audio','access','network','diagnostics','settings'];
   let activeGroup = null;
   let pinned = false;
   const root = () => document.getElementById(ROOT_ID);

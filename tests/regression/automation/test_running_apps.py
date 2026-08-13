@@ -59,6 +59,9 @@ class RunningAppsFakeAdb(VirtualDisplayFakeAdb):
     async def list_running_gui_apps(self, serial: str) -> list[RunningGuiApp]:
         return list(self.apps)
 
+    async def free_memory_bytes(self, serial: str) -> int | None:
+        return 3 * 1024 * 1024 * 1024
+
     async def move_running_app_to_display(
         self, serial: str, *, task_id: int, component_name: str, display_id: int
     ) -> dict[str, object]:
@@ -101,6 +104,7 @@ def test_running_apps_api_moves_validated_task_to_active_virtual_display(tmp_pat
         listed = client.get("/api/v1/devices/PHONE/running-apps")
         assert listed.status_code == 200
         assert listed.json()["apps"][0]["taskId"] == 42
+        assert listed.json()["freeMemoryBytes"] == 3 * 1024 * 1024 * 1024
 
         moved = client.post(
             "/api/v1/sessions/SESSION/virtual-display/move-running-app",

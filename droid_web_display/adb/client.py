@@ -241,6 +241,16 @@ class AdbClient:
         return apps
 
 
+    async def free_memory_bytes(self, serial: str) -> int | None:
+        result = await self.shell(serial, "cat", "/proc/meminfo", check=False, timeout=10.0)
+        if result.returncode != 0:
+            return None
+        for raw in result.stdout.splitlines():
+            match = re.match(r"^MemAvailable:\s+(\d+)\s+kB$", raw.strip(), re.IGNORECASE)
+            if match:
+                return int(match.group(1)) * 1024
+        return None
+
     async def list_running_gui_apps(self, serial: str) -> list[RunningGuiApp]:
         result = await self.shell(serial, "dumpsys", "activity", "activities", check=False, timeout=30.0)
         if result.returncode != 0:

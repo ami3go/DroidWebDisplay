@@ -151,8 +151,10 @@ async function bootstrap(): Promise<void> {
       device: required<HTMLSelectElement>("#device"),
       select: required<HTMLSelectElement>("#running-app-select"),
       refresh: required<HTMLButtonElement>("#running-app-refresh"),
-      move: required<HTMLButtonElement>("#running-app-move"),
+      count: required<HTMLElement>("#running-app-count"),
       status: required<HTMLElement>("#running-app-status"),
+      diagnosticDisplay: required<HTMLElement>("#diagnostic-display"),
+      diagnosticRam: required<HTMLElement>("#diagnostic-ram"),
     });
     const transferController = new TransferController({
       device: required<HTMLSelectElement>("#device"),

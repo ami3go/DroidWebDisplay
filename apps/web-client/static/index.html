@@ -85,11 +85,20 @@
           <button id="power" class="secondary compact" disabled>Screen off</button>
           <button id="fullscreen" class="secondary compact" disabled>Fullscreen</button>
         </div>
+        <div class="running-app-header" aria-label="Running Android applications">
+          <span class="running-app-header-icon" aria-hidden="true" title="Running application">
+            <svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>
+          </span>
+          <select id="running-app-select" aria-label="Running Android application" title="Selecting an application moves it to the active virtual display" disabled>
+            <option value="">No GUI apps</option>
+          </select>
+          <button id="running-app-refresh" type="button" class="secondary compact running-app-refresh" aria-label="Refresh running applications, 0 found" title="Refresh running applications (0 found)"><span aria-hidden="true">↻</span><span id="running-app-count">0</span></button>
+          <span id="running-app-status" class="visually-hidden" aria-live="polite">Start a virtual display to move applications.</span>
+        </div>
       </div>
     </header>
     <div id="gb-single-drawer-root" data-version="1.1.0">
       <nav class="gb-rail" aria-label="DroidWebDisplay tools">
-        <button type="button" class="gb-rail-button" data-group="apps" aria-selected="false" title="Apps"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Apps</span></button>
         <button type="button" class="gb-rail-button" data-group="files" aria-selected="false" title="Files"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Files</span></button>
         <button type="button" class="gb-rail-button" data-group="clipboard" aria-selected="false" title="Clipboard"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Clipboard</span></button>
         <button type="button" class="gb-rail-button" data-group="display" aria-selected="false" title="Display"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Display</span></button>
@@ -107,20 +116,6 @@
           <button type="button" class="gb-drawer-close" aria-label="Close drawer" title="Close drawer">×</button>
         </div>
         <div class="gb-drawer-body">
-          <div class="gb-drawer-slot" data-slot="apps"><section class="help-card running-app-card" aria-label="Running Android applications">
-          <div class="section-heading running-app-heading">
-            <h2>Running apps</h2>
-            <button id="running-app-refresh" type="button" class="secondary compact">Refresh</button>
-          </div>
-          <p>Choose a running Android application with a graphical activity and bring it onto the active virtual display.</p>
-          <label>Application
-            <select id="running-app-select">
-              <option value="">No GUI applications detected</option>
-            </select>
-          </label>
-          <button id="running-app-move" type="button" disabled>Move to virtual display</button>
-          <p id="running-app-status" class="running-app-status">Start a virtual display to enable task relocation.</p>
-        </section></div>
           <div class="gb-drawer-slot" data-slot="files"><details class="gb-accordion" data-section-key="files-load" open>
   <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Load</span></summary>
   <div class="gb-accordion-content">
@@ -395,6 +390,10 @@
         </section></div>
           <div class="gb-drawer-slot" data-slot="diagnostics"><section class="help-card statistics-card">
           <h2>Mode statistic</h2>
+          <div class="device-diagnostic-summary" aria-label="Android device diagnostics">
+            <div><span>Display</span><strong id="diagnostic-display">—</strong></div>
+            <div><span>Free RAM</span><strong id="diagnostic-ram">—</strong></div>
+          </div>
           <div id="statistics" class="statistics">No video statistics</div>
         </section></div>
           <div class="gb-drawer-slot" data-slot="settings"><section class="help-card settings-card">

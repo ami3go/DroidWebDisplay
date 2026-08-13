@@ -147,8 +147,10 @@ async function bootstrap() {
             device: required("#device"),
             select: required("#running-app-select"),
             refresh: required("#running-app-refresh"),
-            move: required("#running-app-move"),
+            count: required("#running-app-count"),
             status: required("#running-app-status"),
+            diagnosticDisplay: required("#diagnostic-display"),
+            diagnosticRam: required("#diagnostic-ram"),
         });
         const transferController = new TransferController({
             device: required("#device"),

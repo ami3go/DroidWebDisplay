@@ -3,8 +3,10 @@ interface Elements {
     readonly device: HTMLSelectElement;
     readonly select: HTMLSelectElement;
     readonly refresh: HTMLButtonElement;
-    readonly move: HTMLButtonElement;
+    readonly count: HTMLElement;
     readonly status: HTMLElement;
+    readonly diagnosticDisplay: HTMLElement;
+    readonly diagnosticRam: HTMLElement;
 }
 export declare class RunningAppController {
     #private;
@@ -14,7 +16,8 @@ export declare class RunningAppController {
     refresh(silent?: boolean): Promise<void>;
     private render;
     private selectedApp;
-    private updateControls;
+    private updateSelectionStatus;
     private moveSelected;
+    private renderDiagnostics;
 }
 export {};

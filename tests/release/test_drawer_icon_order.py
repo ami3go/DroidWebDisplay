@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_ORDER = "['display','clipboard','files','apps','audio','access','network','diagnostics','settings']"
+EXPECTED_ORDER = "['display','clipboard','files','audio','access','network','diagnostics','settings']"
 
 
 def test_drawer_icon_order_is_product_order() -> None:
