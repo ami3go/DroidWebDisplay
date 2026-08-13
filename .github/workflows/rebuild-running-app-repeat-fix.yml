@@ -23,6 +23,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Update stale layout regression
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'apps/web-client/tests/layout.test.mjs';
+          let source = fs.readFileSync(path, 'utf8');
+          source = source.replace(
+            'assert.match(runningAppSource, /select\\.addEventListener\\("change", \\(\\) => void this\\.moveSelected\\(\\)\\)/);',
+            'assert.match(runningAppSource, /select\\.addEventListener\\("change", \\(\\) => void this\\.handleSelectionChange\\(\\)\\)/);',
+          );
+          source = source.replace(
+            'assert.match(runningAppSource, /select\\.addEventListener\\("pointerdown", \\(\\) => void this\\.refreshIfStale\\(\\)\\)/);',
+            'assert.match(runningAppSource, /select\\.addEventListener\\("pointerdown", \\(\\) => this\\.beginDropdownInteraction\\(\\)\\)/);',
+          );
+          source = source.replace(
+            'assert.match(runningAppSource, /select\\.addEventListener\\("focus", \\(\\) => void this\\.refreshIfStale\\(\\)\\)/);',
+            'assert.match(runningAppSource, /select\\.addEventListener\\("focus", \\(\\) => this\\.beginDropdownInteraction\\(\\)\\)/);',
+          );
+          if (source.includes('void this\\.moveSelected') || source.includes('void this\\.refreshIfStale')) {
+            throw new Error('stale running-app layout expectation remains');
+          }
+          fs.writeFileSync(path, source);
+          NODE
       - name: Install and build
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
