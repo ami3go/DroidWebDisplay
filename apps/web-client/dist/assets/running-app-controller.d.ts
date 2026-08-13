@@ -14,7 +14,9 @@ export declare class RunningAppController {
     initialize(): Promise<void>;
     close(): void;
     refresh(silent?: boolean): Promise<void>;
-    private refreshIfStale;
+    private beginDropdownInteraction;
+    private finishDropdownInteraction;
+    private handleSelectionChange;
     private render;
     private selectedApp;
     private updateSelectionStatus;
