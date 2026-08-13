@@ -9,31 +9,33 @@ const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-d
 const connectCss = await readFile(resolve(root, "static/droidwebdisplay-connect-drawer.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 
-test("Connect is the first drawer group and owns connection controls", () => {
-  assert.match(drawerSource, /const GROUPS = \['connect','display'/);
-  assert.match(drawerSource, /dataset\.group = 'connect'/);
-  assert.match(drawerSource, /dataset\.slot = 'connect'/);
+test("Display is the first drawer group and owns connection controls", () => {
+  assert.match(drawerSource, /const GROUPS = \['display','clipboard','files'/);
+  assert.doesNotMatch(drawerSource, /data-group=\"connect\"/);
+  assert.doesNotMatch(drawerSource, /dataset\.group = 'connect'/);
+  assert.match(drawerSource, /data-slot=\"display\"/);
   for (const id of ["device", "refresh", "connect", "disconnect"]) {
     assert.match(drawerSource, new RegExp(`getElementById\\('${id}'\\)`));
   }
   assert.match(drawerSource, /actions\.append\(refresh, connect, disconnect\)/);
+  assert.match(drawerSource, /displaySlot\.insertBefore\(card, displaySlot\.firstElementChild\)/);
 });
 
-test("Connect controls use a compact non-overlapping three-column layout", () => {
+test("Display connection controls use a compact non-overlapping three-column layout", () => {
   assert.match(drawerSource, /droidwebdisplay-connect-drawer\.css/);
+  assert.match(connectCss, /data-slot=\"display\"/);
+  assert.doesNotMatch(connectCss, /data-slot=\"connect\"/);
   assert.match(connectCss, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\) !important/);
   assert.match(connectCss, /grid-column: auto !important/);
   assert.match(connectCss, /min-height: 2rem !important/);
   assert.match(connectCss, /#device[\s\S]*height: 2rem/);
-  assert.match(connectCss, /@media \(max-width: 380px\)/);
 });
 
-test("readiness indicator stays in header and old subtitle is removed", () => {
+test("readiness indicator stays in header and Connect rail item is absent", () => {
   const start = html.indexOf('<header class="topbar">');
   const end = html.indexOf('</header>', start);
   const header = html.slice(start, end);
   assert.match(header, /id="connection-status"/);
   assert.match(header, /id="status-icon"/);
-  assert.match(drawerSource, /LOCAL USB BRIDGE/);
-  assert.match(drawerSource, /eyebrow\.remove\(\)/);
+  assert.doesNotMatch(drawerSource, /label\.textContent = 'Connect'/);
 });

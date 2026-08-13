@@ -1,12 +1,12 @@
-/* DroidWebDisplay native single-drawer controller v1.2.1 */
+/* DroidWebDisplay native single-drawer controller v1.3.0 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
   const LAST_GROUP_KEY = 'droidwebdisplay.ui.drawer.lastGroup.v1';
   const ACCORDION_KEY = 'droidwebdisplay.ui.drawer.accordions.v1';
   const ROOT_ID = 'gb-single-drawer-root';
-  const CONNECT_STYLE_ID = 'droidwebdisplay-connect-drawer-css';
-  const GROUPS = ['connect','display','clipboard','files','apps','audio','access','network','diagnostics','settings'];
+  const CONNECTION_STYLE_ID = 'droidwebdisplay-connect-drawer-css';
+  const GROUPS = ['display','clipboard','files','apps','audio','access','network','diagnostics','settings'];
   let activeGroup = null;
   let pinned = false;
   const root = () => document.getElementById(ROOT_ID);
@@ -15,10 +15,10 @@
   function set(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
   function storedPinned() { return get(PIN_KEY, '0') === '1'; }
   function storedGroup() { const value = get(LAST_GROUP_KEY, 'display'); return GROUPS.includes(value) ? value : 'display'; }
-  function ensureConnectStyles() {
-    if (document.getElementById(CONNECT_STYLE_ID)) return;
+  function ensureConnectionStyles() {
+    if (document.getElementById(CONNECTION_STYLE_ID)) return;
     const link = document.createElement('link');
-    link.id = CONNECT_STYLE_ID;
+    link.id = CONNECTION_STYLE_ID;
     link.rel = 'stylesheet';
     link.href = './droidwebdisplay-connect-drawer.css?v=0.11.2-connect2';
     document.head.append(link);
@@ -27,59 +27,33 @@
     const eyebrow = document.querySelector('.topbar-brand .eyebrow');
     if (eyebrow?.textContent?.trim().toUpperCase() === 'LOCAL USB BRIDGE') eyebrow.remove();
   }
-  function ensureConnectUi() {
+  function ensureDisplayConnectionUi() {
     const ui = root();
     if (!ui) return;
-    const rail = ui.querySelector('.gb-rail');
-    const drawerBody = ui.querySelector('.gb-drawer-body');
-    if (!rail || !drawerBody) return;
+    const displaySlot = ui.querySelector('.gb-drawer-slot[data-slot="display"]');
+    if (!displaySlot) return;
 
-    let railButton = rail.querySelector('.gb-rail-button[data-group="connect"]');
-    if (!railButton) {
-      railButton = document.createElement('button');
-      railButton.type = 'button';
-      railButton.className = 'gb-rail-button';
-      railButton.dataset.group = 'connect';
-      railButton.setAttribute('aria-selected', 'false');
-      railButton.title = 'Connect';
-      const icon = document.createElement('span');
-      icon.className = 'gb-rail-icon';
-      icon.setAttribute('aria-hidden', 'true');
-      icon.style.setProperty('--gb-icon', 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'%3E%3Cg fill=\'none\' stroke=\'black\' stroke-width=\'1.8\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'M8 8V5m8 3V5M7 8h10v4a5 5 0 0 1-5 5v2\'/%3E%3Cpath d=\'M10 19h4\'/%3E%3C/g%3E%3C/svg%3E")');
-      const label = document.createElement('span');
-      label.className = 'gb-rail-label';
-      label.textContent = 'Connect';
-      railButton.append(icon, label);
-      rail.insertBefore(railButton, rail.querySelector('.gb-rail-spacer'));
-    }
+    const device = document.getElementById('device');
+    const refresh = document.getElementById('refresh');
+    const connect = document.getElementById('connect');
+    const disconnect = document.getElementById('disconnect');
+    if (!device || !refresh || !connect || !disconnect) return;
 
-    let slot = drawerBody.querySelector('.gb-drawer-slot[data-slot="connect"]');
-    if (!slot) {
-      const device = document.getElementById('device');
-      const refresh = document.getElementById('refresh');
-      const connect = document.getElementById('connect');
-      const disconnect = document.getElementById('disconnect');
-      if (!device || !refresh || !connect || !disconnect) return;
+    if (displaySlot.querySelector('.connect-card')) return;
 
-      slot = document.createElement('div');
-      slot.className = 'gb-drawer-slot';
-      slot.dataset.slot = 'connect';
+    const card = document.createElement('section');
+    card.className = 'help-card connect-card';
+    card.setAttribute('aria-label', 'Android device connection');
 
-      const card = document.createElement('section');
-      card.className = 'help-card connect-card';
-      card.setAttribute('aria-label', 'Android device connection');
+    const deviceLabel = document.createElement('label');
+    deviceLabel.append(document.createTextNode('Android device'), device);
 
-      const deviceLabel = document.createElement('label');
-      deviceLabel.append(document.createTextNode('Android device'), device);
+    const actions = document.createElement('div');
+    actions.className = 'button-grid connect-actions';
+    actions.append(refresh, connect, disconnect);
 
-      const actions = document.createElement('div');
-      actions.className = 'button-grid connect-actions';
-      actions.append(refresh, connect, disconnect);
-
-      card.append(deviceLabel, actions);
-      slot.append(card);
-      drawerBody.insertBefore(slot, drawerBody.firstElementChild);
-    }
+    card.append(deviceLabel, actions);
+    displaySlot.insertBefore(card, displaySlot.firstElementChild);
   }
   function applyRailOrder() {
     const rail = root()?.querySelector('.gb-rail');
@@ -130,9 +104,9 @@
   function boot() {
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
-    ensureConnectStyles();
+    ensureConnectionStyles();
     removeLegacyHeaderText();
-    ensureConnectUi();
+    ensureDisplayConnectionUi();
     applyRailOrder();
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));
     ui.querySelector('.gb-drawer-pin')?.addEventListener('click', () => applyPinned(!pinned));

@@ -1,11 +1,11 @@
-/* Compact connection controls for the Connect drawer. */
-#gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-card {
+/* Compact connection controls at the top of the Display drawer. */
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-card {
   display: grid;
   gap: .46rem;
   padding: .58rem !important;
 }
 
-#gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-card > label {
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-card > label {
   min-width: 0;
   display: grid;
   gap: .26rem;
@@ -14,7 +14,7 @@
   font-weight: 600;
 }
 
-#gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] #device {
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] #device {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -27,7 +27,7 @@
 }
 
 /* Override generic .button-grid and last-child spanning rules. */
-#gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-actions {
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions {
   width: 100%;
   min-width: 0;
   display: grid !important;
@@ -35,8 +35,8 @@
   gap: .3rem !important;
 }
 
-#gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-actions > button,
-#gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-actions > button:last-child {
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button:last-child {
   grid-column: auto !important;
   width: 100%;
   min-width: 0;
@@ -52,44 +52,19 @@
   text-overflow: ellipsis;
 }
 
-/* Android-head icon for the Connect rail button, drawn in CSS. */
-#gb-single-drawer-root .gb-rail-button[data-group="connect"] .gb-rail-icon::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  top: 6px;
-  bottom: 2px;
-  background: currentColor !important;
-  -webkit-mask: none !important;
-  mask: none !important;
-  border-radius: 7px 7px 4px 4px;
-}
-
-#gb-single-drawer-root .gb-rail-button[data-group="connect"] .gb-rail-icon::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 0;
-  height: 7px;
-  background:
-    linear-gradient(58deg, transparent 42%, currentColor 43% 57%, transparent 58%) left top / 7px 7px no-repeat,
-    linear-gradient(-58deg, transparent 42%, currentColor 43% 57%, transparent 58%) right top / 7px 7px no-repeat;
-}
 
 @media (max-width: 380px) {
   :root { --gb-drawer-w: calc(100vw - var(--gb-rail-w)); }
 
-  #gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-card {
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-card {
     padding: .52rem !important;
   }
 
-  #gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-actions {
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions {
     gap: .22rem !important;
   }
 
-  #gb-single-drawer-root .gb-drawer-slot[data-slot="connect"] .connect-actions > button {
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button {
     padding-inline: .16rem !important;
     font-size: .6rem !important;
   }
