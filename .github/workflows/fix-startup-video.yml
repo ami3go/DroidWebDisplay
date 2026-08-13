@@ -70,6 +70,19 @@ jobs:
           Path('apps/web-client/src/video-backlog-policy.ts').write_text('''export type DecoderBacklogAction = "decode" | "drop-delta" | "recover";\n\nexport function decoderBacklogAction(\n  queueSize: number,\n  threshold: number,\n  decoderHasOutput: boolean,\n  packetIsKeyFrame: boolean,\n): DecoderBacklogAction {\n  if (queueSize < threshold) return "decode";\n  if (decoderHasOutput || packetIsKeyFrame) return "recover";\n  return "drop-delta";\n}\n''', encoding='utf-8')
 
           Path('apps/web-client/tests/video-backlog-policy.test.mjs').write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport { decoderBacklogAction } from "../dist/assets/video-backlog-policy.js";\n\ntest("startup backlog preserves the first queued keyframe", () => {\n  assert.equal(decoderBacklogAction(3, 4, false, false), "decode");\n  assert.equal(decoderBacklogAction(4, 4, false, false), "drop-delta");\n});\n\ntest("startup may recover when a fresh keyframe is available", () => {\n  assert.equal(decoderBacklogAction(4, 4, false, true), "recover");\n});\n\ntest("normal low-latency recovery resumes after first decoder output", () => {\n  assert.equal(decoderBacklogAction(4, 4, true, false), "recover");\n});\n''', encoding='utf-8')
+
+          regression = Path('tests/regression/browser/test_low_latency_runtime.py')
+          regression_text = regression.read_text(encoding='utf-8')
+          old_read = '    renderer = (root / "apps/web-client/src/video-renderer.ts").read_text(encoding="utf-8")\n'
+          new_read = old_read + '    backlog_policy = (root / "apps/web-client/src/video-backlog-policy.ts").read_text(encoding="utf-8")\n'
+          if old_read not in regression_text:
+              raise SystemExit('Expected renderer read in low-latency regression test not found')
+          regression_text = regression_text.replace(old_read, new_read, 1)
+          old_contract = '''    # Decoder recovery must keep an arriving keyframe after reset.\n    assert "DECODER_BACKLOG_RECOVERY_THRESHOLD = 4" in renderer\n    assert "if (this.#decoder.decodeQueueSize >= DECODER_BACKLOG_RECOVERY_THRESHOLD)" in renderer\n    assert "if (!packet.keyFrame)" in renderer\n    assert "this.#awaitingKeyFrame = false" in renderer\n'''
+          new_contract = '''    # Decoder recovery must preserve the initial queued keyframe until WebCodecs\n    # produces output, while retaining aggressive low-latency recovery afterward.\n    assert "DECODER_BACKLOG_RECOVERY_THRESHOLD = 4" in renderer\n    assert "decoderBacklogAction(" in renderer\n    assert "this.#decoderHasOutput" in renderer\n    assert 'backlogAction === "drop-delta"' in renderer\n    assert 'if (decoderHasOutput || packetIsKeyFrame) return "recover"' in backlog_policy\n    assert 'return "drop-delta"' in backlog_policy\n    assert "if (!packet.keyFrame)" in renderer\n    assert "this.#awaitingKeyFrame = false" in renderer\n'''
+          if old_contract not in regression_text:
+              raise SystemExit('Expected decoder recovery contract assertions not found')
+          regression.write_text(regression_text.replace(old_contract, new_contract, 1), encoding='utf-8')
           PY
 
       - name: Build protocol package
@@ -101,7 +114,8 @@ jobs:
                   apps/web-client/src/video-backlog-policy.ts \
                   apps/web-client/tests/video-backlog-policy.test.mjs \
                   apps/web-client/dist \
-                  apps/web-client/dist-manifest.json
+                  apps/web-client/dist-manifest.json \
+                  tests/regression/browser/test_low_latency_runtime.py
           git diff --cached --check
           git commit -m "Fix initial video keyframe starvation"
           git push origin HEAD:main
