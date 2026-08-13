@@ -5,6 +5,7 @@ def test_optimized_response_time_runtime_contract() -> None:
     root = Path(__file__).resolve().parents[3]
     launcher = (root / "tools/run_bridge_service.py").read_text(encoding="utf-8")
     renderer = (root / "apps/web-client/src/video-renderer.ts").read_text(encoding="utf-8")
+    backlog_policy = (root / "apps/web-client/src/video-backlog-policy.ts").read_text(encoding="utf-8")
     worker = (root / "apps/web-client/src/video-render-worker.ts").read_text(encoding="utf-8")
     transport = (root / "apps/web-client/src/websocket-transport.ts").read_text(encoding="utf-8")
     display = (root / "apps/web-client/src/display-config.ts").read_text(encoding="utf-8")
@@ -26,9 +27,14 @@ def test_optimized_response_time_runtime_contract() -> None:
     assert "QueueDelayMs" in transport
     assert "maximumBufferedBytes = 64 * 1024" in transport
 
-    # Decoder recovery must keep an arriving keyframe after reset.
+    # Decoder recovery must preserve the initial queued keyframe until WebCodecs
+    # produces output, while retaining aggressive low-latency recovery afterward.
     assert "DECODER_BACKLOG_RECOVERY_THRESHOLD = 4" in renderer
-    assert "if (this.#decoder.decodeQueueSize >= DECODER_BACKLOG_RECOVERY_THRESHOLD)" in renderer
+    assert "decoderBacklogAction(" in renderer
+    assert "this.#decoderHasOutput" in renderer
+    assert 'backlogAction === "drop-delta"' in renderer
+    assert 'if (decoderHasOutput || packetIsKeyFrame) return "recover"' in backlog_policy
+    assert 'return "drop-delta"' in backlog_policy
     assert "if (!packet.keyFrame)" in renderer
     assert "this.#awaitingKeyFrame = false" in renderer
     assert "parserToDrawMs" in renderer

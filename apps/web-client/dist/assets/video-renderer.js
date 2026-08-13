@@ -1,4 +1,5 @@
 import { extractH264DecoderConfiguration, } from "@droid-web-display/scrcpy-protocol";
+import { decoderBacklogAction } from "./video-backlog-policy.js";
 const DECODER_BACKLOG_RECOVERY_THRESHOLD = 4;
 const STATISTICS_INTERVAL_MS = 250;
 const MAX_RENDER_WORKER_RESTARTS = 2;
@@ -27,6 +28,7 @@ export class WebCodecsVideoRenderer {
     #decoderRecoveries = 0;
     #workerRestarts = 0;
     #awaitingKeyFrame = false;
+    #decoderHasOutput = false;
     #decodeLatencyMs = 0;
     #presentationLatencyMs = 0;
     #parserToDrawMs = 0;
@@ -136,16 +138,24 @@ export class WebCodecsVideoRenderer {
         if (!this.#decoder || this.#decoder.state !== "configured") {
             throw new Error("Received video frame before H.264 decoder configuration");
         }
-        if (this.#decoder.decodeQueueSize >= DECODER_BACKLOG_RECOVERY_THRESHOLD) {
+        const backlogAction = decoderBacklogAction(this.#decoder.decodeQueueSize, DECODER_BACKLOG_RECOVERY_THRESHOLD, this.#decoderHasOutput, packet.keyFrame);
+        if (backlogAction === "recover") {
             this.recoverDecoderBacklog();
-            // A keyframe is exactly the packet needed to resume after reset. Decode it
-            // immediately instead of discarding it with the old backlog. Delta frames
-            // are dropped until the next keyframe arrives.
+            // A fresh keyframe can immediately seed the reset decoder. Delta frames
+            // are dropped until a new keyframe arrives.
             if (!packet.keyFrame) {
                 this.#framesDropped += 1;
                 this.emitStatistics(true);
                 return;
             }
+        }
+        else if (backlogAction === "drop-delta") {
+            // During decoder startup, preserve the already queued keyframe instead of
+            // resetting it out of the queue. Bound startup pressure by dropping only
+            // newly arriving delta frames until the decoder produces its first output.
+            this.#framesDropped += 1;
+            this.emitStatistics(true);
+            return;
         }
         if (this.#awaitingKeyFrame && !packet.keyFrame) {
             this.#framesDropped += 1;
@@ -218,6 +228,7 @@ export class WebCodecsVideoRenderer {
         this.#decoderRecoveries += 1;
         this.#framesDropped += discarded;
         this.#awaitingKeyFrame = true;
+        this.#decoderHasOutput = false;
         this.#packetArrivals.clear();
         this.#decodeOutputs.clear();
         const metrics = latencyMetrics();
@@ -229,6 +240,7 @@ export class WebCodecsVideoRenderer {
             this.#decoder.close();
         this.#decoder = null;
         this.#awaitingKeyFrame = false;
+        this.#decoderHasOutput = false;
         this.#packetArrivals.clear();
         this.#decodeOutputs.clear();
     }
@@ -240,6 +252,7 @@ export class WebCodecsVideoRenderer {
             this.#decodeLatencyMs = Math.max(0, decodedAt - arrivedAt);
         this.#decodeOutputs.set(timestamp, decodedAt);
         this.#framesDecoded += 1;
+        this.#decoderHasOutput = true;
         const width = frame.displayWidth || frame.codedWidth;
         const height = frame.displayHeight || frame.codedHeight;
         if (width !== this.#width || height !== this.#height) {
