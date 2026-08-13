@@ -6,7 +6,7 @@
   const ACCORDION_KEY = 'droidwebdisplay.ui.drawer.accordions.v1';
   const ROOT_ID = 'gb-single-drawer-root';
   const CONNECTION_STYLE_ID = 'droidwebdisplay-connect-drawer-css';
-  const GROUPS = ['display','clipboard','files','audio','access','network','diagnostics','settings'];
+  const GROUPS = ['display','clipboard','files','audio','access','diagnostics','settings'];
   let activeGroup = null;
   let pinned = false;
   const root = () => document.getElementById(ROOT_ID);
@@ -52,6 +52,32 @@
 
     card.append(deviceLabel, actions);
     displaySlot.insertBefore(card, displaySlot.firstElementChild);
+  }
+  function mergeNetworkIntoAccess() {
+    const ui = root();
+    const accessSlot = ui?.querySelector('.gb-drawer-slot[data-slot="access"]');
+    const networkSlot = ui?.querySelector('.gb-drawer-slot[data-slot="network"]');
+    if (!ui || !accessSlot || !networkSlot || accessSlot.querySelector('[data-section-key="access-network"]')) return;
+    const details = document.createElement('details');
+    details.className = 'gb-accordion';
+    details.dataset.sectionKey = 'access-network';
+    const summary = document.createElement('summary');
+    summary.className = 'gb-accordion-summary';
+    const triangle = document.createElement('span');
+    triangle.className = 'gb-accordion-triangle';
+    triangle.setAttribute('aria-hidden', 'true');
+    triangle.textContent = '▸';
+    const label = document.createElement('span');
+    label.className = 'gb-accordion-label';
+    label.textContent = 'Network access';
+    summary.append(triangle, label);
+    const content = document.createElement('div');
+    content.className = 'gb-accordion-content';
+    while (networkSlot.firstChild) content.append(networkSlot.firstChild);
+    details.append(summary, content);
+    accessSlot.append(details);
+    networkSlot.remove();
+    ui.querySelector('.gb-rail-button[data-group="network"]')?.remove();
   }
   function applyRailOrder() {
     const rail = root()?.querySelector('.gb-rail');
@@ -116,6 +142,7 @@
     ensureConnectionStyles();
     removeLegacyHeaderText();
     ensureDisplayConnectionUi();
+    mergeNetworkIntoAccess();
     applyRailOrder();
     bindStatusShortcut();
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));

@@ -22,5 +22,5 @@ def test_native_single_drawer_is_source_of_truth() -> None:
     assert '<aside class="sidepanel">' not in html
     assert '<aside class="transfer-panel"' not in html
     assert 'id="workspace-layout"' not in html
-    for label in ("Display", "Clipboard", "Files", "Audio", "Access", "Network", "Diagnostics", "Settings"):
+    for label in ("Display", "Clipboard", "Files", "Audio", "Access", "Diagnostics", "Settings"):
         assert f'>{label}<' in html

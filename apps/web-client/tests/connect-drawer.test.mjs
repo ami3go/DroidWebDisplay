@@ -48,3 +48,11 @@ test("connection status pill opens Display settings", () => {
   assert.match(drawerSource, /openGroup\('display'\)/);
 });
 
+test("Network settings are integrated into Access", () => {
+  assert.doesNotMatch(html, /data-group="network"/);
+  assert.doesNotMatch(drawerSource, /'access','network'/);
+  assert.match(drawerSource, /function mergeNetworkIntoAccess\(\)/);
+  assert.match(drawerSource, /access-network/);
+  assert.match(drawerSource, /label\.textContent = 'Network access'/);
+});
+

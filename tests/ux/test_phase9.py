@@ -54,7 +54,7 @@ def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled
     assert ">Paste</button>" in html
     assert ">Type</button>" in html
     assert ">Copy</button>" in html
-    for group in ("display", "clipboard", "files", "audio", "access", "network", "diagnostics", "settings"):
+    for group in ("display", "clipboard", "files", "audio", "access", "diagnostics", "settings"):
         assert f'data-group="{group}"' in html
 
 def test_audio_server_mapping_uses_opus_and_keeps_channel_order() -> None:

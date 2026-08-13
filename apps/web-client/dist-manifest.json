@@ -240,13 +240,13 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 6502,
-      "sha256": "3d924325ed1571c28640bc3ed639568b42556378edb25c4b5512dadc132cef8e"
+      "bytes": 7822,
+      "sha256": "b6e9e07019e8ea7992abcc4afda378f72b84dce27abeaff6b3ece0528acea643"
     },
     {
       "path": "index.html",
-      "bytes": 30505,
-      "sha256": "fbbfa80bd18e311649e587fc69933611417edd850999fa4816431b160350f119"
+      "bytes": 30288,
+      "sha256": "eb73c6de0d438fdc89850120debb36b0849104747406c70be9ededf5d929550c"
     },
     {
       "path": "styles.css",
