@@ -1,0 +1,45 @@
+name: Rebuild repeated app selection fix
+
+on:
+  push:
+    branches: [agent/connect-drawer]
+    paths:
+      - .github/workflows/rebuild-running-app-repeat-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/connect-drawer
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install and build
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          $HOME/.local/bin/uv sync --locked --extra dev
+          npm ci --prefix packages/scrcpy-protocol
+          npm run build --prefix packages/scrcpy-protocol
+          npm ci --prefix apps/web-client
+          npm run build --prefix apps/web-client
+      - name: Verify
+        run: |
+          npm test --prefix apps/web-client
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output /tmp/gate-running-app-repeat.json
+      - name: Commit generated client and remove helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A apps/web-client
+          git rm .github/workflows/rebuild-running-app-repeat-fix.yml
+          git commit -m "Rebuild web client for repeated app selection fix"
+          git push origin HEAD:agent/connect-drawer
