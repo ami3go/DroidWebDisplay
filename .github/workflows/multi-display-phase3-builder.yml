@@ -1,0 +1,66 @@
+name: Multi-display Phase 3 Builder
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  build-phase3:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Apply device-scoped multi-display API
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old[:120]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          api = Path('droid_web_display/api/app.py')
+          anchor = '''    @app.delete("/api/v1/sessions/{session_id}")\n    async def delete_session(session_id: str, container: Annotated[ServiceContainer, Depends(get_container)]) -> dict:\n        return (await container.manager.stop_session(session_id)).to_dict()\n\n'''
+          routes = anchor + '''    @app.get("/api/v1/devices/{serial}/sessions")\n    async def device_sessions(\n        serial: str,\n        container: Annotated[ServiceContainer, Depends(get_container)],\n    ) -> dict:\n        # Validate the device explicitly so a typo cannot silently look like an\n        # empty session list. Only active/indexed sessions belong in display tabs.\n        await container.manager.select_device(serial)\n        values = container.manager.list_sessions_for_device(serial)\n        return {\n            "serial": serial,\n            "activeSessionCount": len(values),\n            "sessions": [item.to_dict() for item in values],\n        }\n\n    @app.post("/api/v1/devices/{serial}/sessions", status_code=201)\n    async def create_device_session(\n        serial: str,\n        body: StartSessionRequest,\n        container: Annotated[ServiceContainer, Depends(get_container)],\n    ) -> dict:\n        if body.serial is not None and body.serial != serial:\n            raise HTTPException(\n                status_code=422,\n                detail="Body serial must match the device serial in the request path",\n            )\n        scoped_body = body.model_copy(update={"serial": serial})\n        return await create_session(scoped_body, container)\n\n    @app.delete("/api/v1/devices/{serial}/sessions/{session_id}")\n    async def delete_device_session(\n        serial: str,\n        session_id: str,\n        container: Annotated[ServiceContainer, Depends(get_container)],\n    ) -> dict:\n        session = container.manager.get_session(session_id)\n        if session.serial != serial:\n            raise HTTPException(status_code=404, detail="Session not found for this device")\n        return (await container.manager.stop_session(session_id)).to_dict()\n\n    @app.delete("/api/v1/devices/{serial}/sessions")\n    async def delete_device_sessions(\n        serial: str,\n        container: Annotated[ServiceContainer, Depends(get_container)],\n    ) -> dict:\n        # Snapshot before stopping because stop_session removes each session from\n        # the per-device active index. Sequential cleanup keeps ADB resource\n        # release deterministic and isolates failures to the session being closed.\n        values = list(container.manager.list_sessions_for_device(serial))\n        stopped: list[dict] = []\n        for session in values:\n            stopped.append((await container.manager.stop_session(session.session_id)).to_dict())\n        return {\n            "serial": serial,\n            "stoppedCount": len(stopped),\n            "sessions": stopped,\n        }\n\n'''
+          replace_once(api, anchor, routes)
+
+          test = Path('tests/regression/session/test_device_session_api.py')
+          test.write_text('''from pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom droid_web_display.api import create_app\nfrom droid_web_display.config import BridgeConfig\nfrom droid_web_display.models import AndroidDevice\nfrom droid_web_display.scrcpy.artifact import ScrcpyArtifact\nfrom droid_web_display.scrcpy.session import SessionManager\nfrom tests.regression.session.fakes import FakeAdb\n\n\ndef artifact(tmp_path: Path) -> ScrcpyArtifact:\n    path = tmp_path / "scrcpy-server-v4.1"\n    path.write_bytes(b"verified-test-server")\n    return ScrcpyArtifact(path, "4.1", "a" * 40, "b" * 64, "scrcpy-4.1")\n\n\ndef make_client(tmp_path: Path, devices: list[AndroidDevice]):\n    adb = FakeAdb(devices)\n    manager = SessionManager(adb, artifact(tmp_path), connect_timeout=2.0, monitor_interval=10)\n    config = BridgeConfig(repo_root=tmp_path, authentication_required=False)\n    app = create_app(config=config, manager=manager, adb=adb)  # type: ignore[arg-type]\n    return TestClient(app), manager, adb\n\n\ndef test_device_scoped_api_creates_lists_and_stops_independent_sessions(tmp_path: Path) -> None:\n    client, manager, adb = make_client(tmp_path, [AndroidDevice("PHONE", "device", model="Test")])\n    with client:\n        first = client.post(\n            "/api/v1/devices/PHONE/sessions",\n            json={"audio": False, "displayName": "Phone"},\n        )\n        second = client.post(\n            "/api/v1/devices/PHONE/sessions",\n            json={"audio": False, "displayName": "Development"},\n        )\n        assert first.status_code == 201\n        assert second.status_code == 201\n        first_body = first.json()\n        second_body = second.json()\n        assert first_body["sessionId"] != second_body["sessionId"]\n        assert first_body["serial"] == second_body["serial"] == "PHONE"\n\n        listed = client.get("/api/v1/devices/PHONE/sessions")\n        assert listed.status_code == 200\n        payload = listed.json()\n        assert payload["serial"] == "PHONE"\n        assert payload["activeSessionCount"] == 2\n        assert [item["display"]["name"] for item in payload["sessions"]] == ["Phone", "Development"]\n\n        stopped = client.delete(f"/api/v1/devices/PHONE/sessions/{first_body['sessionId']}")\n        assert stopped.status_code == 200\n        assert stopped.json()["state"] == "stopped"\n        remaining = client.get("/api/v1/devices/PHONE/sessions").json()\n        assert remaining["activeSessionCount"] == 1\n        assert remaining["sessions"][0]["sessionId"] == second_body["sessionId"]\n        assert second_body["localPort"] in adb.forward_servers\n\n        bulk = client.delete("/api/v1/devices/PHONE/sessions")\n        assert bulk.status_code == 200\n        assert bulk.json()["stoppedCount"] == 1\n        assert bulk.json()["sessions"][0]["sessionId"] == second_body["sessionId"]\n        assert client.get("/api/v1/devices/PHONE/sessions").json()["activeSessionCount"] == 0\n        assert not manager.list_sessions_for_device("PHONE")\n\n\ndef test_device_scoped_create_rejects_conflicting_body_serial(tmp_path: Path) -> None:\n    client, manager, _ = make_client(\n        tmp_path,\n        [AndroidDevice("PHONE", "device"), AndroidDevice("OTHER", "device")],\n    )\n    with client:\n        response = client.post(\n            "/api/v1/devices/PHONE/sessions",\n            json={"serial": "OTHER", "audio": False},\n        )\n        assert response.status_code == 422\n        assert "must match" in response.json()["detail"]\n        assert manager.list_sessions_for_device("PHONE") == []\n        assert manager.list_sessions_for_device("OTHER") == []\n\n\ndef test_device_scoped_delete_cannot_stop_other_device_session(tmp_path: Path) -> None:\n    client, manager, _ = make_client(\n        tmp_path,\n        [AndroidDevice("PHONE", "device"), AndroidDevice("OTHER", "device")],\n    )\n    with client:\n        created = client.post(\n            "/api/v1/devices/OTHER/sessions",\n            json={"audio": False, "displayName": "Other phone"},\n        )\n        assert created.status_code == 201\n        session_id = created.json()["sessionId"]\n\n        wrong_device = client.delete(f"/api/v1/devices/PHONE/sessions/{session_id}")\n        assert wrong_device.status_code == 404\n        assert manager.get_session(session_id).state.value == "running"\n\n        correct_device = client.delete(f"/api/v1/devices/OTHER/sessions/{session_id}")\n        assert correct_device.status_code == 200\n        assert correct_device.json()["state"] == "stopped"\n\n\ndef test_device_scoped_list_rejects_unknown_device(tmp_path: Path) -> None:\n    client, _, _ = make_client(tmp_path, [AndroidDevice("PHONE", "device")])\n    with client:\n        response = client.get("/api/v1/devices/MISSING/sessions")\n        assert response.status_code == 404\n''', encoding='utf-8')
+          PY
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+      - name: Run Phase 3 tests
+        run: |
+          $HOME/.local/bin/uv run ruff check droid_web_display/api/app.py tests/regression/session/test_device_session_api.py --select E9,F63,F7,F82
+          $HOME/.local/bin/uv run pytest -q tests/regression/session/test_device_session_api.py tests/regression/session/test_display_identity.py tests/regression/session/test_multi_session.py
+      - name: Regenerate OpenAPI
+        run: $HOME/.local/bin/uv run python tools/generate_openapi.py
+      - name: Commit Phase 3
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add droid_web_display/api/app.py tests/regression/session/test_device_session_api.py packages/bridge-api/openapi/openapi-v1.json
+          if git diff --cached --quiet; then
+            echo "No Phase 3 changes to commit"
+            exit 0
+          fi
+          git commit -m "Implement multi-display Phase 3 device session API"
+          git push origin HEAD:multi-display-tabs
