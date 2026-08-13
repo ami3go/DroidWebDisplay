@@ -113,9 +113,12 @@ jobs:
           git add apps/web-client/src/video-renderer.ts \
                   apps/web-client/src/video-backlog-policy.ts \
                   apps/web-client/tests/video-backlog-policy.test.mjs \
-                  apps/web-client/dist \
                   apps/web-client/dist-manifest.json \
                   tests/regression/browser/test_low_latency_runtime.py
+          git add -u apps/web-client/dist
+          git add -f apps/web-client/dist/assets/video-backlog-policy.js \
+                     apps/web-client/dist/assets/video-backlog-policy.d.ts \
+                     apps/web-client/dist/assets/video-backlog-policy.js.map
           git diff --cached --check
           git commit -m "Fix initial video keyframe starvation"
           git push origin HEAD:main
