@@ -29,7 +29,8 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .android-control-row { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
 .android-control-row button { background: #202838; }
 .running-app-header { height: 2.12rem; min-height: 2.12rem; margin-left: auto; display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
-.running-app-header-icon { position: relative; width: 2.12rem; height: 2.12rem; flex: 0 0 2.12rem; display: grid; place-items: center; color: #9fb0c2; }
+.running-app-header-icon { position: relative; width: 2.12rem; min-width: 2.12rem; height: 2.12rem; min-height: 2.12rem; flex: 0 0 2.12rem; display: grid; place-items: center; padding: 0; border: 1px solid #343d50; border-radius: 8px; background: #202838; color: #9fb0c2; }
+.running-app-header-icon:focus-visible { outline: 2px solid #82a6ff; outline-offset: 2px; }
 .running-app-header-icon svg { width: 1.12rem; height: 1.12rem; fill: currentColor; }
 .running-app-count { position: absolute; top: 0.05rem; right: 0.02rem; min-width: 0.9rem; height: 0.9rem; padding: 0 0.18rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #516078; border-radius: 999px; background: #202838; color: #eef3ff; font-size: 0.55rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; box-shadow: 0 1px 4px #0008; }
 .connection-row .running-app-header select { width: clamp(10rem, 18vw, 16rem); min-width: 10rem; max-width: 16rem; height: 2.12rem; min-height: 2.12rem; flex: 0 1 16rem; padding: 0.42rem 1.8rem 0.42rem 0.58rem; border-radius: 8px; font-size: 0.76rem; }

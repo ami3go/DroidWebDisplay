@@ -18,7 +18,7 @@ test("Diagnostics expose active display and available Android RAM", () => {
 });
 
 test("GUI task counter is a digits-only badge on the app icon", () => {
-  assert.match(html, /id="running-app-icon" class="running-app-header-icon"/);
+  assert.match(html, /<button id="running-app-icon" class="running-app-header-icon"/);
   assert.match(html, /id="running-app-count" class="running-app-count">0<\/span>/);
   assert.equal(html.includes('id="running-app-refresh"'), false);
   assert.match(source, /count\.textContent = String\(this\.#apps\.length\)/);
@@ -36,4 +36,16 @@ test("running app selector resets after each move action", () => {
   assert.match(source, /select\.addEventListener\("change", \(\) => void this\.handleSelectionChange\(\)\)/);
   assert.match(source, /this\.#elements\.select\.value = ""/);
   assert.match(source, /await this\.finishDropdownInteraction\(\)/);
+});
+
+
+test("app icon explicitly refreshes the running GUI task list", () => {
+  assert.match(source, /elements\.icon\.addEventListener\("click"/);
+  assert.match(source, /void this\.refresh\(\)/);
+  assert.match(source, /Refresh running applications/);
+});
+
+test("every application selection calls the move API", () => {
+  assert.doesNotMatch(source, /if \(app\.displayId === displayId\)/);
+  assert.match(source, /await this\.#api\.moveRunningApp\(\{/);
 });

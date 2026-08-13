@@ -135,8 +135,8 @@
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 8370,
-      "sha256": "2374e7ce37dfd31d78a540e62d87f21c140df78bf74eede1a5deaa59f4c72f1a"
+      "bytes": 8371,
+      "sha256": "11f451d3a261dc54680a5cda88439788b32e1289cf5c987a2a7a7d8ee749b5f3"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -155,18 +155,18 @@
     },
     {
       "path": "assets/running-app-controller.d.ts",
-      "bytes": 798,
-      "sha256": "dd8e0f13dbffc1e427a8b1d54853d6a137f6292dfeff753a837357a199a3d938"
+      "bytes": 804,
+      "sha256": "c059aecc9d9f9ff4708d202bb26ff0cb02bb932cc0ed7e19e01157749bd6671e"
     },
     {
       "path": "assets/running-app-controller.js",
-      "bytes": 8968,
-      "sha256": "09c3bfba8f49d247a729174f1219bf24d8d6603ca7ef3d444bb67e51872180f3"
+      "bytes": 9192,
+      "sha256": "558c2fe07ad4a6b04ec99ae356324f83e4abd8ec98e1851c3392e13bd6ca54db"
     },
     {
       "path": "assets/running-app-controller.js.map",
-      "bytes": 8822,
-      "sha256": "0994d905f3a4fc7c26705bb2fa4249997ed08f4ca6e989cbfa9c0819fa270ea4"
+      "bytes": 9014,
+      "sha256": "cb2a136796af7b5711471b2fe60660385895e1a8fcd3c65d7cf8ce524dc7765e"
     },
     {
       "path": "assets/transfer-controller.d.ts",
@@ -245,13 +245,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 30169,
-      "sha256": "763aedd6e2e20902fc8ac2e462a48af5beec923f353c5da4af97800a6622aeca"
+      "bytes": 30270,
+      "sha256": "53ac2e5c62e9ec56f4d576636b72feb5344712be6590e947831511a710bfa166"
     },
     {
       "path": "styles.css",
-      "bytes": 28433,
-      "sha256": "8c9bb680cc3e1f9981a2c98fcd6051df87a27fcdbb554d5ab4fc9782d2be54c8"
+      "bytes": 28646,
+      "sha256": "8cf4c3b6d3e6af9fed3a5d51f406095b928c6483571d98e894b080fe4e7a661d"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",

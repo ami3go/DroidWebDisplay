@@ -2,7 +2,7 @@ import { BridgeApi } from "./api.js";
 interface Elements {
     readonly device: HTMLSelectElement;
     readonly select: HTMLSelectElement;
-    readonly icon: HTMLElement;
+    readonly icon: HTMLButtonElement;
     readonly count: HTMLElement;
     readonly status: HTMLElement;
     readonly diagnosticDisplay: HTMLElement;

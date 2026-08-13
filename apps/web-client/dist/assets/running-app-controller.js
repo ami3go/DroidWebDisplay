@@ -24,6 +24,11 @@ export class RunningAppController {
     constructor(elements, api = new BridgeApi()) {
         this.#elements = elements;
         this.#api = api;
+        elements.icon.addEventListener("click", () => {
+            this.#dropdownActive = false;
+            this.#refreshAfterDropdown = false;
+            void this.refresh();
+        });
         elements.select.addEventListener("pointerdown", () => this.beginDropdownInteraction());
         elements.select.addEventListener("focus", () => this.beginDropdownInteraction());
         elements.select.addEventListener("change", () => void this.handleSelectionChange());
@@ -129,7 +134,8 @@ export class RunningAppController {
         const previous = this.#elements.select.value;
         this.#elements.select.replaceChildren();
         this.#elements.count.textContent = String(this.#apps.length);
-        this.#elements.icon.title = `${this.#apps.length} running GUI task(s)`;
+        this.#elements.icon.title = `Refresh running applications · ${this.#apps.length} GUI task(s)`;
+        this.#elements.icon.setAttribute("aria-label", `Refresh running applications · ${this.#apps.length} GUI task(s)`);
         const placeholder = document.createElement("option");
         placeholder.value = "";
         placeholder.textContent = this.#apps.length ? "Select application" : "No GUI apps";
@@ -174,10 +180,6 @@ export class RunningAppController {
         const session = this.#virtualSession;
         const displayId = session?.virtualDisplay.displayId ?? null;
         if (!app || !session || displayId === null) {
-            this.updateSelectionStatus();
-            return;
-        }
-        if (app.displayId === displayId) {
             this.updateSelectionStatus();
             return;
         }

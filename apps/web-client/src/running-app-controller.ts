@@ -6,7 +6,7 @@ const DROPDOWN_REFRESH_STALE_MS = 1500;
 interface Elements {
   readonly device: HTMLSelectElement;
   readonly select: HTMLSelectElement;
-  readonly icon: HTMLElement;
+  readonly icon: HTMLButtonElement;
   readonly count: HTMLElement;
   readonly status: HTMLElement;
   readonly diagnosticDisplay: HTMLElement;
@@ -39,6 +39,11 @@ export class RunningAppController {
   public constructor(elements: Elements, api = new BridgeApi()) {
     this.#elements = elements;
     this.#api = api;
+    elements.icon.addEventListener("click", () => {
+      this.#dropdownActive = false;
+      this.#refreshAfterDropdown = false;
+      void this.refresh();
+    });
     elements.select.addEventListener("pointerdown", () => this.beginDropdownInteraction());
     elements.select.addEventListener("focus", () => this.beginDropdownInteraction());
     elements.select.addEventListener("change", () => void this.handleSelectionChange());
@@ -147,7 +152,8 @@ export class RunningAppController {
     const previous = this.#elements.select.value;
     this.#elements.select.replaceChildren();
     this.#elements.count.textContent = String(this.#apps.length);
-    this.#elements.icon.title = `${this.#apps.length} running GUI task(s)`;
+    this.#elements.icon.title = `Refresh running applications · ${this.#apps.length} GUI task(s)`;
+    this.#elements.icon.setAttribute("aria-label", `Refresh running applications · ${this.#apps.length} GUI task(s)`);
 
     const placeholder = document.createElement("option");
     placeholder.value = "";
@@ -197,11 +203,6 @@ export class RunningAppController {
       this.updateSelectionStatus();
       return;
     }
-    if (app.displayId === displayId) {
-      this.updateSelectionStatus();
-      return;
-    }
-
     this.#moving = true;
     this.#elements.select.disabled = true;
     this.#elements.status.textContent = `Moving ${app.label} to display ${displayId}…`;

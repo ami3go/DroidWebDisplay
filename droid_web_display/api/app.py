@@ -747,17 +747,6 @@ def create_app(
         )
         if selected is None:
             raise HTTPException(status_code=404, detail="The selected Android GUI task is no longer running")
-        if selected.display_id == session.display_id:
-            return {
-                "status": "already-on-target",
-                "moved": False,
-                "verified": True,
-                "sessionId": session_id,
-                "displayId": session.display_id,
-                "app": selected.to_dict(),
-                "strategy": "none",
-            }
-
         try:
             command = await container.adb.move_running_app_to_display(
                 session.serial,
