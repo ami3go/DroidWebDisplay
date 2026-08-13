@@ -39,6 +39,24 @@ from .virtual_display import (
 Connector = Callable[[str, int], Awaitable[tuple[asyncio.StreamReader, asyncio.StreamWriter]]]
 ArtifactLoader = Callable[[], ScrcpyArtifact]
 
+MAX_DISPLAY_NAME_LENGTH = 80
+DEFAULT_DISPLAY_NAMES = {
+    DisplayMode.PHYSICAL: "Phone",
+    DisplayMode.VIRTUAL: "Virtual display",
+}
+
+
+def _normalize_display_name(value: str | None, display_mode: DisplayMode) -> str:
+    if value is None:
+        return DEFAULT_DISPLAY_NAMES[display_mode]
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("Display name must contain at least one visible character")
+    if len(normalized) > MAX_DISPLAY_NAME_LENGTH:
+        raise ValueError(f"Display name must be at most {MAX_DISPLAY_NAME_LENGTH} characters")
+    if any(ord(character) < 32 or ord(character) == 127 for character in normalized):
+        raise ValueError("Display name must not contain control characters")
+    return normalized
 
 
 class PrefixedStreamReader:
@@ -142,6 +160,8 @@ class ScrcpySession:
     local_port: int
     socket_name: str
     options: SessionOptions
+    display_name: str | None = None
+    display_kind: DisplayMode = field(init=False)
     state: SessionState = SessionState.STARTING
     channels: dict[ChannelName, ScrcpyChannel] = field(default_factory=dict)
     process: SpawnedAdbProcess | None = None
@@ -173,6 +193,56 @@ class ScrcpySession:
     virtual_display_warnings: list[str] = field(default_factory=list)
     virtual_display_failure_classification: str | None = None
     _lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+
+    def __post_init__(self) -> None:
+        self.display_kind = self.options.display_mode
+        self.display_name = _normalize_display_name(self.display_name, self.display_kind)
+        if self.display_kind == DisplayMode.PHYSICAL and self.display_id is None:
+            self.display_id = 0
+
+    def display_metadata(self) -> dict:
+        virtual = self.options.virtual_display if self.display_kind == DisplayMode.VIRTUAL else None
+        if self.actual_width is not None and self.actual_height is not None:
+            width = self.actual_width
+            height = self.actual_height
+            resolution_source = "actual"
+        elif virtual is not None:
+            width = virtual.width
+            height = virtual.height
+            resolution_source = "requested"
+        else:
+            width = None
+            height = None
+            resolution_source = "unknown"
+
+        if self.actual_dpi is not None:
+            dpi = self.actual_dpi
+            dpi_source = "actual"
+        elif virtual is not None:
+            dpi = virtual.dpi
+            dpi_source = "requested"
+        else:
+            dpi = None
+            dpi_source = "unknown"
+
+        return {
+            "sessionId": self.session_id,
+            "kind": self.display_kind.value,
+            "displayId": self.display_id,
+            "name": self.display_name,
+            "application": self.application,
+            "resolution": {
+                "width": width,
+                "height": height,
+                "source": resolution_source,
+            },
+            "dpi": {
+                "value": dpi,
+                "source": dpi_source,
+            },
+            "createdAt": self.created_at,
+            "state": self.state.value,
+        }
 
     def to_dict(self) -> dict:
         virtual = self.options.virtual_display
@@ -221,6 +291,7 @@ class ScrcpySession:
             "dummyByteValidated": self.dummy_byte_validated,
             "options": self.options.to_dict(),
             "displayMode": self.options.display_mode.value,
+            "display": self.display_metadata(),
             "virtualDisplay": virtual_diagnostics,
         }
 
@@ -306,11 +377,13 @@ class SessionManager:
         *,
         serial: str | None = None,
         options: SessionOptions | None = None,
+        display_name: str | None = None,
     ) -> ScrcpySession:
         selected = await self.select_device(serial)
         artifact = self._resolve_artifact()
         selected_options = options or SessionOptions()
         selected_options.validate()
+        resolved_display_name = _normalize_display_name(display_name, selected_options.display_mode)
         if selected_options.display_mode == DisplayMode.VIRTUAL and (selected.sdk or 0) < 29:
             raise SessionError(
                 "Virtual Display mode requires Android 10 / API 29 or newer",
@@ -328,6 +401,7 @@ class SessionManager:
                 local_port=port,
                 socket_name=socket_name(scid),
                 options=selected_options,
+                display_name=resolved_display_name,
             )
             if selected_options.display_mode == DisplayMode.VIRTUAL and selected_options.virtual_display:
                 session.application = selected_options.virtual_display.start_app or None

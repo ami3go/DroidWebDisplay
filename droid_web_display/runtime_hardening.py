@@ -96,6 +96,7 @@ class ResilientSessionManager(_BaseSessionManager):
         *,
         serial: str | None = None,
         options: SessionOptions | None = None,
+        display_name: str | None = None,
     ):
         effective_serial = serial
         selected_options = options or SessionOptions()
@@ -110,7 +111,11 @@ class ResilientSessionManager(_BaseSessionManager):
                 selected_options = replace(selected_options, video_encoder=injected_preference)
 
         try:
-            return await super().start_session(serial=effective_serial, options=selected_options)
+            return await super().start_session(
+                serial=effective_serial,
+                options=selected_options,
+                display_name=display_name,
+            )
         except Exception as preferred_error:
             if not injected_preference or effective_serial is None:
                 raise
@@ -126,7 +131,11 @@ class ResilientSessionManager(_BaseSessionManager):
             )
             fallback_options = replace(selected_options, video_encoder=None)
             try:
-                session = await super().start_session(serial=effective_serial, options=fallback_options)
+                session = await super().start_session(
+                    serial=effective_serial,
+                    options=fallback_options,
+                    display_name=display_name,
+                )
             except Exception as fallback_error:
                 raise fallback_error from preferred_error
             session.server_log.append(

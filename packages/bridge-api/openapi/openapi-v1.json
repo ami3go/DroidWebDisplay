@@ -828,6 +828,18 @@
             "$ref": "#/components/schemas/DisplayMode",
             "default": "physical"
           },
+          "displayName": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname"
+          },
           "maxFps": {
             "default": 30,
             "maximum": 120.0,

@@ -132,6 +132,7 @@ class StartSessionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     serial: str | None = None
+    display_name: str | None = Field(default=None, alias="displayName", max_length=80)
     video: bool = True
     audio: bool = False
     control: bool = True
@@ -700,6 +701,7 @@ def create_app(
             session = await container.manager.start_session(
                 serial=selected.serial if selected else body.serial,
                 options=options,
+                display_name=body.display_name,
             )
             if requested_virtual_options and effective_virtual_options:
                 session.requested_ime_policy = requested_virtual_options.ime_policy.value
