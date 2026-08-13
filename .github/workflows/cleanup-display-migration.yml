@@ -1,0 +1,27 @@
+name: Cleanup Display Migration
+
+on:
+  push:
+    branches:
+      - agent/connect-drawer
+    paths:
+      - .github/workflows/cleanup-display-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/connect-drawer
+          fetch-depth: 0
+      - name: Remove temporary migration workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/move-connection-to-display.yml .github/workflows/cleanup-display-migration.yml
+          git commit -m "Remove temporary Display migration workflows"
+          git push origin HEAD:agent/connect-drawer
