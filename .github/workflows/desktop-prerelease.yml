@@ -1,0 +1,184 @@
+name: DroidWebDisplay Desktop Pre-release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/desktop-prerelease.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: v0.11.2-rc.1
+  RELEASE_VERSION: 0.11.2-rc.1
+  PYINSTALLER_VERSION: 6.21.0
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Build protocol package
+        working-directory: packages/scrcpy-protocol
+        run: |
+          npm ci
+          npm run build
+      - name: Build web client
+        working-directory: apps/web-client
+        run: |
+          npm ci
+          npm run build
+      - name: Install Python build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . "pyinstaller==$env:PYINSTALLER_VERSION"
+      - name: Download verified scrcpy server
+        run: python tools/download_server.py
+      - name: Download Android platform-tools
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile platform-tools.zip
+          Expand-Archive -Path platform-tools.zip -DestinationPath platform-tools
+          $adb = (Resolve-Path "platform-tools/platform-tools").Path
+          "DWD_ADB_DIR=$adb" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Build Windows executable
+        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplay.spec
+      - name: Smoke-test Windows executable
+        shell: pwsh
+        run: |
+          & .\dist\DroidWebDisplay.exe --help | Out-Host
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Stage Windows asset
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item .\dist\DroidWebDisplay.exe ".\release\DroidWebDisplay-$env:RELEASE_VERSION-windows-x86_64.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop
+          path: release/*
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Build protocol package
+        working-directory: packages/scrcpy-protocol
+        run: |
+          npm ci
+          npm run build
+      - name: Build web client
+        working-directory: apps/web-client
+        run: |
+          npm ci
+          npm run build
+      - name: Install Python build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . "pyinstaller==$PYINSTALLER_VERSION"
+      - name: Download verified scrcpy server
+        run: python tools/download_server.py
+      - name: Download Android platform-tools
+        run: |
+          curl -fsSL "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o platform-tools.zip
+          unzip -q platform-tools.zip -d platform-tools
+          echo "DWD_ADB_DIR=$PWD/platform-tools/platform-tools" >> "$GITHUB_ENV"
+      - name: Build Linux frozen runtime
+        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplay.spec
+      - name: Smoke-test frozen runtime
+        run: ./dist/DroidWebDisplay/DroidWebDisplay --help
+      - name: Build AppImage
+        run: |
+          set -euxo pipefail
+          APPDIR="$PWD/AppDir"
+          mkdir -p "$APPDIR/usr/lib/droidwebdisplay"
+          cp -a dist/DroidWebDisplay/. "$APPDIR/usr/lib/droidwebdisplay/"
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/usr/bin/env sh
+          HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          exec "$HERE/usr/lib/droidwebdisplay/DroidWebDisplay" "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+          cat > "$APPDIR/droidwebdisplay.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=DroidWebDisplay
+          Comment=Open the local DroidWebDisplay browser interface
+          Exec=DroidWebDisplay
+          Icon=droidwebdisplay
+          Terminal=false
+          Categories=Development;Utility;
+          EOF
+          cp packaging/linux/droidwebdisplay.svg "$APPDIR/droidwebdisplay.svg"
+          ln -s droidwebdisplay.svg "$APPDIR/.DirIcon"
+          curl -fsSL "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -o appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          mkdir -p release
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool-x86_64.AppImage "$APPDIR" "release/DroidWebDisplay-$RELEASE_VERSION-linux-x86_64.AppImage"
+          chmod +x "release/DroidWebDisplay-$RELEASE_VERSION-linux-x86_64.AppImage"
+      - name: Smoke-test AppImage
+        run: APPIMAGE_EXTRACT_AND_RUN=1 "./release/DroidWebDisplay-$RELEASE_VERSION-linux-x86_64.AppImage" --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-desktop
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    runs-on: ubuntu-24.04
+    needs: [windows, linux]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Generate checksums and release notes
+        run: |
+          cd release
+          sha256sum DroidWebDisplay-* > SHA256SUMS.txt
+          cd ..
+          cat > release-notes.md <<EOF
+          DroidWebDisplay $RELEASE_VERSION pre-release built from main commit $GITHUB_SHA.
+
+          Assets:
+          - Windows x86_64 single-file executable
+          - Linux x86_64 AppImage
+          - SHA-256 checksum manifest
+
+          Both desktop packages bundle the Python application runtime, the verified pinned scrcpy server, and Android platform-tools. Persistent authentication/network state is stored outside the executable bundle in the user's local state directory.
+
+          This is a pre-release validation build. The Windows executable and Linux AppImage are not code-signed yet.
+          EOF
+      - name: Publish GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" --title "DroidWebDisplay $RELEASE_VERSION" --notes-file release-notes.md
+            gh release upload "$RELEASE_TAG" release/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --prerelease --title "DroidWebDisplay $RELEASE_VERSION" --notes-file release-notes.md
+          fi
