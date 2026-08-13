@@ -9,6 +9,7 @@ const css = await readFile(resolve(root, "static/styles.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 const mainSource = await readFile(resolve(root, "src/main.ts"), "utf8");
 const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");
+const autoDownloadSource = await readFile(resolve(root, "src/auto-download-controller.ts"), "utf8");
 const runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");
 
 
@@ -115,6 +116,12 @@ test("audio card uses the concise label without the experimental badge", () => {
   assert.equal(html.includes("Experimental:"), false);
   assert.match(html, /Browser audio may have interruptions or delay/);
   assert.equal(css.includes(".experimental-badge"), false);
+});
+
+test("File sync keeps Save primary and moves uncommon actions into overflow", () => {
+  assert.match(html, /class="sync-action-row"/);
+  assert.match(html, /class="sync-more-actions"/);
+  assert.match(autoDownloadSource, /applySnapshot\(await this\.#api\.scanAutoDownload\(\)\)/);
 });
 
 test("File sync controls are present", () => {

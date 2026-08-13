@@ -59,7 +59,7 @@ export class AutoDownloadController {
     }
     async save() {
         const serial = this.elements.device.value || null;
-        const snapshot = await this.#api.configureAutoDownload({
+        await this.#api.configureAutoDownload({
             enabled: this.elements.enabled.checked,
             pcToAndroidEnabled: this.elements.pcToAndroidEnabled.checked,
             serial,
@@ -74,7 +74,7 @@ export class AutoDownloadController {
             includeExistingPc: this.elements.includeExistingPc.checked,
             deleteAfterVerified: this.elements.deleteAfterVerified.checked,
         });
-        this.applySnapshot(snapshot);
+        this.applySnapshot(await this.#api.scanAutoDownload());
     }
     async refresh() {
         try {

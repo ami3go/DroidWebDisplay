@@ -209,10 +209,15 @@
             <label><input id="auto-download-notifications" type="checkbox"> Show browser notifications</label>
           </div>
           <p class="sync-safety-note">Files created by one sync direction are fingerprinted so they are not immediately sent back by the other direction.</p>
-          <div class="three-button-row uniform-buttons">
+          <div class="sync-action-row">
             <button id="auto-download-save">Save</button>
-            <button id="auto-download-scan-now" class="secondary">Scan now</button>
-            <button id="auto-download-reset" class="secondary">Reset</button>
+            <details class="sync-more-actions">
+              <summary aria-label="More File sync actions" title="More actions">⋯</summary>
+              <div class="sync-more-menu">
+                <button id="auto-download-scan-now" type="button" class="secondary">Scan now</button>
+                <button id="auto-download-reset" type="button" class="secondary">Reset</button>
+              </div>
+            </details>
           </div>
           <div id="auto-download-summary" class="monitor-summary">No sync activity.</div>
           <div id="auto-download-events" class="monitor-events"><p class="empty-state">No automatic transfers yet.</p></div></div>

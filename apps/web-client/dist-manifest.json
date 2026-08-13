@@ -55,13 +55,13 @@
     },
     {
       "path": "assets/auto-download-controller.js",
-      "bytes": 9783,
-      "sha256": "dea6929536661ad9c3f850eee9e2fda5489bd986c02d31b12368b98b9dcd7e1f"
+      "bytes": 9792,
+      "sha256": "913af30d9a8a05e4967dd3a934cdeebbce1c9668a90ae187d33fd263adc6adbb"
     },
     {
       "path": "assets/auto-download-controller.js.map",
-      "bytes": 9839,
-      "sha256": "9c684b7484eac3a945fdfc25053a5d3f5ec85cc898a42f80b2bfc7bdd8d0c2e0"
+      "bytes": 9856,
+      "sha256": "7fadabb9a5d42284b16a7bda7d1c2ded75ec77f6c30ecf448a3705cc2099cd78"
     },
     {
       "path": "assets/browser-support.d.ts",
@@ -245,13 +245,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 30270,
-      "sha256": "53ac2e5c62e9ec56f4d576636b72feb5344712be6590e947831511a710bfa166"
+      "bytes": 30518,
+      "sha256": "3f4b91c28b1b70980b91053508773cd137aba06ea56cf7dca22bc987f353f3a2"
     },
     {
       "path": "styles.css",
-      "bytes": 28646,
-      "sha256": "8cf4c3b6d3e6af9fed3a5d51f406095b928c6483571d98e894b080fe4e7a661d"
+      "bytes": 29450,
+      "sha256": "6671d2711237764781573957af2aa6090b28db3426cfa32ce4535266fb9b5272"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",
