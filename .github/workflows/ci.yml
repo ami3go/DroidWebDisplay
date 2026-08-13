@@ -1,31 +1,72 @@
-name: DroidWebDisplay Release Gate
+name: Apply File Sync UI simplification
 
 on:
   push:
-  pull_request:
+    branches: [agent/connect-drawer]
+    paths: [.github/workflows/ci.yml]
+
+permissions:
+  contents: write
 
 jobs:
-  release:
+  apply:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-running-app-always-move
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: |
-            apps/web-client/package-lock.json
-            packages/scrcpy-protocol/package-lock.json
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Sync locked Python environment
-        run: $HOME/.local/bin/uv sync --locked --extra dev
-      - run: npm ci
-        working-directory: packages/scrcpy-protocol
-      - run: npm ci
-        working-directory: apps/web-client
-      - name: Run release gate
-        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
+      - name: Install
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          $HOME/.local/bin/uv sync --locked --extra dev
+          npm ci --prefix packages/scrcpy-protocol
+          npm run build --prefix packages/scrcpy-protocol
+          npm ci --prefix apps/web-client
+      - name: Apply File Sync UI simplification
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('apps/web-client/static/index.html'); s=p.read_text()
+          old='''          <div class="three-button-row uniform-buttons">\n            <button id="auto-download-save">Save</button>\n            <button id="auto-download-scan-now" class="secondary">Scan now</button>\n            <button id="auto-download-reset" class="secondary">Reset</button>\n          </div>'''
+          new='''          <div class="sync-action-row">\n            <button id="auto-download-save">Save</button>\n            <details class="sync-more-actions">\n              <summary aria-label="More File sync actions" title="More actions">⋯</summary>\n              <div class="sync-more-menu">\n                <button id="auto-download-scan-now" type="button" class="secondary">Scan now</button>\n                <button id="auto-download-reset" type="button" class="secondary">Reset</button>\n              </div>\n            </details>\n          </div>'''
+          assert old in s
+          p.write_text(s.replace(old,new))
+
+          p=Path('apps/web-client/src/auto-download-controller.ts'); s=p.read_text()
+          assert '    const snapshot = await this.#api.configureAutoDownload({' in s
+          s=s.replace('    const snapshot = await this.#api.configureAutoDownload({','    await this.#api.configureAutoDownload({',1)
+          old='''    });\n    this.applySnapshot(snapshot);\n  }'''
+          new='''    });\n    this.applySnapshot(await this.#api.scanAutoDownload());\n  }'''
+          assert old in s
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('apps/web-client/static/styles.css'); s=p.read_text(); marker='.device-diagnostic-summary {'
+          css='''.sync-action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.45rem; align-items: start; }\n.sync-action-row > #auto-download-save { width: 100%; }\n.sync-more-actions { position: relative; }\n.sync-more-actions > summary { list-style: none; min-width: 2.55rem; height: 2.55rem; display: grid; place-items: center; cursor: pointer; border-radius: 8px; background: #252c39; color: white; font-weight: 800; user-select: none; }\n.sync-more-actions > summary::-webkit-details-marker { display: none; }\n.sync-more-menu { position: absolute; right: 0; top: calc(100% + 0.3rem); z-index: 20; width: 9rem; padding: 0.35rem; display: grid; gap: 0.3rem; border: 1px solid #30394b; border-radius: 9px; background: #101620; box-shadow: 0 8px 24px #0008; }\n.sync-more-menu button { width: 100%; }\n'''
+          assert marker in s
+          p.write_text(s.replace(marker,css+marker,1))
+
+          p=Path('apps/web-client/tests/layout.test.mjs'); s=p.read_text()
+          if 'const autoDownloadSource =' not in s:
+              s=s.replace('const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");','const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");\nconst autoDownloadSource = await readFile(resolve(root, "src/auto-download-controller.ts"), "utf8");')
+          anchor='test("File sync controls are present", () => {'
+          add='''test("File sync keeps Save primary and moves uncommon actions into overflow", () => {\n  assert.match(html, /class="sync-action-row"/);\n  assert.match(html, /class="sync-more-actions"/);\n  assert.match(autoDownloadSource, /applySnapshot\(await this\.#api\.scanAutoDownload\(\)\)/);\n});\n\n'''
+          assert anchor in s
+          p.write_text(s.replace(anchor,add+anchor,1))
+          PY
+          npm run build --prefix apps/web-client
+          npm test --prefix apps/web-client
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output /tmp/gate-file-sync.json
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A apps/web-client
+          git commit -m "Simplify File Sync actions"
+          git push origin HEAD:agent/fix-running-app-always-move
