@@ -1,6 +1,5 @@
 interface Elements {
     readonly device: HTMLSelectElement;
-    readonly refresh: HTMLButtonElement;
     readonly connect: HTMLButtonElement;
     readonly disconnect: HTMLButtonElement;
     readonly canvas: HTMLCanvasElement;
@@ -73,6 +72,7 @@ export declare class DroidWebDisplayController {
     private readDisplayValues;
     private updateDisplayUi;
     private updateConnectAvailability;
+    private refreshDevicesIfStale;
     private refreshVirtualCapabilities;
     private startFlexResize;
     private stopFlexResize;

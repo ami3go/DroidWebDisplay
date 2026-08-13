@@ -91,7 +91,6 @@ async function bootstrap(): Promise<void> {
     }
     const controller = new DroidWebDisplayController({
       device: required<HTMLSelectElement>("#device"),
-      refresh: required<HTMLButtonElement>("#refresh"),
       connect: required<HTMLButtonElement>("#connect"),
       disconnect: required<HTMLButtonElement>("#disconnect"),
       canvas: required<HTMLCanvasElement>("#screen"),

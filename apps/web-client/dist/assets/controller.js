@@ -5,6 +5,7 @@ import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboa
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
+const DEVICE_DROPDOWN_REFRESH_STALE_MS = 1500;
 export class DroidWebDisplayController {
     elements;
     #api = new BridgeApi();
@@ -32,6 +33,7 @@ export class DroidWebDisplayController {
     #latestStatistics = null;
     #deviceMessageTask = null;
     #capabilities = null;
+    #deviceListRefreshedAt = 0;
     #resizeObserver = null;
     #resizeTimer = null;
     #lastResizeAt = 0;
@@ -63,9 +65,13 @@ export class DroidWebDisplayController {
             option.disabled = !device.ready;
             this.elements.device.append(option);
         }
-        const previousOption = [...this.elements.device.options].find((option) => option.value === previous && !option.disabled);
+        const readyOptions = [...this.elements.device.options].filter((option) => !option.disabled);
+        const previousOption = readyOptions.find((option) => option.value === previous);
         if (previousOption)
             previousOption.selected = true;
+        else if (readyOptions.length === 1)
+            readyOptions[0].selected = true;
+        this.#deviceListRefreshedAt = Date.now();
         this.updateConnectAvailability();
     }
     async connect() {
@@ -169,10 +175,8 @@ export class DroidWebDisplayController {
         void this.#api.stopSession(sessionId, true);
     }
     bindEvents() {
-        this.elements.refresh.addEventListener("click", () => void this.runUiAction(async () => {
-            await this.refreshDevices();
-            await this.refreshVirtualCapabilities();
-        }));
+        this.elements.device.addEventListener("pointerdown", () => void this.runUiAction(() => this.refreshDevicesIfStale()));
+        this.elements.device.addEventListener("focus", () => void this.runUiAction(() => this.refreshDevicesIfStale()));
         this.elements.device.addEventListener("change", () => void this.runUiAction(() => this.refreshVirtualCapabilities()));
         this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.connect()));
         this.elements.disconnect.addEventListener("click", () => void this.runUiAction(() => this.disconnect()));
@@ -339,6 +343,14 @@ export class DroidWebDisplayController {
         const errors = validateDisplayForm(this.readDisplayValues());
         const unsupported = this.elements.displayMode.value === "virtual" && this.#capabilities?.virtualDisplaySupported === false;
         this.elements.connect.disabled = !hasDevice || this.#serverSession !== null || errors.length > 0 || unsupported;
+    }
+    async refreshDevicesIfStale() {
+        if (Date.now() - this.#deviceListRefreshedAt < DEVICE_DROPDOWN_REFRESH_STALE_MS)
+            return;
+        const selected = this.elements.device.value;
+        await this.refreshDevices();
+        if (this.elements.device.value !== selected)
+            await this.refreshVirtualCapabilities();
     }
     async refreshVirtualCapabilities() {
         const serial = this.elements.device.value;

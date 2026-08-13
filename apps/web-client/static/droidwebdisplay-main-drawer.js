@@ -34,10 +34,9 @@
     if (!displaySlot) return;
 
     const device = document.getElementById('device');
-    const refresh = document.getElementById('refresh');
     const connect = document.getElementById('connect');
     const disconnect = document.getElementById('disconnect');
-    if (!device || !refresh || !connect || !disconnect) return;
+    if (!device || !connect || !disconnect) return;
 
     if (displaySlot.querySelector('.connect-card')) return;
 
@@ -50,7 +49,7 @@
 
     const actions = document.createElement('div');
     actions.className = 'button-grid connect-actions';
-    actions.append(refresh, connect, disconnect);
+    actions.append(connect, disconnect);
 
     card.append(deviceLabel, actions);
     displaySlot.insertBefore(card, displaySlot.firstElementChild);
