@@ -112,7 +112,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web-client/src apps/web-client/static apps/web-client/tests apps/web-client/dist
+          git add apps/web-client/src apps/web-client/static apps/web-client/tests
+          git add -f apps/web-client/dist
           if git diff --cached --quiet; then
             echo "No Phase 4 changes to commit"
             exit 0
