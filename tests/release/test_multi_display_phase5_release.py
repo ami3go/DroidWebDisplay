@@ -34,7 +34,7 @@ def test_phase5_tab_switch_contract_is_browser_only_and_50ms_target() -> None:
     running_apps = (root / "apps/web-client/src/running-app-controller.ts").read_text(encoding="utf-8")
     assert "const TAB_SWITCH_TARGET_MS = 50" in controller
     start = controller.index("private activateRuntime")
-    end = controller.index("private async refreshSessionCapacity", start)
+    end = controller.index("private bindControlDebug", start)
     switch_body = controller[start:end]
     assert "await " not in switch_body
     assert "#api" not in switch_body
