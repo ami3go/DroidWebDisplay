@@ -10,6 +10,7 @@ const files = [
   resolve(root, "tests/transfer.test.mjs"),
   resolve(root, "tests/display-config.test.mjs"),
   resolve(root, "tests/layout.test.mjs"),
+  resolve(root, "tests/connect-drawer.test.mjs"),
 ];
 await new Promise((resolvePromise, reject) => {
   const child = spawn(process.execPath, ["--test", ...files], { stdio: "inherit" });
