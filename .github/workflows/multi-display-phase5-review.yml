@@ -1,0 +1,130 @@
+name: Multi-display Phase 5 Review
+
+on:
+  push:
+    branches:
+      - multi-display-tabs
+
+permissions:
+  contents: write
+
+jobs:
+  review-phase5:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+
+      - name: Apply Phase 5 review fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old[:160]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Make the resource limit user-configurable from the normal service launcher.
+          runner = Path('tools/run_bridge_service.py')
+          replace_once(
+              runner,
+              '        transfer_concurrency=args.transfer_concurrency,\n        maximum_file_size=args.maximum_file_size,\n',
+              '        transfer_concurrency=args.transfer_concurrency,\n        maximum_display_sessions=args.maximum_display_sessions,\n        maximum_file_size=args.maximum_file_size,\n',
+          )
+          replace_once(
+              runner,
+              '    parser.add_argument("--transfer-concurrency", type=int, default=1)\n    parser.add_argument("--maximum-file-size", type=int, default=2 * 1024 * 1024 * 1024)\n',
+              '    parser.add_argument("--transfer-concurrency", type=int, default=1)\n    parser.add_argument("--maximum-display-sessions", type=int, default=4, choices=range(1, 9), metavar="1..8", help="Maximum simultaneous display sessions per Android device")\n    parser.add_argument("--maximum-file-size", type=int, default=2 * 1024 * 1024 * 1024)\n',
+          )
+          replace_once(
+              runner,
+              '    print(f"Transfer concurrency: {config.transfer_concurrency}")\n',
+              '    print(f"Transfer concurrency: {config.transfer_concurrency}")\n    print(f"Maximum display sessions per device: {config.maximum_display_sessions}")\n',
+          )
+
+          # Keep imports conventional and make a capacity probe failure non-fatal.
+          controller = Path('apps/web-client/src/controller.ts')
+          replace_once(
+              controller,
+              '''import type { AndroidDevice, SessionDto, VirtualDisplayCapabilities } from "./types.js";\n\nconst TAB_SWITCH_TARGET_MS = 50;\nimport { WebCodecsVideoRenderer, type VideoStatistics } from "./video-renderer.js";\nimport { WebSocketBridgeTransport } from "./websocket-transport.js";\nimport { WebCodecsAudioPlayer, type AudioStatistics } from "./audio-player.js";\n''',
+              '''import type { AndroidDevice, SessionDto, VirtualDisplayCapabilities } from "./types.js";\nimport { WebCodecsVideoRenderer, type VideoStatistics } from "./video-renderer.js";\nimport { WebSocketBridgeTransport } from "./websocket-transport.js";\nimport { WebCodecsAudioPlayer, type AudioStatistics } from "./audio-player.js";\n\nconst TAB_SWITCH_TARGET_MS = 50;\n''',
+          )
+          replace_once(
+              controller,
+              '''  private async refreshSessionCapacity(): Promise<void> {\n    const serial = this.elements.device.value;\n    if (!serial) {\n      this.#maximumDisplaySessions = 4;\n      this.#availableDisplaySlots = 4;\n      this.renderCapacity();\n      return;\n    }\n    const response = await this.#api.deviceSessions(serial);\n    this.#maximumDisplaySessions = response.maximumSessions;\n    this.#availableDisplaySlots = response.availableSlots;\n    this.renderCapacity();\n    this.updateConnectAvailability();\n  }\n''',
+              '''  private async refreshSessionCapacity(): Promise<void> {\n    const serial = this.elements.device.value;\n    if (!serial) {\n      this.#maximumDisplaySessions = 4;\n      this.#availableDisplaySlots = 4;\n      this.renderCapacity();\n      return;\n    }\n    try {\n      const response = await this.#api.deviceSessions(serial);\n      this.#maximumDisplaySessions = response.maximumSessions;\n      this.#availableDisplaySlots = response.availableSlots;\n    } catch (error) {\n      // Capacity is a hard server-side guard. A transient status read must not\n      // prevent the existing single-display UI from initializing; retain the\n      // last known limit and let the POST endpoint remain authoritative.\n      this.#availableDisplaySlots = Math.max(0, this.#maximumDisplaySessions - this.#runtimes.size);\n      console.warn("Display session capacity refresh failed", error);\n    }\n    this.renderCapacity();\n    this.updateConnectAvailability();\n  }\n''',
+          )
+
+          # Add a genuinely concurrent capacity reservation regression.
+          multi = Path('tests/regression/session/test_multi_session.py')
+          multi.write_text(multi.read_text(encoding='utf-8') + '''\n\n@pytest.mark.asyncio\nasync def test_concurrent_start_requests_cannot_overbook_final_slot(tmp_path: Path) -> None:\n    from droid_web_display.errors import SessionConflictError\n\n    adb = FakeAdb([AndroidDevice("PHONE", "device")])\n    manager = SessionManager(\n        adb,\n        artifact(tmp_path),\n        connect_timeout=2.0,\n        monitor_interval=10,\n        maximum_sessions_per_device=1,\n    )\n    results = await asyncio.gather(\n        manager.start_session(serial="PHONE", options=SessionOptions(audio=False)),\n        manager.start_session(serial="PHONE", options=SessionOptions(audio=False)),\n        return_exceptions=True,\n    )\n    running = [item for item in results if not isinstance(item, BaseException)]\n    rejected = [item for item in results if isinstance(item, SessionConflictError)]\n    assert len(running) == 1\n    assert len(rejected) == 1\n    assert len(manager.list_sessions_for_device("PHONE")) == 1\n    assert len(adb.forward_servers) == 1\n    await manager.close()\n''', encoding='utf-8')
+
+          # Strengthen release qualification for configurability and isolated reconnect lifecycle.
+          release = Path('tests/release/test_multi_display_phase5_release.py')
+          release.write_text(release.read_text(encoding='utf-8') + '''\n\ndef test_phase5_limit_is_exposed_by_service_launcher() -> None:\n    root = Path(__file__).resolve().parents[2]\n    runner = (root / "tools/run_bridge_service.py").read_text(encoding="utf-8")\n    assert '"--maximum-display-sessions"' in runner\n    assert "maximum_display_sessions=args.maximum_display_sessions" in runner\n    assert "choices=range(1, 9)" in runner\n\n\ndef test_phase5_failure_cleanup_and_reconnect_are_session_scoped() -> None:\n    root = Path(__file__).resolve().parents[2]\n    controller = (root / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")\n    start = controller.index("private async handleRuntimeFailure")\n    end = controller.index("private setConnectedControls", start)\n    lifecycle = controller[start:end]\n    assert "cleanupRuntime(sessionId)" in lifecycle\n    assert "stopDeviceSessions" not in lifecycle\n    assert "this.#runtimes.delete(sessionId)" in lifecycle\n    reconnect_start = controller.index("private async reconnectNow")\n    reconnect_end = controller.index("private scheduleReconnect", reconnect_start)\n    reconnect = controller[reconnect_start:reconnect_end]\n    assert "cleanupSession()" in reconnect\n    assert "stopDeviceSessions" not in reconnect\n''', encoding='utf-8')
+
+          docs = Path('docs/MULTI_DISPLAY_PHASE5.md')
+          text = docs.read_text(encoding='utf-8')
+          text = text.replace(
+              '- Configurable range: **1..8** through `BridgeConfig.maximum_display_sessions`.\n',
+              '- Configurable range: **1..8** through `BridgeConfig.maximum_display_sessions` or the service launcher option `--maximum-display-sessions 1..8`.\n',
+          )
+          docs.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+      - run: npm ci
+        working-directory: packages/scrcpy-protocol
+      - run: npm ci
+        working-directory: apps/web-client
+      - name: Run Phase 5 reviewed Python tests
+        run: |
+          $HOME/.local/bin/uv run ruff check tools/run_bridge_service.py droid_web_display/config.py droid_web_display/scrcpy/session.py droid_web_display/api/app.py tests/regression/session/test_multi_session.py tests/regression/session/test_device_session_api.py tests/release/test_multi_display_phase5_release.py --select E9,F63,F7,F82
+          $HOME/.local/bin/uv run pytest -q tests/regression/session/test_multi_session.py tests/regression/session/test_device_session_api.py tests/release/test_multi_display_phase5_release.py
+      - name: Build protocol package
+        run: npm run build
+        working-directory: packages/scrcpy-protocol
+      - name: Build web client
+        run: node tools/build.mjs
+        working-directory: apps/web-client
+      - name: Run web client tests
+        run: node tools/run-tests.mjs
+        working-directory: apps/web-client
+      - name: Verify bundled static client
+        run: |
+          $HOME/.local/bin/uv run python - <<'PY'
+          from pathlib import Path
+          from droid_web_display.release_checks import verify_static_client
+          result = verify_static_client(Path.cwd())
+          print(result)
+          if result.get("status") != "PASS":
+              raise SystemExit(1)
+          PY
+      - name: Commit Phase 5 review fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/run_bridge_service.py apps/web-client/src/controller.ts apps/web-client/dist-manifest.json tests/regression/session/test_multi_session.py tests/release/test_multi_display_phase5_release.py docs/MULTI_DISPLAY_PHASE5.md
+          git add -f apps/web-client/dist
+          git commit -m "Harden multi-display Phase 5 qualification"
+          git push origin HEAD:multi-display-tabs
