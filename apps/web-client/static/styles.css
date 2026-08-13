@@ -395,3 +395,16 @@ body[data-layout="compact"] .statistics-card { padding: 0.75rem; }
 .display-canvas[hidden] { display: none !important; }
 .display-canvas:focus { box-shadow: 0 0 0 2px #22d3ee; }
 @media (max-width: 700px) { .display-tab-add { padding-inline: 0.5rem !important; } .display-tab { min-width: 7.4rem; } }
+
+
+/* Multi-display Phase 5 capacity and per-display diagnostics */
+.display-tab-capacity { flex: 0 0 auto; padding: 0.35rem 0.48rem; border: 1px solid #243244; border-radius: 7px; background: #0b1220; color: #8fa4b8; font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.display-tab-capacity[data-full="true"] { border-color: #fb7185; color: #ffd6de; }
+.display-diagnostics { display: grid; gap: 0.45rem; }
+.display-diagnostic-row { padding: 0.5rem 0.55rem; border: 1px solid #243244; border-radius: 8px; background: #0b1220; }
+.display-diagnostic-row[data-active="true"] { border-color: #22d3ee; }
+.display-diagnostic-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.display-diagnostic-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e6edf7; }
+.display-diagnostic-heading span, .display-diagnostic-meta { color: #71869d; font-size: 0.68rem; }
+.display-diagnostic-meta { margin-top: 0.2rem; line-height: 1.35; }
+.display-switch-metric { margin: 0 0 0.45rem; color: #8fa4b8; font-size: 0.7rem; }

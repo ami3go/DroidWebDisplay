@@ -1,4 +1,4 @@
-import type { AndroidStorageResponse, AndroidStorageRootsResponse, AutoDownloadConfigDto, AutoDownloadSnapshotDto, BrowserSupportResponse, DestinationProfileResponse, DeviceListResponse, DeviceSessionListResponse, DeviceSessionStopResponse, DuplicatePolicy, LaunchableAppsResponse, MoveRunningAppResponse, RunningAppsResponse, SessionDto, SessionListResponse, TransferDto, TransferListResponse, VirtualDisplayCapabilities, VirtualDisplayProfilesResponse } from "./types.js";
+import type { AndroidStorageResponse, AndroidStorageRootsResponse, AutoDownloadConfigDto, AutoDownloadSnapshotDto, BrowserSupportResponse, DestinationProfileResponse, DeviceDisplayDiagnosticsResponse, DeviceListResponse, DeviceSessionListResponse, DeviceSessionStopResponse, DuplicatePolicy, LaunchableAppsResponse, MoveRunningAppResponse, RunningAppsResponse, SessionDto, SessionListResponse, TransferDto, TransferListResponse, VirtualDisplayCapabilities, VirtualDisplayProfilesResponse } from "./types.js";
 export interface AuthSessionDto {
     readonly sessionId: string;
     readonly createdAt: number;
@@ -101,6 +101,7 @@ export declare class BridgeApi {
     virtualDisplayProfiles(): Promise<VirtualDisplayProfilesResponse>;
     sessions(): Promise<SessionListResponse>;
     deviceSessions(serial: string): Promise<DeviceSessionListResponse>;
+    displayDiagnostics(serial: string): Promise<DeviceDisplayDiagnosticsResponse>;
     startDeviceSession(serial: string, request: StartSessionRequest): Promise<SessionDto>;
     stopDeviceSession(serial: string, sessionId: string, keepalive?: boolean): Promise<SessionDto | null>;
     stopDeviceSessions(serial: string, keepalive?: boolean): Promise<DeviceSessionStopResponse | null>;

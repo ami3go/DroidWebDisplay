@@ -11,6 +11,7 @@ class BridgeConfig:
     bind_host: str = "127.0.0.1"
     bind_port: int = 8765
     device_monitor_interval: float = 2.0
+    maximum_display_sessions: int = 4
     transfer_concurrency: int = 1
     maximum_transfer_queue_length: int = 100
     maximum_file_size: int = 2 * 1024 * 1024 * 1024
@@ -50,6 +51,8 @@ class BridgeConfig:
             raise ValueError("bind_port must be in range 1..65535")
         if self.device_monitor_interval < 0.2:
             raise ValueError("device_monitor_interval must be at least 0.2 seconds")
+        if not 1 <= self.maximum_display_sessions <= 8:
+            raise ValueError("maximum_display_sessions must be in range 1..8")
         if not 1 <= self.transfer_concurrency <= 4:
             raise ValueError("transfer_concurrency must be in range 1..4")
         if self.maximum_transfer_queue_length < 1:

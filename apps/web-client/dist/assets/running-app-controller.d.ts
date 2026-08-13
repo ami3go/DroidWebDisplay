@@ -13,6 +13,8 @@ export declare class RunningAppController {
     close(): void;
     refresh(silent?: boolean): Promise<void>;
     private render;
+    private selectActiveVirtualSession;
+    private updateTargetStatus;
     private selectedApp;
     private updateControls;
     private moveSelected;

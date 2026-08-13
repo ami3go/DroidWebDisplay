@@ -399,6 +399,8 @@
           <div class="gb-drawer-slot" data-slot="diagnostics"><section class="help-card statistics-card">
           <h2>Mode statistic</h2>
           <div id="statistics" class="statistics">No video statistics</div>
+          <h2>Display sessions</h2>
+          <div id="display-diagnostics" class="display-diagnostics" aria-live="polite"><p class="empty-state">No active display sessions.</p></div>
         </section></div>
           <div class="gb-drawer-slot" data-slot="settings"><section class="help-card settings-card">
           <h2>Settings</h2>
@@ -417,6 +419,7 @@
           <div id="display-tabs" class="display-tabs" role="tablist" aria-label="Android display sessions">
             <span class="display-tabs-empty">No active displays</span>
           </div>
+          <span id="display-tab-capacity" class="display-tab-capacity" title="Active display sessions on the selected Android device">0 / 4 sessions</span>
           <button id="display-tab-add" type="button" class="display-tab-add" title="Create another display session">+ New display</button>
         </div>
         <section id="stage" class="stage" aria-label="Android display">

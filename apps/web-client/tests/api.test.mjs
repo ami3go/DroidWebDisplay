@@ -213,3 +213,20 @@ test("device-scoped display-session API supports tab lifecycle", async () => {
   assert.equal(calls[2].init.method, "DELETE");
   assert.equal(calls[3].init.method, "DELETE");
 });
+
+
+test("Phase 5 display diagnostics use the device-scoped endpoint", async () => {
+  const calls = [];
+  const api = new BridgeApi("", async (url) => {
+    calls.push(String(url));
+    return new Response(JSON.stringify({
+      serial: "PHONE",
+      capacity: { serial: "PHONE", activeSessions: 2, maximumSessions: 4, availableSlots: 2 },
+      displays: [],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  const result = await api.displayDiagnostics("PHONE");
+  assert.equal(result.capacity.maximumSessions, 4);
+  assert.equal(result.capacity.availableSlots, 2);
+  assert.deepEqual(calls, ["/api/v1/devices/PHONE/display-diagnostics"]);
+});

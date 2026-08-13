@@ -7,12 +7,14 @@ interface Elements {
     readonly stage: HTMLElement;
     readonly stageHint: HTMLElement;
     readonly tabs: HTMLElement;
+    readonly tabCapacity: HTMLElement;
     readonly tabAdd: HTMLButtonElement;
     readonly statusContainer: HTMLElement;
     readonly statusIcon: HTMLElement;
     readonly status: HTMLElement;
     readonly details: HTMLElement;
     readonly statistics: HTMLElement;
+    readonly displayDiagnostics: HTMLElement;
     readonly back: HTMLButtonElement;
     readonly home: HTMLButtonElement;
     readonly recent: HTMLButtonElement;
@@ -76,6 +78,9 @@ export declare class DroidWebDisplayController {
     private bindCanvasEvents;
     private renderTabs;
     private activateRuntime;
+    private refreshSessionCapacity;
+    private renderCapacity;
+    private renderDisplayDiagnostics;
     private clearActiveRuntime;
     private updateActiveRuntimeStatus;
     private closeDisplayTab;

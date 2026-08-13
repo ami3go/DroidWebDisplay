@@ -2,6 +2,7 @@ import { ControlMessageType, DeviceMessageType, ScrcpyV41Adapter, } from "@droid
 import { BridgeApi } from "./api.js";
 import { alignedFlexSize, buildSessionRequest, validateDisplayForm, VIRTUAL_DISPLAY_PROFILES, } from "./display-config.js";
 import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
+const TAB_SWITCH_TARGET_MS = 50;
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
@@ -39,6 +40,11 @@ export class DroidWebDisplayController {
     #lastRequestedSize = null;
     #runtimes = new Map();
     #activeSessionId = null;
+    #maximumDisplaySessions = 4;
+    #availableDisplaySlots = 4;
+    #lastTabSwitchMs = 0;
+    #tabSwitchCount = 0;
+    #lastDiagnosticsRenderAt = 0;
     #clipboardAcks = new Map();
     constructor(elements) {
         this.elements = elements;
@@ -54,7 +60,7 @@ export class DroidWebDisplayController {
         this.applyProfile(localStorage.getItem("droidwebdisplay-virtual-profile-v1") ?? "chatgpt-desktop");
         this.restoreBrowserSettings();
         await this.refreshDevices();
-        await this.refreshVirtualCapabilities();
+        await Promise.all([this.refreshVirtualCapabilities(), this.refreshSessionCapacity()]);
         this.updateDisplayUi();
         this.setStatus("Ready", "Select an authorized Android device and connect.");
     }
@@ -81,6 +87,9 @@ export class DroidWebDisplayController {
         const existingSerial = this.firstRuntime()?.serverSession.serial ?? null;
         if (existingSerial && existingSerial !== serial) {
             throw new Error("Close the current device display tabs before selecting another Android device");
+        }
+        if (this.#availableDisplaySlots <= 0) {
+            throw new Error(`Display session limit reached (${this.#maximumDisplaySessions} per Android device). Close a display tab before starting another.`);
         }
         const values = this.readDisplayValues();
         const errors = validateDisplayForm(values);
@@ -137,6 +146,8 @@ export class DroidWebDisplayController {
                 lastSentClipboard: "",
             };
             this.#runtimes.set(serverSession.sessionId, runtime);
+            this.#availableDisplaySlots = Math.max(0, this.#availableDisplaySlots - 1);
+            this.renderCapacity();
             this.renderTabs();
             runtime.deviceMessageTask = this.consumeDeviceMessages(serverSession.sessionId, protocolSession);
             void runtime.deviceMessageTask.catch((error) => {
@@ -160,6 +171,7 @@ export class DroidWebDisplayController {
             this.activateRuntime(serverSession.sessionId);
             this.#reconnectCount = 0;
             this.renderTabs();
+            void this.refreshSessionCapacity().catch(() => undefined);
         }
         catch (error) {
             if (serverSession && this.#runtimes.has(serverSession.sessionId)) {
@@ -285,11 +297,13 @@ export class DroidWebDisplayController {
     }
     renderTabs() {
         this.elements.tabs.replaceChildren();
+        this.renderCapacity();
         if (!this.#runtimes.size) {
             const empty = document.createElement("span");
             empty.className = "display-tabs-empty";
             empty.textContent = "No active displays";
             this.elements.tabs.append(empty);
+            this.renderDisplayDiagnostics(true);
             return;
         }
         const ids = [...this.#runtimes.keys()];
@@ -338,11 +352,14 @@ export class DroidWebDisplayController {
             item.append(select, close);
             this.elements.tabs.append(item);
         }
+        this.renderDisplayDiagnostics(true);
     }
     activateRuntime(sessionId) {
         const runtime = this.#runtimes.get(sessionId);
         if (!runtime)
             return;
+        const previousSessionId = this.#activeSessionId;
+        const switchStartedAt = performance.now();
         this.stopFlexResize();
         this.stopClipboardPolling();
         this.#activeSessionId = sessionId;
@@ -388,6 +405,77 @@ export class DroidWebDisplayController {
         void this.startClipboardPolling(false);
         runtime.canvas.focus();
         globalThis.dispatchEvent(new CustomEvent("droidwebdisplay-active-session", { detail: { sessionId } }));
+        if (previousSessionId !== null && previousSessionId !== sessionId) {
+            this.#lastTabSwitchMs = performance.now() - switchStartedAt;
+            this.#tabSwitchCount += 1;
+            this.renderDisplayDiagnostics(true);
+        }
+    }
+    async refreshSessionCapacity() {
+        const serial = this.elements.device.value;
+        if (!serial) {
+            this.#maximumDisplaySessions = 4;
+            this.#availableDisplaySlots = 4;
+            this.renderCapacity();
+            return;
+        }
+        const response = await this.#api.deviceSessions(serial);
+        this.#maximumDisplaySessions = response.maximumSessions;
+        this.#availableDisplaySlots = response.availableSlots;
+        this.renderCapacity();
+        this.updateConnectAvailability();
+    }
+    renderCapacity() {
+        const active = Math.max(0, this.#maximumDisplaySessions - this.#availableDisplaySlots);
+        this.elements.tabCapacity.textContent = `${active} / ${this.#maximumDisplaySessions} sessions`;
+        this.elements.tabCapacity.dataset.full = String(this.#availableDisplaySlots <= 0);
+        this.elements.tabCapacity.title = this.#availableDisplaySlots <= 0
+            ? `Session limit reached. Close a display before creating another.`
+            : `${this.#availableDisplaySlots} display slot(s) available on the selected Android device.`;
+    }
+    renderDisplayDiagnostics(force = false) {
+        const now = performance.now();
+        if (!force && now - this.#lastDiagnosticsRenderAt < 500)
+            return;
+        this.#lastDiagnosticsRenderAt = now;
+        this.elements.displayDiagnostics.replaceChildren();
+        const switchMetric = document.createElement("p");
+        switchMetric.className = "display-switch-metric";
+        switchMetric.textContent = this.#tabSwitchCount
+            ? `Last tab switch ${this.#lastTabSwitchMs.toFixed(2)} ms · target <${TAB_SWITCH_TARGET_MS} ms · switches ${this.#tabSwitchCount}`
+            : `Tab switch target <${TAB_SWITCH_TARGET_MS} ms · no completed tab switch yet.`;
+        this.elements.displayDiagnostics.append(switchMetric);
+        if (!this.#runtimes.size) {
+            const empty = document.createElement("p");
+            empty.className = "empty-state";
+            empty.textContent = "No active display sessions.";
+            this.elements.displayDiagnostics.append(empty);
+            return;
+        }
+        for (const [sessionId, runtime] of this.#runtimes) {
+            const row = document.createElement("div");
+            row.className = "display-diagnostic-row";
+            row.dataset.active = String(sessionId === this.#activeSessionId);
+            const heading = document.createElement("div");
+            heading.className = "display-diagnostic-heading";
+            const name = document.createElement("strong");
+            name.textContent = runtime.serverSession.display.name;
+            const state = document.createElement("span");
+            state.textContent = sessionId === this.#activeSessionId ? "ACTIVE" : "BACKGROUND";
+            heading.append(name, state);
+            const meta = document.createElement("div");
+            meta.className = "display-diagnostic-meta";
+            const video = runtime.latestStatistics;
+            const audio = runtime.latestAudioStatistics;
+            const displayId = runtime.serverSession.display.displayId ?? "…";
+            const videoText = video
+                ? `video ${video.width}×${video.height}, decoded ${video.framesDecoded}, dropped ${video.framesDropped}, queue ${video.decoderQueue}`
+                : "video waiting";
+            const audioText = audio ? `audio ${audio.codec}, ${audio.bufferedMilliseconds} ms buffered` : "audio off/unavailable";
+            meta.textContent = `${runtime.serverSession.display.kind} display ${displayId} · ${videoText} · ${audioText} · session ${sessionId.slice(0, 8)}`;
+            row.append(heading, meta);
+            this.elements.displayDiagnostics.append(row);
+        }
     }
     clearActiveRuntime() {
         this.stopFlexResize();
@@ -439,9 +527,11 @@ export class DroidWebDisplayController {
     bindEvents() {
         this.elements.refresh.addEventListener("click", () => void this.runUiAction(async () => {
             await this.refreshDevices();
-            await this.refreshVirtualCapabilities();
+            await Promise.all([this.refreshVirtualCapabilities(), this.refreshSessionCapacity()]);
         }));
-        this.elements.device.addEventListener("change", () => void this.runUiAction(() => this.refreshVirtualCapabilities()));
+        this.elements.device.addEventListener("change", () => void this.runUiAction(async () => {
+            await Promise.all([this.refreshVirtualCapabilities(), this.refreshSessionCapacity()]);
+        }));
         this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.connect()));
         this.elements.tabAdd.addEventListener("click", () => void this.runUiAction(() => this.connect()));
         this.elements.disconnect.addEventListener("click", () => void this.runUiAction(() => this.disconnect()));
@@ -593,7 +683,8 @@ export class DroidWebDisplayController {
         const selectedReady = [...this.elements.device.options].some((option) => option.value === this.elements.device.value && !option.disabled);
         const runtimeSerial = this.firstRuntime()?.serverSession.serial ?? null;
         const sameDevice = runtimeSerial === null || runtimeSerial === this.elements.device.value;
-        const disabled = !hasDevice || !selectedReady || !sameDevice || errors.length > 0 || unsupported;
+        const atCapacity = this.#availableDisplaySlots <= 0;
+        const disabled = !hasDevice || !selectedReady || !sameDevice || atCapacity || errors.length > 0 || unsupported;
         this.elements.connect.disabled = disabled;
         this.elements.tabAdd.disabled = disabled;
     }
@@ -963,6 +1054,9 @@ export class DroidWebDisplayController {
             // A closing WebSocket may already have stopped this isolated server session.
         }
         this.releaseRuntimeCanvas(runtime.canvas);
+        this.#availableDisplaySlots = Math.min(this.#maximumDisplaySessions, this.#availableDisplaySlots + 1);
+        this.renderCapacity();
+        void this.refreshSessionCapacity().catch(() => undefined);
         if (wasActive) {
             const next = this.#runtimes.values().next().value;
             if (next)
@@ -1021,6 +1115,7 @@ export class DroidWebDisplayController {
         if (!runtime)
             return;
         runtime.latestStatistics = stats;
+        this.renderDisplayDiagnostics();
         if (sessionId !== this.#activeSessionId)
             return;
         this.#latestStatistics = stats;
@@ -1037,6 +1132,7 @@ export class DroidWebDisplayController {
         if (!runtime)
             return;
         runtime.latestAudioStatistics = stats;
+        this.renderDisplayDiagnostics();
         if (sessionId !== this.#activeSessionId)
             return;
         this.#latestAudioStatistics = stats;

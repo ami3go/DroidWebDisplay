@@ -9,6 +9,7 @@ const css = await readFile(resolve(root, "static/styles.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 const mainSource = await readFile(resolve(root, "src/main.ts"), "utf8");
 const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");
+const runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");
 
 
 
@@ -218,4 +219,39 @@ test("clipboard async fallbacks stay bound to the initiating display tab", () =>
   assert.match(controllerSource, /synchronizePcClipboard\(initial, sessionId, session\)/);
   assert.match(controllerSource, /synchronizePcClipboard\(text, sessionId, session\)/);
   assert.match(controllerSource, /this\.#copyShortcutPending = false;[\s\S]{0,400}const userMuted/);
+});
+
+
+test("Phase 5 enforces visible display capacity and per-display diagnostics", () => {
+  assert.match(html, /id="display-tab-capacity"/);
+  assert.match(html, /id="display-diagnostics"/);
+  assert.match(mainSource, /tabCapacity: required<HTMLElement>\("#display-tab-capacity"\)/);
+  assert.match(mainSource, /displayDiagnostics: required<HTMLElement>\("#display-diagnostics"\)/);
+  assert.match(controllerSource, /#maximumDisplaySessions = 4/);
+  assert.match(controllerSource, /#availableDisplaySlots = 4/);
+  assert.match(controllerSource, /atCapacity = this\.#availableDisplaySlots <= 0/);
+  assert.match(controllerSource, /renderDisplayDiagnostics/);
+});
+
+test("Phase 5 tab switching stays synchronous and browser-only with a 50 ms target", () => {
+  assert.match(controllerSource, /const TAB_SWITCH_TARGET_MS = 50/);
+  const start = controllerSource.indexOf("private activateRuntime");
+  const end = controllerSource.indexOf("private async refreshSessionCapacity", start);
+  assert.ok(start >= 0 && end > start);
+  const body = controllerSource.slice(start, end);
+  assert.doesNotMatch(body, /await\s/);
+  assert.doesNotMatch(body, /#api/);
+  assert.doesNotMatch(body, /startDeviceSession|recordApplicationLaunch|refreshDevices/);
+  assert.match(body, /performance\.now\(\)/);
+  assert.match(body, /audioPlayer\.setMuted/);
+});
+
+test("active-session event does not query ADB or REST during tab switch", () => {
+  const start = runningAppSource.indexOf('globalThis.addEventListener("droidwebdisplay-active-session"');
+  const end = runningAppSource.indexOf("  });", start);
+  assert.ok(start >= 0 && end > start);
+  const body = runningAppSource.slice(start, end);
+  assert.doesNotMatch(body, /refresh\(/);
+  assert.doesNotMatch(body, /#api/);
+  assert.match(body, /selectActiveVirtualSession/);
 });

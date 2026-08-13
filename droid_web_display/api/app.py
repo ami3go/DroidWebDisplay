@@ -5,6 +5,7 @@ from pathlib import Path
 import asyncio
 import json
 import secrets
+import time
 from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, WebSocket
@@ -295,6 +296,7 @@ def create_app(
         resolved_adb,
         artifact_loader=lambda: ScrcpyArtifact.from_repository(resolved_config.repo_root),
         monitor_interval=resolved_config.device_monitor_interval,
+        maximum_sessions_per_device=resolved_config.maximum_display_sessions,
     )
     resolved_transfers = transfers or TransferManager(
         resolved_adb,
@@ -729,10 +731,44 @@ def create_app(
         # empty session list. Only active/indexed sessions belong in display tabs.
         await container.manager.select_device(serial)
         values = container.manager.list_sessions_for_device(serial)
+        capacity = container.manager.session_capacity(serial)
         return {
             "serial": serial,
             "activeSessionCount": len(values),
+            "maximumSessions": capacity["maximumSessions"],
+            "availableSlots": capacity["availableSlots"],
             "sessions": [item.to_dict() for item in values],
+        }
+
+    @app.get("/api/v1/devices/{serial}/display-diagnostics")
+    async def device_display_diagnostics(
+        serial: str,
+        container: Annotated[ServiceContainer, Depends(get_container)],
+    ) -> dict:
+        await container.manager.select_device(serial)
+        values = container.manager.list_sessions_for_device(serial)
+        capacity = container.manager.session_capacity(serial)
+        now = time.time()
+        displays = []
+        for session in values:
+            payload = session.to_dict()
+            started = session.started_at or session.created_at
+            displays.append({
+                "sessionId": session.session_id,
+                "state": session.state.value,
+                "display": payload["display"],
+                "createdAt": session.created_at,
+                "startedAt": session.started_at,
+                "ageSeconds": max(0.0, now - started),
+                "channelDiagnostics": payload["channelDiagnostics"],
+                "error": session.error,
+                "stopReason": session.stop_reason,
+                "virtualDisplay": payload["virtualDisplay"],
+            })
+        return {
+            "serial": serial,
+            "capacity": capacity,
+            "displays": displays,
         }
 
     @app.post("/api/v1/devices/{serial}/sessions", status_code=201)

@@ -5,6 +5,7 @@ import type {
   AutoDownloadSnapshotDto,
   BrowserSupportResponse,
   DestinationProfileResponse,
+  DeviceDisplayDiagnosticsResponse,
   DeviceListResponse,
   DeviceSessionListResponse,
   DeviceSessionStopResponse,
@@ -187,6 +188,10 @@ export class BridgeApi {
 
   public async deviceSessions(serial: string): Promise<DeviceSessionListResponse> {
     return this.request<DeviceSessionListResponse>(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`);
+  }
+
+  public async displayDiagnostics(serial: string): Promise<DeviceDisplayDiagnosticsResponse> {
+    return this.request<DeviceDisplayDiagnosticsResponse>(`/api/v1/devices/${encodeURIComponent(serial)}/display-diagnostics`);
   }
 
   public async startDeviceSession(serial: string, request: StartSessionRequest): Promise<SessionDto> {

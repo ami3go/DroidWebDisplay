@@ -310,6 +310,7 @@ class SessionManager:
         display_creation_timeout: float = 20.0,
         connect_retry_interval: float = 0.1,
         monitor_interval: float = 2.0,
+        maximum_sessions_per_device: int = 4,
     ) -> None:
         self.adb = adb
         self.artifact = artifact
@@ -319,6 +320,9 @@ class SessionManager:
         self.display_creation_timeout = display_creation_timeout
         self.connect_retry_interval = connect_retry_interval
         self.monitor_interval = monitor_interval
+        if not 1 <= maximum_sessions_per_device <= 8:
+            raise ValueError("maximum_sessions_per_device must be in range 1..8")
+        self.maximum_sessions_per_device = maximum_sessions_per_device
         self._sessions: dict[str, ScrcpySession] = {}
         self._device_sessions: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
@@ -391,6 +395,21 @@ class SessionManager:
             )
 
         async with self._lock:
+            # Reserve capacity before allocating any transport resources. Keeping
+            # this check under the manager lock makes concurrent Start requests
+            # deterministic and prevents two callers from both taking the final slot.
+            active_count = len(self._device_sessions.get(selected.serial, set()))
+            if active_count >= self.maximum_sessions_per_device:
+                raise SessionConflictError(
+                    f"Display session limit reached for device {selected.serial}",
+                    details={
+                        "scope": "device",
+                        "serial": selected.serial,
+                        "activeSessions": active_count,
+                        "maximumSessions": self.maximum_sessions_per_device,
+                        "availableSlots": 0,
+                    },
+                )
             session_id = self._allocate_session_id()
             scid = self._allocate_scid()
             port = self._allocate_local_port()
@@ -818,6 +837,15 @@ class SessionManager:
             (self._sessions[session_id] for session_id in session_ids if session_id in self._sessions),
             key=lambda item: item.created_at,
         )
+
+    def session_capacity(self, serial: str) -> dict:
+        active_sessions = len(self._device_sessions.get(serial, set()))
+        return {
+            "serial": serial,
+            "activeSessions": active_sessions,
+            "maximumSessions": self.maximum_sessions_per_device,
+            "availableSlots": max(0, self.maximum_sessions_per_device - active_sessions),
+        }
 
     def _index_session(self, session: ScrcpySession) -> None:
         self._device_sessions.setdefault(session.serial, set()).add(session.session_id)

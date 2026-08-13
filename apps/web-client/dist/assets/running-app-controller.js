@@ -7,6 +7,7 @@ export class RunningAppController {
     #elements;
     #apps = [];
     #virtualSession = null;
+    #virtualSessions = [];
     #refreshing = false;
     #timer = null;
     #activeSessionId = null;
@@ -20,7 +21,11 @@ export class RunningAppController {
         globalThis.addEventListener("droidwebdisplay-active-session", (event) => {
             const detail = event.detail;
             this.#activeSessionId = detail?.sessionId ?? null;
-            void this.refresh(true);
+            // Tab switching is intentionally browser-local. Use the most recent
+            // session snapshot here; the 4-second/manual refresh owns ADB/API work.
+            this.selectActiveVirtualSession();
+            this.updateTargetStatus();
+            this.updateControls();
         });
     }
     async initialize() {
@@ -41,6 +46,7 @@ export class RunningAppController {
         const serial = this.#elements.device.value;
         if (!serial) {
             this.#apps = [];
+            this.#virtualSessions = [];
             this.#virtualSession = null;
             this.render();
             this.#elements.status.textContent = "Select an authorized Android device.";
@@ -52,19 +58,16 @@ export class RunningAppController {
         try {
             const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.deviceSessions(serial)]);
             this.#apps = apps.apps;
-            const virtualSessions = sessions.sessions.filter((session) => session.state === "running"
+            this.#virtualSessions = sessions.sessions.filter((session) => session.state === "running"
                 && session.displayMode === "virtual"
                 && typeof session.virtualDisplay.displayId === "number");
-            this.#virtualSession = virtualSessions.find((session) => session.sessionId === this.#activeSessionId)
-                ?? (this.#activeSessionId === null ? virtualSessions[0] ?? null : null);
+            this.selectActiveVirtualSession();
             this.render();
-            const displayId = this.#virtualSession?.virtualDisplay.displayId;
-            this.#elements.status.textContent = displayId === null || displayId === undefined
-                ? `${this.#apps.length} GUI task(s) found. Start a virtual display to move one.`
-                : `${this.#apps.length} GUI task(s) found · target display ${displayId}.`;
+            this.updateTargetStatus();
         }
         catch (error) {
             this.#apps = [];
+            this.#virtualSessions = [];
             this.#virtualSession = null;
             this.render();
             this.#elements.status.textContent = `Running-app query failed: ${errorMessage(error)}`;
@@ -93,6 +96,16 @@ export class RunningAppController {
             this.#elements.select.value = previous;
         }
         this.updateControls();
+    }
+    selectActiveVirtualSession() {
+        this.#virtualSession = this.#virtualSessions.find((session) => session.sessionId === this.#activeSessionId)
+            ?? (this.#activeSessionId === null ? this.#virtualSessions[0] ?? null : null);
+    }
+    updateTargetStatus() {
+        const displayId = this.#virtualSession?.virtualDisplay.displayId;
+        this.#elements.status.textContent = displayId === null || displayId === undefined
+            ? `${this.#apps.length} GUI task(s) found. Start or select a virtual display to move one.`
+            : `${this.#apps.length} GUI task(s) found · target display ${displayId}.`;
     }
     selectedApp() {
         const taskId = Number(this.#elements.select.value);

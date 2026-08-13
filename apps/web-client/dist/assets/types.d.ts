@@ -95,6 +95,8 @@ export interface SessionDto {
     readonly stopReason: string | null;
     readonly dummyByteValidated: boolean;
     readonly firstChannelAttempts: number;
+    readonly createdAt?: number;
+    readonly startedAt?: number | null;
     readonly channelDiagnostics?: Readonly<Record<string, ChannelDiagnosticDto>>;
 }
 export interface DeviceListResponse {
@@ -103,10 +105,35 @@ export interface DeviceListResponse {
 export interface SessionListResponse {
     readonly sessions: readonly SessionDto[];
 }
+export interface DisplaySessionCapacityDto {
+    readonly serial: string;
+    readonly activeSessions: number;
+    readonly maximumSessions: number;
+    readonly availableSlots: number;
+}
 export interface DeviceSessionListResponse {
     readonly serial: string;
     readonly activeSessionCount: number;
+    readonly maximumSessions: number;
+    readonly availableSlots: number;
     readonly sessions: readonly SessionDto[];
+}
+export interface DisplayDiagnosticDto {
+    readonly sessionId: string;
+    readonly state: string;
+    readonly display: DisplayIdentityDto;
+    readonly createdAt: number;
+    readonly startedAt: number | null;
+    readonly ageSeconds: number;
+    readonly channelDiagnostics: Readonly<Record<string, ChannelDiagnosticDto>>;
+    readonly error: string | null;
+    readonly stopReason: string | null;
+    readonly virtualDisplay: VirtualDisplayDiagnosticDto;
+}
+export interface DeviceDisplayDiagnosticsResponse {
+    readonly serial: string;
+    readonly capacity: DisplaySessionCapacityDto;
+    readonly displays: readonly DisplayDiagnosticDto[];
 }
 export interface DeviceSessionStopResponse {
     readonly serial: string;

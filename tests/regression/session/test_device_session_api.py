@@ -47,6 +47,8 @@ def test_device_scoped_api_creates_lists_and_stops_independent_sessions(tmp_path
         payload = listed.json()
         assert payload["serial"] == "PHONE"
         assert payload["activeSessionCount"] == 2
+        assert payload["maximumSessions"] == 4
+        assert payload["availableSlots"] == 2
         assert [item["display"]["name"] for item in payload["sessions"]] == ["Phone", "Development"]
 
         stopped = client.delete(f"/api/v1/devices/PHONE/sessions/{first_body['sessionId']}")
@@ -108,3 +110,36 @@ def test_device_scoped_list_rejects_unknown_device(tmp_path: Path) -> None:
     with client:
         response = client.get("/api/v1/devices/MISSING/sessions")
         assert response.status_code == 404
+
+
+def test_device_session_limit_returns_409_and_diagnostics_report_capacity(tmp_path: Path) -> None:
+    adb = FakeAdb([AndroidDevice("PHONE", "device", model="Test")])
+    manager = SessionManager(
+        adb,
+        artifact(tmp_path),
+        connect_timeout=2.0,
+        monitor_interval=10,
+        maximum_sessions_per_device=2,
+    )
+    config = BridgeConfig(repo_root=tmp_path, authentication_required=False, maximum_display_sessions=2)
+    app = create_app(config=config, manager=manager, adb=adb)  # type: ignore[arg-type]
+    with TestClient(app) as client:
+        first = client.post("/api/v1/devices/PHONE/sessions", json={"audio": False, "displayName": "Phone"})
+        second = client.post("/api/v1/devices/PHONE/sessions", json={"audio": False, "displayName": "Work"})
+        assert first.status_code == second.status_code == 201
+
+        rejected = client.post("/api/v1/devices/PHONE/sessions", json={"audio": False, "displayName": "Overflow"})
+        assert rejected.status_code == 409
+        error = rejected.json()["error"]
+        assert error["code"] == "session_conflict"
+        assert error["details"]["maximumSessions"] == 2
+        assert error["details"]["availableSlots"] == 0
+
+        diagnostics = client.get("/api/v1/devices/PHONE/display-diagnostics")
+        assert diagnostics.status_code == 200
+        payload = diagnostics.json()
+        assert payload["capacity"]["activeSessions"] == 2
+        assert payload["capacity"]["maximumSessions"] == 2
+        assert payload["capacity"]["availableSlots"] == 0
+        assert {item["display"]["name"] for item in payload["displays"]} == {"Phone", "Work"}
+        assert all("channelDiagnostics" in item for item in payload["displays"])

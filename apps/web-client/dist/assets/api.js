@@ -105,6 +105,9 @@ export class BridgeApi {
     async deviceSessions(serial) {
         return this.request(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`);
     }
+    async displayDiagnostics(serial) {
+        return this.request(`/api/v1/devices/${encodeURIComponent(serial)}/display-diagnostics`);
+    }
     async startDeviceSession(serial, request) {
         return this.request(`/api/v1/devices/${encodeURIComponent(serial)}/sessions`, {
             method: "POST",

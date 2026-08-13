@@ -1675,6 +1675,52 @@
         "summary": "Installed Apps"
       }
     },
+    "/api/v1/devices/{serial}/display-diagnostics": {
+      "get": {
+        "operationId": "device_display_diagnostics_api_v1_devices__serial__display_diagnostics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "title": "Serial",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Device Display Diagnostics Api V1 Devices  Serial  Display Diagnostics Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Device Display Diagnostics"
+      }
+    },
     "/api/v1/devices/{serial}/running-apps": {
       "get": {
         "operationId": "running_apps_api_v1_devices__serial__running_apps_get",
