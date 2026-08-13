@@ -89,6 +89,7 @@ def _bridge_config(args: argparse.Namespace, network) -> BridgeConfig:
         transfer_data_directory=args.data_directory.resolve() if args.data_directory else None,
         default_download_directory=args.download_directory.resolve() if args.download_directory else None,
         transfer_concurrency=args.transfer_concurrency,
+        maximum_display_sessions=args.maximum_display_sessions,
         maximum_file_size=args.maximum_file_size,
         authentication_required=True,
         network_mode=network.mode,
@@ -155,6 +156,7 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
     print("WebSocket compression: disabled (low-latency mode)")
     print(f"PC download folder: {config.resolved_default_download_directory}")
     print(f"Transfer concurrency: {config.transfer_concurrency}")
+    print(f"Maximum display sessions per device: {config.maximum_display_sessions}")
     print(f"Authentication store: {config.resolved_auth_data_file}")
     print(f"Network configuration: {config.resolved_network_config_file}")
     print("Trust authority: this PC bridge (not the Android phone)")
@@ -188,6 +190,7 @@ def main() -> int:
     parser.add_argument("--data-directory", type=Path, help="Persistent state directory (auth, network and transfer metadata)")
     parser.add_argument("--download-directory", type=Path)
     parser.add_argument("--transfer-concurrency", type=int, default=1)
+    parser.add_argument("--maximum-display-sessions", type=int, default=4, choices=range(1, 9), metavar="1..8", help="Maximum simultaneous display sessions per Android device")
     parser.add_argument("--maximum-file-size", type=int, default=2 * 1024 * 1024 * 1024)
     parser.add_argument("--pid-file", type=Path, help="Write the running service PID here and remove it on clean exit")
     args = parser.parse_args()

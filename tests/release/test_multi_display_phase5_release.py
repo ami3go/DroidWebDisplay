@@ -55,3 +55,27 @@ def test_phase5_browser_exposes_capacity_and_per_display_diagnostics() -> None:
     assert 'id="display-diagnostics"' in html
     assert "renderDisplayDiagnostics" in controller
     assert "Last tab switch" in controller
+
+
+def test_phase5_limit_is_exposed_by_service_launcher() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "tools/run_bridge_service.py").read_text(encoding="utf-8")
+    assert '"--maximum-display-sessions"' in runner
+    assert "maximum_display_sessions=args.maximum_display_sessions" in runner
+    assert "choices=range(1, 9)" in runner
+
+
+def test_phase5_failure_cleanup_and_reconnect_are_session_scoped() -> None:
+    root = Path(__file__).resolve().parents[2]
+    controller = (root / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")
+    start = controller.index("private async handleRuntimeFailure")
+    end = controller.index("private setConnectedControls", start)
+    lifecycle = controller[start:end]
+    assert "cleanupRuntime(sessionId)" in lifecycle
+    assert "stopDeviceSessions" not in lifecycle
+    assert "this.#runtimes.delete(sessionId)" in lifecycle
+    reconnect_start = controller.index("private async reconnectNow")
+    reconnect_end = controller.index("private browserSettings", reconnect_start)
+    reconnect = controller[reconnect_start:reconnect_end]
+    assert "cleanupSession()" in reconnect
+    assert "stopDeviceSessions" not in reconnect

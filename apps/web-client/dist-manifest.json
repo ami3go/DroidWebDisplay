@@ -100,13 +100,13 @@
     },
     {
       "path": "assets/controller.js",
-      "bytes": 70748,
-      "sha256": "eb993a61105b3f58770ab0cb22c93eda2024cc9b841d3309889d7df2ac6ac934"
+      "bytes": 71251,
+      "sha256": "6dd9fc17f18846c0ee32d02a8c7dd055b226c8e8848f0f34ebba983b439e7e55"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 65532,
-      "sha256": "9e876f12d180ec7eafff6800e5ddf32121ccd20a0efa7828d8f716acf618a6b5"
+      "bytes": 65799,
+      "sha256": "0cbc8e5cfa3882a669dd02dc30be739bfe58aa23e380ea6d961fd816a5c2217f"
     },
     {
       "path": "assets/display-config.d.ts",

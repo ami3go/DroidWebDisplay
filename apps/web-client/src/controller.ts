@@ -15,11 +15,11 @@ import {
 } from "./display-config.js";
 import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
 import type { AndroidDevice, SessionDto, VirtualDisplayCapabilities } from "./types.js";
-
-const TAB_SWITCH_TARGET_MS = 50;
 import { WebCodecsVideoRenderer, type VideoStatistics } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer, type AudioStatistics } from "./audio-player.js";
+
+const TAB_SWITCH_TARGET_MS = 50;
 
 interface ClipboardAckWaiter {
   readonly resolve: (acknowledged: boolean) => void;
@@ -525,9 +525,17 @@ export class DroidWebDisplayController {
       this.renderCapacity();
       return;
     }
-    const response = await this.#api.deviceSessions(serial);
-    this.#maximumDisplaySessions = response.maximumSessions;
-    this.#availableDisplaySlots = response.availableSlots;
+    try {
+      const response = await this.#api.deviceSessions(serial);
+      this.#maximumDisplaySessions = response.maximumSessions;
+      this.#availableDisplaySlots = response.availableSlots;
+    } catch (error) {
+      // Capacity is a hard server-side guard. A transient status read must not
+      // prevent the existing single-display UI from initializing; retain the
+      // last known limit and let the POST endpoint remain authoritative.
+      this.#availableDisplaySlots = Math.max(0, this.#maximumDisplaySessions - this.#runtimes.size);
+      console.warn("Display session capacity refresh failed", error);
+    }
     this.renderCapacity();
     this.updateConnectAvailability();
   }

@@ -222,3 +222,29 @@ async def test_capacity_is_independent_per_android_device(tmp_path: Path) -> Non
     assert manager.session_capacity("A")["availableSlots"] == 0
     assert manager.session_capacity("B")["availableSlots"] == 0
     await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_start_requests_cannot_overbook_final_slot(tmp_path: Path) -> None:
+    from droid_web_display.errors import SessionConflictError
+
+    adb = FakeAdb([AndroidDevice("PHONE", "device")])
+    manager = SessionManager(
+        adb,
+        artifact(tmp_path),
+        connect_timeout=2.0,
+        monitor_interval=10,
+        maximum_sessions_per_device=1,
+    )
+    results = await asyncio.gather(
+        manager.start_session(serial="PHONE", options=SessionOptions(audio=False)),
+        manager.start_session(serial="PHONE", options=SessionOptions(audio=False)),
+        return_exceptions=True,
+    )
+    running = [item for item in results if not isinstance(item, BaseException)]
+    rejected = [item for item in results if isinstance(item, SessionConflictError)]
+    assert len(running) == 1
+    assert len(rejected) == 1
+    assert len(manager.list_sessions_for_device("PHONE")) == 1
+    assert len(adb.forward_servers) == 1
+    await manager.close()

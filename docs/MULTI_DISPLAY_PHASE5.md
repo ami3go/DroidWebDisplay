@@ -5,7 +5,7 @@ Phase 5 hardens the Phase 1–4 multi-display implementation without changing th
 ## Runtime limits
 
 - Default maximum simultaneous display sessions per Android device: **4**.
-- Configurable range: **1..8** through `BridgeConfig.maximum_display_sessions`.
+- Configurable range: **1..8** through `BridgeConfig.maximum_display_sessions` or the service launcher option `--maximum-display-sessions 1..8`.
 - Capacity is reserved atomically before a new scrcpy transport is allocated.
 - Capacity is independent per Android serial.
 - Stopping or failing one display releases only that display's slot.
