@@ -101,46 +101,28 @@ QLabel#statusPill[serverState="error"] {{
     color: #ffd4dc;
 }}
 
-QGroupBox {{
-    margin-top: 13px;
-    padding: 17px 13px 13px 13px;
+QFrame#card {{
     border: 1px solid {c['border']};
     border-radius: 14px;
     background-color: {c['surface']};
+}}
+
+QLabel#cardTitle {{
     color: {c['text']};
+    font-size: 10pt;
     font-weight: 700;
 }}
 
-QGroupBox::title {{
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    left: 12px;
-    padding: 0 6px;
-    background-color: {c['surface']};
-    color: {c['text']};
-}}
-
-QGroupBox QLabel {{
+QLabel[fieldLabel="true"] {{
     color: {c['text_muted']};
 }}
 
-QGroupBox QLabel[fieldValue="true"],
-QGroupBox QLabel#statusPill {{
+QFrame#card QLabel[fieldValue="true"] {{
     color: {c['text']};
 }}
 
-QGroupBox QLabel#statusPill[serverState="running"],
-QGroupBox QLabel#statusPill[serverState="external"] {{
-    color: {c['success']};
-}}
-
-QGroupBox QLabel#statusPill[serverState="starting"],
-QGroupBox QLabel#statusPill[serverState="stopping"] {{
-    color: {c['focus']};
-}}
-
-QGroupBox QLabel#statusPill[serverState="error"] {{
-    color: #ffd4dc;
+QFrame#card QLabel[errorValue="true"] {{
+    color: {c['text_secondary']};
 }}
 
 QPushButton {{

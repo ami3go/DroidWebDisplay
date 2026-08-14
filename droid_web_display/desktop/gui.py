@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QFormLayout,
-    QGroupBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -66,6 +66,18 @@ def _set_button_variant(button: QPushButton, variant: str | None) -> None:
     _refresh_widget_style(button)
 
 
+def _make_card(title: str) -> tuple[QFrame, QVBoxLayout]:
+    card = QFrame()
+    card.setObjectName("card")
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(16, 14, 16, 16)
+    layout.setSpacing(11)
+    heading = QLabel(title)
+    heading.setObjectName("cardTitle")
+    layout.addWidget(heading)
+    return card, layout
+
+
 class _StatusSignals(QObject):
     ready = Signal(object)
     failed = Signal(str)
@@ -112,8 +124,8 @@ class ServerWindow(QMainWindow):
 
         self.setWindowTitle("DroidWebDisplay Server")
         self.setWindowIcon(icon)
-        self.resize(620, 510)
-        self.setMinimumSize(540, 455)
+        self.resize(700, 760)
+        self.setMinimumSize(580, 600)
 
         self._status_value = QLabel("Starting…")
         self._status_value.setObjectName("statusPill")
@@ -156,18 +168,24 @@ class ServerWindow(QMainWindow):
         header_layout.addLayout(brand_layout, 1)
         header_layout.addWidget(self._status_value, 0, Qt.AlignRight | Qt.AlignVCenter)
 
-        status_box = QGroupBox("Server details")
-        status_form = QFormLayout(status_box)
-        status_form.setContentsMargins(14, 18, 14, 14)
-        status_form.setHorizontalSpacing(22)
+        status_box, status_layout = _make_card("Server details")
+        status_form = QFormLayout()
+        status_form.setContentsMargins(0, 0, 0, 0)
+        status_form.setHorizontalSpacing(24)
         status_form.setVerticalSpacing(9)
         status_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        status_form.addRow("URL", self._url_value)
-        status_form.addRow("Network mode", self._network_value)
-        status_form.addRow("Android device", self._device_value)
-        status_form.addRow("Process", self._pid_value)
-        status_form.addRow("Uptime", self._uptime_value)
-        status_form.addRow("Last error", self._error_value)
+        for field_name, field_value in (
+            ("URL", self._url_value),
+            ("Network mode", self._network_value),
+            ("Android device", self._device_value),
+            ("Process", self._pid_value),
+            ("Uptime", self._uptime_value),
+            ("Last error", self._error_value),
+        ):
+            field_label = QLabel(field_name)
+            field_label.setProperty("fieldLabel", True)
+            status_form.addRow(field_label, field_value)
+        status_layout.addLayout(status_form)
 
         self._start_stop_button = QPushButton("Stop Server")
         self._start_stop_button.clicked.connect(self._toggle_server)
@@ -183,14 +201,15 @@ class ServerWindow(QMainWindow):
         logs_button = QPushButton("Open Logs")
         logs_button.clicked.connect(lambda: open_directory(self.controller.paths.logs_root))
 
-        controls = QGroupBox("Actions")
-        controls_layout = QHBoxLayout(controls)
-        controls_layout.setContentsMargins(13, 17, 13, 13)
+        controls, controls_card_layout = _make_card("Actions")
+        controls_layout = QHBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(8)
         controls_layout.addWidget(open_button)
         controls_layout.addWidget(self._start_stop_button)
         controls_layout.addWidget(restart_button)
         controls_layout.addWidget(logs_button)
+        controls_card_layout.addLayout(controls_layout)
 
         self._open_browser_checkbox = QCheckBox("Open browser when DroidWebDisplay starts")
         self._open_browser_checkbox.setChecked(
@@ -221,10 +240,8 @@ class ServerWindow(QMainWindow):
         settings_hint.setObjectName("sectionHint")
         settings_hint.setWordWrap(True)
 
-        settings_box = QGroupBox("Desktop host")
-        settings_layout = QVBoxLayout(settings_box)
-        settings_layout.setContentsMargins(13, 17, 13, 13)
-        settings_layout.setSpacing(7)
+        settings_box, settings_layout = _make_card("Desktop host")
+        settings_layout.setSpacing(8)
         settings_layout.addWidget(self._open_browser_checkbox)
         settings_layout.addWidget(self._startup_checkbox)
         settings_layout.addWidget(self._start_minimized_checkbox)
