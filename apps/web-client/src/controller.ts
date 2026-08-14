@@ -108,6 +108,7 @@ export class DroidWebDisplayController {
   #latestStatistics: VideoStatistics | null = null;
   #deviceMessageTask: Promise<void> | null = null;
   #capabilities: VirtualDisplayCapabilities | null = null;
+  #capabilityRequestGeneration = 0;
   #deviceListRefreshedAt = 0;
   #resizeObserver: ResizeObserver | null = null;
   #resizeTimer: number | null = null;
@@ -431,6 +432,7 @@ export class DroidWebDisplayController {
   }
 
   private async refreshVirtualCapabilities(): Promise<void> {
+    const generation = ++this.#capabilityRequestGeneration;
     const serial = this.elements.device.value;
     if (!serial) {
       this.#capabilities = null;
@@ -442,6 +444,7 @@ export class DroidWebDisplayController {
         this.#api.virtualDisplayCapabilities(serial, this.elements.manualApp.value.trim() || "com.openai.chatgpt"),
         this.#api.launchableApps(serial),
       ]);
+      if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial) return;
       this.#capabilities = capabilities;
       const localImeOption = [...this.elements.imePolicy.options].find((option) => option.value === "local");
       if (localImeOption) localImeOption.disabled = !capabilities.localImePolicySupported;
@@ -468,6 +471,7 @@ export class DroidWebDisplayController {
         : capabilities.warnings.join(" ");
       this.elements.capability.classList.toggle("error-text", !capabilities.virtualDisplaySupported);
     } catch (error) {
+      if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial) return;
       this.#capabilities = null;
       this.elements.capability.textContent = `Capability probe failed: ${errorMessage(error)}. Physical Screen mode remains available.`;
       this.elements.capability.classList.add("error-text");

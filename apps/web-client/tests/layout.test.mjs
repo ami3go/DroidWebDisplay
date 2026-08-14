@@ -130,6 +130,14 @@ test("Android File Explorer accepts PC file drag and drop", () => {
   assert.match(html, /Drag PC files onto a folder to upload there/);
 });
 
+test("device-dependent UI refreshes reject stale or overlapping results", () => {
+  assert.match(controllerSource, /#capabilityRequestGeneration/);
+  assert.match(transferSource, /#browseGeneration/);
+  assert.match(transferSource, /#refreshTransfersBusy/);
+  assert.match(autoDownloadSource, /#refreshing/);
+  assert.match(runningAppSource, /#refreshQueued/);
+});
+
 test("Android File Explorer refreshes when stale", () => {
   assert.match(transferSource, /EXPLORER_REFRESH_STALE_MS = 3000/);
   assert.match(transferSource, /refreshExplorerIfStale/);

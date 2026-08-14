@@ -27,6 +27,7 @@ export class AutoDownloadController {
   readonly #api = new BridgeApi();
   #timer: number | null = null;
   #snapshot: AutoDownloadSnapshotDto | null = null;
+  #refreshing = false;
   #lastNotificationTimestamp = Number(localStorage.getItem("droidwebdisplay-auto-download-notification-ts") ?? "0");
 
   public constructor(private readonly elements: AutoDownloadElements) {
@@ -105,12 +106,16 @@ export class AutoDownloadController {
   }
 
   private async refresh(): Promise<void> {
+    if (this.#refreshing) return;
+    this.#refreshing = true;
     try {
       this.applySnapshot(await this.#api.autoDownload());
     } catch (error) {
       this.elements.status.textContent = "Unavailable";
       this.elements.summary.textContent = errorMessage(error);
       this.elements.summary.classList.add("error-text");
+    } finally {
+      this.#refreshing = false;
     }
   }
 

@@ -46,6 +46,8 @@ export class TransferController {
   #sortDirection: SortDirection = "ascending";
   #lastSelectedIndex: number | null = null;
   #lastBrowseAt = 0;
+  #browseGeneration = 0;
+  #refreshTransfersBusy = false;
 
   public constructor(private readonly elements: TransferElements) {
     this.bindEvents();
@@ -210,6 +212,7 @@ export class TransferController {
   }
 
   private async browse(path = this.elements.storagePath.value || "/sdcard/Download"): Promise<void> {
+    const generation = ++this.#browseGeneration;
     const serial = this.elements.device.value;
     if (!serial) {
       this.elements.storageBody.textContent = "Select an authorized Android device.";
@@ -218,6 +221,7 @@ export class TransferController {
     this.hideContextMenu();
     this.setStatus("Reading Android storage…");
     const result = await this.#api.androidStorage(serial, path);
+    if (generation !== this.#browseGeneration || this.elements.device.value !== serial) return;
     this.elements.storagePath.value = result.path;
     const root = ANDROID_ROOTS.find((candidate) => result.path === candidate || result.path.startsWith(`${candidate}/`));
     if (root && [...this.elements.storageRoot.options].some((option) => option.value === root)) this.elements.storageRoot.value = root;
@@ -502,12 +506,16 @@ export class TransferController {
   }
 
   private async refreshTransfers(): Promise<void> {
+    if (this.#refreshTransfersBusy) return;
+    this.#refreshTransfersBusy = true;
     try {
       const response = await this.#api.transfers();
       this.#lastTransfers = response.transfers;
       this.renderTransfers(response.transfers);
     } catch (error) {
       this.setStatus(errorMessage(error), true);
+    } finally {
+      this.#refreshTransfersBusy = false;
     }
   }
 

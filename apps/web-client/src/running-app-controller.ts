@@ -35,6 +35,7 @@ export class RunningAppController {
   #lastRefreshAt = 0;
   #dropdownActive = false;
   #refreshAfterDropdown = false;
+  #refreshQueued = false;
 
   public constructor(elements: Elements, api = new BridgeApi()) {
     this.#elements = elements;
@@ -51,7 +52,9 @@ export class RunningAppController {
     elements.device.addEventListener("change", () => {
       this.#dropdownActive = false;
       this.#refreshAfterDropdown = false;
-      void this.refresh();
+      this.#lastRefreshAt = 0;
+      if (this.#refreshing) this.#refreshQueued = true;
+      else void this.refresh();
     });
   }
 
@@ -68,7 +71,10 @@ export class RunningAppController {
   }
 
   public async refresh(silent = false): Promise<void> {
-    if (this.#refreshing) return;
+    if (this.#refreshing) {
+      this.#refreshQueued = true;
+      return;
+    }
     if (silent && this.#dropdownActive) {
       this.#refreshAfterDropdown = true;
       return;
@@ -89,6 +95,10 @@ export class RunningAppController {
     if (!silent) this.#elements.status.textContent = "Reading running Android applications…";
     try {
       const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
+      if (this.#elements.device.value !== serial) {
+        this.#refreshQueued = true;
+        return;
+      }
       this.#apps = apps.apps;
       const runningSessions = sessions.sessions.filter(
         (session) => session.serial === serial && session.state === "running",
@@ -114,6 +124,10 @@ export class RunningAppController {
       this.#elements.status.textContent = `Running-app query failed: ${errorMessage(error)}`;
     } finally {
       this.#refreshing = false;
+      if (this.#refreshQueued) {
+        this.#refreshQueued = false;
+        void this.refresh(true);
+      }
     }
   }
 
