@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   diagnose:
-    if: github.event.head_commit.message == 'Diagnose UI refactor phase one'
+    if: github.event.head_commit.message == 'Capture UI refactor gate output'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,8 @@ jobs:
           $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ui-refactor-1.json > evidence/release/gate-ui-refactor-1.log 2>&1
           rc=$?
           set -e
-          git add apps/web-client evidence/release/gate-ui-refactor-1.json evidence/release/gate-ui-refactor-1.log
+          git add apps/web-client
+          git add -f evidence/release/gate-ui-refactor-1.json evidence/release/gate-ui-refactor-1.log
           git commit -m "Capture phase one gate evidence"
           git push origin HEAD:agent/web-ui-refactor-builder
           exit $rc
