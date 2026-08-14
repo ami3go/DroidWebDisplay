@@ -36,6 +36,7 @@ export declare class TransferController {
     private browse;
     private renderBreadcrumbs;
     private renderStorage;
+    private entryForRow;
     private handleRowSelection;
     private prepareContextSelection;
     private setFileSelected;
