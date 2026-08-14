@@ -9,8 +9,8 @@ import tempfile
 import uuid
 from typing import Callable
 
-from PySide6.QtCore import QObject, QRunnable, QSettings, QThreadPool, QTimer, Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QIcon
+from PySide6.QtCore import QObject, QRunnable, QSettings, QThreadPool, QTimer, Qt, QUrl, Signal
+from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
     QApplication,
@@ -35,6 +35,11 @@ from PySide6.QtWidgets import (
 
 from droid_web_display import __version__
 from droid_web_display.desktop.controller import ServerController, ServerSnapshot, ServerState
+from droid_web_display.desktop.update_check import (
+    ReleaseInfo,
+    check_latest_release,
+    is_newer_release,
+)
 from droid_web_display.desktop.platform import StartupManager, open_directory
 from droid_web_display.desktop.support import (
     diagnostic_summary,
@@ -194,6 +199,7 @@ class ServerWindow(QMainWindow):
         self._thread_pool = QThreadPool.globalInstance()
         self._settings = QSettings("DroidWebDisplay", "DesktopHost")
         self._last_log_signature: tuple[object, ...] | None = None
+        self._latest_release_url = ""
 
         self.setWindowTitle("DroidWebDisplay Server")
         self.setWindowIcon(icon)
@@ -542,10 +548,91 @@ class ServerWindow(QMainWindow):
         open_logs.clicked.connect(lambda: open_directory(self.controller.paths.logs_root))
         logging_layout.addWidget(open_logs, alignment=Qt.AlignLeft)
 
+        update_card, update_layout = _make_card(
+            "Updates",
+            "Checks GitHub releases only; it does not install or replace the current build.",
+        )
+        update_form = QFormLayout()
+        update_form.setContentsMargins(0, 0, 0, 0)
+        update_form.setHorizontalSpacing(28)
+        update_form.setVerticalSpacing(8)
+        update_form.addRow(_field_label("Current version"), _field_value(__version__))
+        self._update_channel = QComboBox()
+        self._update_channel.addItems(["Stable", "Pre-release"])
+        saved_channel = str(self._settings.value("updateChannel", "Stable"))
+        self._update_channel.setCurrentText(
+            saved_channel if saved_channel in {"Stable", "Pre-release"} else "Stable"
+        )
+        self._update_channel.currentTextChanged.connect(
+            lambda value: self._settings.setValue("updateChannel", value)
+        )
+        update_form.addRow(_field_label("Release channel"), self._update_channel)
+        update_layout.addLayout(update_form)
+
+        update_actions = QHBoxLayout()
+        update_actions.setContentsMargins(0, 0, 0, 0)
+        update_actions.setSpacing(8)
+        self._check_updates_button = QPushButton("Check for updates")
+        self._check_updates_button.clicked.connect(self._check_for_updates)
+        self._open_release_button = QPushButton("Open release page")
+        self._open_release_button.setEnabled(False)
+        self._open_release_button.clicked.connect(self._open_latest_release)
+        update_actions.addWidget(self._check_updates_button)
+        update_actions.addWidget(self._open_release_button)
+        update_actions.addStretch(1)
+        update_layout.addLayout(update_actions)
+
+        self._update_status = QLabel("")
+        self._update_status.setObjectName("sectionHint")
+        self._update_status.setWordWrap(True)
+        update_layout.addWidget(self._update_status)
+
         layout.addWidget(startup_card)
         layout.addWidget(logging_card)
+        layout.addWidget(update_card)
         layout.addStretch(1)
         return page
+
+    def _check_for_updates(self) -> None:
+        channel = self._update_channel.currentText()
+        self._check_updates_button.setEnabled(False)
+        self._open_release_button.setEnabled(False)
+        self._update_status.setText(f"Checking {channel.lower()} releases…")
+
+        def completed(result: object) -> None:
+            self._check_updates_button.setEnabled(True)
+            if not isinstance(result, ReleaseInfo):
+                self._update_status.setText("GitHub returned an unexpected release result.")
+                return
+            self._latest_release_url = result.url
+            self._open_release_button.setEnabled(True)
+            try:
+                update_available = is_newer_release(__version__, result.tag)
+            except ValueError as exc:
+                self._update_status.setText(f"Could not compare release versions: {exc}")
+                return
+            if update_available:
+                self._update_status.setText(
+                    f"Update available: {result.tag} · current version {__version__}"
+                )
+            else:
+                self._update_status.setText(
+                    f"Up to date: {__version__} · latest {channel.lower()} release {result.tag}"
+                )
+
+        def failed(message: str) -> None:
+            self._check_updates_button.setEnabled(True)
+            self._update_status.setText(f"Update check failed: {message}")
+
+        self._start_support_task(
+            lambda: check_latest_release(channel),
+            on_ready=completed,
+            on_failed=failed,
+        )
+
+    def _open_latest_release(self) -> None:
+        if self._latest_release_url:
+            QDesktopServices.openUrl(QUrl(self._latest_release_url))
 
     @property
     def open_browser_on_start(self) -> bool:
