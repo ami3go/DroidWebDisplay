@@ -31,6 +31,19 @@ jobs:
           end = source.index(end_marker, start)
           script_lines = source[start:end]
           script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script_lines) + '\n'
+          exact = 'gui = replace_once(gui, old_apply, new_apply, "snapshot dashboard")'
+          resilient = '''gui, count = re.subn(
+              r"    def _apply_snapshot\\(self, snapshot: ServerSnapshot\\) -> None:\\n.*?(?=        running = snapshot.state)",
+              new_apply,
+              gui,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f"snapshot dashboard replacement count={count}")'''
+          if exact not in script:
+              raise SystemExit('snapshot replacement anchor missing from recovered patcher')
+          script = script.replace(exact, resilient, 1)
           Path('/tmp/apply_server_ui.py').write_text(script, encoding='utf-8')
           PY
           python /tmp/apply_server_ui.py
