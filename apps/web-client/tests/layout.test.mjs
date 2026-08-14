@@ -149,6 +149,15 @@ test("Android File Explorer refreshes when stale", () => {
   assert.match(transferSource, /refreshExplorerIfStale/);
 });
 
+test("idle file polling is adaptive and visibility aware", () => {
+  assert.doesNotMatch(transferSource, /setInterval\(\(\) => void this\.refreshTransfers\(\), 750\)/);
+  assert.match(transferSource, /transferRefreshDelay\(\)/);
+  assert.match(transferSource, /document\.visibilityState !== "visible"/);
+  assert.doesNotMatch(autoDownloadSource, /setInterval\(\(\) => void this\.refresh\(\), 1000\)/);
+  assert.match(autoDownloadSource, /private refreshDelay\(\): number/);
+  assert.match(autoDownloadSource, /monitoring \? 5000 : 10_000/);
+});
+
 test("File sync keeps Save primary and moves uncommon actions into overflow", () => {
   assert.match(html, /class="sync-action-row"/);
   assert.match(html, /class="sync-more-actions"/);

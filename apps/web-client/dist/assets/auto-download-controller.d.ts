@@ -27,6 +27,9 @@ export declare class AutoDownloadController {
     private bindEvents;
     private refreshRoots;
     private save;
+    private filesDrawerVisible;
+    private refreshDelay;
+    private scheduleRefresh;
     private refresh;
     private applySnapshot;
     private renderEvents;

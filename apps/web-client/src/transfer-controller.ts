@@ -81,7 +81,8 @@ export class TransferController {
     }
     this.elements.storageRoot.value = roots.defaultPath;
     await Promise.allSettled([this.browse(roots.defaultPath), this.refreshTransfers()]);
-    this.#pollTimer = window.setInterval(() => void this.refreshTransfers(), 750);
+    this.scheduleTransferRefresh();
+    document.addEventListener("visibilitychange", () => this.scheduleTransferRefresh(0));
   }
 
   private bindEvents(): void {
@@ -91,7 +92,10 @@ export class TransferController {
       void this.runAction(() => this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])]));
     });
     this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));
-    document.querySelector<HTMLButtonElement>('[data-group="files"]')?.addEventListener("click", () => { void this.runAction(() => this.refreshExplorerIfStale()); });
+    document.querySelector<HTMLButtonElement>('[data-group="files"]')?.addEventListener("click", () => {
+      void this.runAction(() => this.refreshExplorerIfStale());
+      this.scheduleTransferRefresh(0);
+    });
     const explorerSection = document.querySelector<HTMLDetailsElement>('[data-section-key="files-explorer"]');
     explorerSection?.addEventListener("toggle", () => { if (explorerSection.open) void this.runAction(() => this.refreshExplorerIfStale()); });
     this.elements.storageUp.addEventListener("click", () => void this.runAction(() => this.browse(parentAndroidPath(this.elements.storagePath.value))));
@@ -516,6 +520,26 @@ export class TransferController {
     this.#lastSelectedIndex = null;
     this.updateSelectionUi();
     this.setStatus(`Queued ${selected.length} download(s)`);
+  }
+
+  private filesDrawerVisible(): boolean {
+    return document.visibilityState === "visible"
+      && document.querySelector('.gb-drawer')?.classList.contains("gb-open") === true
+      && document.querySelector('.gb-drawer-slot[data-slot="files"]')?.classList.contains("gb-active") === true;
+  }
+
+  private transferRefreshDelay(): number {
+    if (document.visibilityState !== "visible") return 10_000;
+    if (this.#lastTransfers.some((transfer) => ACTIVE_STATES.has(transfer.state))) return 750;
+    return this.filesDrawerVisible() ? 2500 : 8000;
+  }
+
+  private scheduleTransferRefresh(delay = this.transferRefreshDelay()): void {
+    if (this.#pollTimer !== null) window.clearTimeout(this.#pollTimer);
+    this.#pollTimer = window.setTimeout(() => {
+      this.#pollTimer = null;
+      void this.refreshTransfers().finally(() => this.scheduleTransferRefresh());
+    }, Math.max(0, delay));
   }
 
   private async refreshTransfers(): Promise<void> {

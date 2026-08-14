@@ -51,7 +51,8 @@ export class TransferController {
         }
         this.elements.storageRoot.value = roots.defaultPath;
         await Promise.allSettled([this.browse(roots.defaultPath), this.refreshTransfers()]);
-        this.#pollTimer = window.setInterval(() => void this.refreshTransfers(), 750);
+        this.scheduleTransferRefresh();
+        document.addEventListener("visibilitychange", () => this.scheduleTransferRefresh(0));
     }
     bindEvents() {
         this.elements.device.addEventListener("change", () => void this.runAction(async () => { await this.refreshStorageRoots(); await this.browse(); }));
@@ -61,7 +62,10 @@ export class TransferController {
             void this.runAction(() => this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])]));
         });
         this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));
-        document.querySelector('[data-group="files"]')?.addEventListener("click", () => { void this.runAction(() => this.refreshExplorerIfStale()); });
+        document.querySelector('[data-group="files"]')?.addEventListener("click", () => {
+            void this.runAction(() => this.refreshExplorerIfStale());
+            this.scheduleTransferRefresh(0);
+        });
         const explorerSection = document.querySelector('[data-section-key="files-explorer"]');
         explorerSection?.addEventListener("toggle", () => { if (explorerSection.open)
             void this.runAction(() => this.refreshExplorerIfStale()); });
@@ -502,6 +506,26 @@ export class TransferController {
         this.#lastSelectedIndex = null;
         this.updateSelectionUi();
         this.setStatus(`Queued ${selected.length} download(s)`);
+    }
+    filesDrawerVisible() {
+        return document.visibilityState === "visible"
+            && document.querySelector('.gb-drawer')?.classList.contains("gb-open") === true
+            && document.querySelector('.gb-drawer-slot[data-slot="files"]')?.classList.contains("gb-active") === true;
+    }
+    transferRefreshDelay() {
+        if (document.visibilityState !== "visible")
+            return 10_000;
+        if (this.#lastTransfers.some((transfer) => ACTIVE_STATES.has(transfer.state)))
+            return 750;
+        return this.filesDrawerVisible() ? 2500 : 8000;
+    }
+    scheduleTransferRefresh(delay = this.transferRefreshDelay()) {
+        if (this.#pollTimer !== null)
+            window.clearTimeout(this.#pollTimer);
+        this.#pollTimer = window.setTimeout(() => {
+            this.#pollTimer = null;
+            void this.refreshTransfers().finally(() => this.scheduleTransferRefresh());
+        }, Math.max(0, delay));
     }
     async refreshTransfers() {
         if (this.#refreshTransfersBusy)
