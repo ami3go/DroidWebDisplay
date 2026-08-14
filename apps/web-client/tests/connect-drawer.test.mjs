@@ -7,6 +7,7 @@ import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.js"), "utf8");
 const connectCss = await readFile(resolve(root, "static/droidwebdisplay-connect-drawer.css"), "utf8");
+const drawerCss = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 
 test("Display is the first drawer group and owns connection controls", () => {
@@ -66,4 +67,16 @@ test("drawer pin control is compact and close can unpin in one action", () => {
   assert.match(drawerSource, /Unpin and close drawer/);
   assert.match(drawerSource, /bindDrawerKeyboard\(\)/);
   assert.match(drawerSource, /event\.key !== 'Escape'/);
+});
+
+test("drawer width is user resizable and persisted", () => {
+  assert.match(drawerSource, /DRAWER_WIDTH_KEY = 'droidwebdisplay\.ui\.drawer\.width\.v1'/);
+  assert.match(drawerSource, /function bindDrawerResize\(\)/);
+  assert.match(drawerSource, /gb-drawer-resize-handle/);
+  assert.match(drawerSource, /addEventListener\('pointerdown'/);
+  assert.match(drawerSource, /addEventListener\('pointermove'/);
+  assert.match(drawerSource, /addEventListener\('dblclick'/);
+  assert.match(drawerSource, /style\.setProperty\('--gb-drawer-w'/);
+  assert.match(drawerCss, /\.gb-drawer-resize-handle \{/);
+  assert.match(drawerCss, /cursor: ew-resize/);
 });

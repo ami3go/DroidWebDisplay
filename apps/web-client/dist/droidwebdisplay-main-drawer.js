@@ -1,9 +1,12 @@
-/* DroidWebDisplay native single-drawer controller v1.4.0 */
+/* DroidWebDisplay native single-drawer controller v1.5.0 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
   const LAST_GROUP_KEY = 'droidwebdisplay.ui.drawer.lastGroup.v1';
   const ACCORDION_KEY = 'droidwebdisplay.ui.drawer.accordions.v1';
+  const DRAWER_WIDTH_KEY = 'droidwebdisplay.ui.drawer.width.v1';
+  const DRAWER_MIN_WIDTH = 280;
+  const DRAWER_MAX_WIDTH = 720;
   const ROOT_ID = 'gb-single-drawer-root';
   const CONNECTION_STYLE_ID = 'droidwebdisplay-connect-drawer-css';
   const GROUPS = ['display','clipboard','files','audio','access','diagnostics','settings'];
@@ -154,6 +157,84 @@
       details.addEventListener('toggle', () => { const current = loadAccordionState(); current[key] = details.open; set(ACCORDION_KEY, JSON.stringify(current)); });
     });
   }
+  function drawerWidthBounds() {
+    const rail = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gb-rail-w')) || 58;
+    return {
+      min: DRAWER_MIN_WIDTH,
+      max: Math.max(DRAWER_MIN_WIDTH, Math.min(DRAWER_MAX_WIDTH, window.innerWidth - rail - 120)),
+    };
+  }
+  function applyDrawerWidth(width, persist = false) {
+    const bounds = drawerWidthBounds();
+    const next = Math.round(Math.min(bounds.max, Math.max(bounds.min, Number(width) || bounds.min)));
+    document.documentElement.style.setProperty('--gb-drawer-w', `${next}px`);
+    if (persist) set(DRAWER_WIDTH_KEY, String(next));
+    return next;
+  }
+  function resetDrawerWidth() {
+    document.documentElement.style.removeProperty('--gb-drawer-w');
+    try { localStorage.removeItem(DRAWER_WIDTH_KEY); } catch (_) {}
+  }
+  function bindDrawerResize() {
+    const panel = drawer();
+    if (!panel || panel.querySelector('.gb-drawer-resize-handle')) return;
+    const stored = Number.parseInt(get(DRAWER_WIDTH_KEY, ''), 10);
+    if (Number.isFinite(stored)) applyDrawerWidth(stored);
+
+    const handle = document.createElement('div');
+    handle.className = 'gb-drawer-resize-handle';
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'vertical');
+    handle.setAttribute('aria-label', 'Resize drawer');
+    handle.tabIndex = 0;
+    handle.title = 'Drag to resize drawer · Double-click to reset';
+    panel.append(handle);
+
+    let startX = 0;
+    let startWidth = 0;
+    let activePointer = null;
+    const finish = () => {
+      if (activePointer === null) return;
+      activePointer = null;
+      document.documentElement.classList.remove('gb-drawer-resizing');
+      const width = panel.getBoundingClientRect().width;
+      applyDrawerWidth(width, true);
+    };
+    handle.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      startX = event.clientX;
+      startWidth = panel.getBoundingClientRect().width;
+      activePointer = event.pointerId;
+      handle.setPointerCapture?.(event.pointerId);
+      document.documentElement.classList.add('gb-drawer-resizing');
+    });
+    handle.addEventListener('pointermove', event => {
+      if (activePointer !== event.pointerId) return;
+      applyDrawerWidth(startWidth + event.clientX - startX);
+    });
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', finish);
+    handle.addEventListener('dblclick', event => {
+      event.preventDefault();
+      resetDrawerWidth();
+    });
+    handle.addEventListener('keydown', event => {
+      if (event.key === 'Home') {
+        event.preventDefault();
+        resetDrawerWidth();
+        return;
+      }
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      const delta = event.key === 'ArrowRight' ? 16 : -16;
+      applyDrawerWidth(panel.getBoundingClientRect().width + delta, true);
+    });
+    window.addEventListener('resize', () => {
+      const current = Number.parseInt(get(DRAWER_WIDTH_KEY, ''), 10);
+      if (Number.isFinite(current)) applyDrawerWidth(current, true);
+    });
+  }
   function boot() {
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
@@ -164,6 +245,7 @@
     applyRailOrder();
     bindStatusShortcut();
     bindDrawerKeyboard();
+    bindDrawerResize();
     ui.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => openGroup(button.dataset.group)));
     ui.querySelector('.gb-drawer-pin')?.addEventListener('click', () => applyPinned(!pinned));
     ui.querySelectorAll('[data-action="close"], .gb-drawer-close').forEach(button => button.addEventListener('click', closeOrUnpinDrawer));

@@ -182,6 +182,32 @@ select:focus, input:focus, textarea:focus, button:focus-visible { outline: none 
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 .gb-drawer.gb-open { transform: translateX(0); }
+
+.gb-drawer-resize-handle {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.gb-drawer-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: transparent;
+  transition: background .12s ease;
+}
+.gb-drawer-resize-handle:hover::after,
+.gb-drawer-resize-handle:focus-visible::after,
+html.gb-drawer-resizing .gb-drawer-resize-handle::after { background: var(--dwd-cyan); }
+.gb-drawer-resize-handle:focus-visible { outline: none; }
+html.gb-drawer-resizing, html.gb-drawer-resizing * { cursor: ew-resize !important; user-select: none !important; }
 .gb-drawer-header { min-height: 56px; display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 13px; border-bottom: 1px solid var(--dwd-border); background: rgba(7, 16, 28, .52); }
 .gb-drawer-title { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; color: #eef6fd; font-size: 14px; font-weight: 700; }
 .gb-drawer-title::before {
