@@ -34,6 +34,7 @@ jobs:
         run: |
           python /tmp/apply_explorer_consolidation.py
           python /tmp/update_explorer_tests.py
+          $HOME/.local/bin/uv run python tools/generate_openapi.py
       - name: Build and verify
         run: |
           npm run build --prefix apps/web-client
@@ -44,6 +45,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A apps/web-client droid_web_display tests
+          git add -A apps/web-client droid_web_display tests tools/release_gate.py packages/bridge-api/openapi/openapi-v1.json
           git commit -m "Consolidate uploads into File Explorer"
           git push origin HEAD:stable_main
