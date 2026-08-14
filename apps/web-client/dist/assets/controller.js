@@ -33,6 +33,7 @@ export class DroidWebDisplayController {
     #latestStatistics = null;
     #deviceMessageTask = null;
     #capabilities = null;
+    #capabilityRequestGeneration = 0;
     #deviceListRefreshedAt = 0;
     #resizeObserver = null;
     #resizeTimer = null;
@@ -360,6 +361,7 @@ export class DroidWebDisplayController {
             await this.refreshVirtualCapabilities();
     }
     async refreshVirtualCapabilities() {
+        const generation = ++this.#capabilityRequestGeneration;
         const serial = this.elements.device.value;
         if (!serial) {
             this.#capabilities = null;
@@ -371,6 +373,8 @@ export class DroidWebDisplayController {
                 this.#api.virtualDisplayCapabilities(serial, this.elements.manualApp.value.trim() || "com.openai.chatgpt"),
                 this.#api.launchableApps(serial),
             ]);
+            if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial)
+                return;
             this.#capabilities = capabilities;
             const localImeOption = [...this.elements.imePolicy.options].find((option) => option.value === "local");
             if (localImeOption)
@@ -400,6 +404,8 @@ export class DroidWebDisplayController {
             this.elements.capability.classList.toggle("error-text", !capabilities.virtualDisplaySupported);
         }
         catch (error) {
+            if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial)
+                return;
             this.#capabilities = null;
             this.elements.capability.textContent = `Capability probe failed: ${errorMessage(error)}. Physical Screen mode remains available.`;
             this.elements.capability.classList.add("error-text");

@@ -21,6 +21,7 @@ export class RunningAppController {
     #lastRefreshAt = 0;
     #dropdownActive = false;
     #refreshAfterDropdown = false;
+    #refreshQueued = false;
     constructor(elements, api = new BridgeApi()) {
         this.#elements = elements;
         this.#api = api;
@@ -36,7 +37,11 @@ export class RunningAppController {
         elements.device.addEventListener("change", () => {
             this.#dropdownActive = false;
             this.#refreshAfterDropdown = false;
-            void this.refresh();
+            this.#lastRefreshAt = 0;
+            if (this.#refreshing)
+                this.#refreshQueued = true;
+            else
+                void this.refresh();
         });
     }
     async initialize() {
@@ -52,8 +57,10 @@ export class RunningAppController {
         this.#timer = null;
     }
     async refresh(silent = false) {
-        if (this.#refreshing)
+        if (this.#refreshing) {
+            this.#refreshQueued = true;
             return;
+        }
         if (silent && this.#dropdownActive) {
             this.#refreshAfterDropdown = true;
             return;
@@ -74,6 +81,10 @@ export class RunningAppController {
             this.#elements.status.textContent = "Reading running Android applications…";
         try {
             const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
+            if (this.#elements.device.value !== serial) {
+                this.#refreshQueued = true;
+                return;
+            }
             this.#apps = apps.apps;
             const runningSessions = sessions.sessions.filter((session) => session.serial === serial && session.state === "running");
             this.#virtualSession = runningSessions.find((session) => session.displayMode === "virtual"
@@ -97,6 +108,10 @@ export class RunningAppController {
         }
         finally {
             this.#refreshing = false;
+            if (this.#refreshQueued) {
+                this.#refreshQueued = false;
+                void this.refresh(true);
+            }
         }
     }
     beginDropdownInteraction() {
