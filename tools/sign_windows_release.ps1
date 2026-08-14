@@ -8,7 +8,8 @@ param(
   [string]$TimestampUrl = "http://timestamp.digicert.com",
   [string]$ChecksumManifest = "",
   [switch]$VerifyOnly,
-  [switch]$SkipTimestamp
+  [switch]$SkipTimestamp,
+  [switch]$CiSelfSignedSmoke
 )
 
 Set-StrictMode -Version Latest
@@ -92,18 +93,27 @@ if ([IO.Path]::GetExtension($resolvedFile) -ne ".exe") {
   throw "Only Windows .exe release artifacts are accepted: $resolvedFile"
 }
 
+$thumbprint = $CertificateThumbprint -replace '\s', ''
+if ($thumbprint -and $thumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
+  throw "Certificate thumbprint must contain exactly 40 hexadecimal characters."
+}
+
+if ($CiSelfSignedSmoke) {
+  if (-not $SkipTimestamp) {
+    throw "-CiSelfSignedSmoke is test-only and requires -SkipTimestamp. Production signing must be timestamped."
+  }
+  if ([string]::IsNullOrWhiteSpace($thumbprint)) {
+    throw "-CiSelfSignedSmoke requires -CertificateThumbprint so the embedded signer identity can be verified."
+  }
+}
+
 Write-Host "Resolving signtool.exe."
 $script:ResolvedSignTool = Resolve-SignTool
 Write-Host "Using SignTool: $script:ResolvedSignTool"
 
 if (-not $VerifyOnly) {
-  if ([string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
+  if ([string]::IsNullOrWhiteSpace($thumbprint)) {
     throw "-CertificateThumbprint is required when signing."
-  }
-
-  $thumbprint = $CertificateThumbprint -replace '\s', ''
-  if ($thumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
-    throw "Certificate thumbprint must contain exactly 40 hexadecimal characters."
   }
 
   $signArguments = @(
@@ -125,19 +135,35 @@ if (-not $VerifyOnly) {
   Invoke-SignTool -Operation "sign" -Arguments $signArguments
 }
 
-Invoke-SignTool -Operation "verify" -Arguments @("verify", "/pa", "/all", "/v", $resolvedFile)
+if (-not $CiSelfSignedSmoke) {
+  Invoke-SignTool -Operation "verify" -Arguments @("verify", "/pa", "/all", "/v", $resolvedFile)
+}
 
-Write-Host "PowerShell Authenticode verification starting."
+Write-Host "PowerShell Authenticode inspection starting."
 $signature = Get-AuthenticodeSignature -FilePath $resolvedFile
-if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+if (-not $signature.SignerCertificate) {
+  throw "Authenticode inspection found no embedded signer certificate."
+}
+
+$actualThumbprint = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+if ($CiSelfSignedSmoke) {
+  if ($actualThumbprint -ne $thumbprint.ToUpperInvariant()) {
+    throw "CI self-signed smoke signer mismatch: expected $thumbprint, got $actualThumbprint"
+  }
+  Write-Host "CI self-signed Authenticode signer matched expected thumbprint."
+} elseif ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
   throw "Authenticode verification failed: $($signature.Status) - $($signature.StatusMessage)"
 }
-Write-Host "PowerShell Authenticode verification completed."
+Write-Host "PowerShell Authenticode inspection completed."
 
 if ($ChecksumManifest) {
   Update-ChecksumManifest -SignedFile $resolvedFile -Manifest $ChecksumManifest
 }
 
-$subject = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { "unknown" }
-Write-Host "Authenticode signature valid: $resolvedFile"
+$subject = $signature.SignerCertificate.Subject
+if ($CiSelfSignedSmoke) {
+  Write-Host "Authenticode CI smoke signature present: $resolvedFile"
+} else {
+  Write-Host "Authenticode signature valid: $resolvedFile"
+}
 Write-Host "Signer: $subject"

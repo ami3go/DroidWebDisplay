@@ -103,42 +103,7 @@ jobs:
           $signedCopy = Join-Path $env:RUNNER_TEMP "DroidWebDisplay-signing-smoke.exe"
           $checksumManifest = Join-Path $env:RUNNER_TEMP "SHA256SUMS-signing-smoke.txt"
           Copy-Item .\dist\DroidWebDisplay.exe $signedCopy
-
-          function Add-CurrentUserCertificate {
-            param(
-              [Parameter(Mandatory = $true)][string]$StoreName,
-              [Parameter(Mandatory = $true)]$Certificate
-            )
-            $store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
-              $StoreName,
-              [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
-            )
-            try {
-              $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-              $store.Add($Certificate)
-            }
-            finally {
-              $store.Close()
-            }
-          }
-
-          function Remove-CurrentUserCertificate {
-            param(
-              [Parameter(Mandatory = $true)][string]$StoreName,
-              [Parameter(Mandatory = $true)]$Certificate
-            )
-            $store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
-              $StoreName,
-              [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
-            )
-            try {
-              $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-              $store.Remove($Certificate)
-            }
-            finally {
-              $store.Close()
-            }
-          }
+          $unsignedHash = (Get-FileHash -LiteralPath $signedCopy -Algorithm SHA256).Hash
 
           Write-Host "Creating disposable CI code-signing certificate."
           $certificate = New-SelfSignedCertificate `
@@ -149,21 +114,28 @@ jobs:
             -NotAfter (Get-Date).AddDays(1)
 
           try {
-            Write-Host "Trusting disposable CI certificate through CurrentUser X509 stores."
-            Add-CurrentUserCertificate -StoreName "Root" -Certificate $certificate
-            Add-CurrentUserCertificate -StoreName "TrustedPublisher" -Certificate $certificate
-            Write-Host "Disposable CI certificate trusted."
-
-            Write-Host "Invoking signing helper on disposable EXE copy."
+            Write-Host "Invoking signing helper on disposable EXE copy without trusting the self-signed root."
             .\tools\sign_windows_release.ps1 `
               -File $signedCopy `
               -CertificateThumbprint $certificate.Thumbprint `
+              -CiSelfSignedSmoke `
               -SkipTimestamp `
               -ChecksumManifest $checksumManifest
-            Write-Host "Invoking verification-only path."
-            .\tools\sign_windows_release.ps1 -File $signedCopy -VerifyOnly
 
-            $expectedHash = (Get-FileHash -LiteralPath $signedCopy -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Host "Invoking CI verification-only path."
+            .\tools\sign_windows_release.ps1 `
+              -File $signedCopy `
+              -CertificateThumbprint $certificate.Thumbprint `
+              -CiSelfSignedSmoke `
+              -SkipTimestamp `
+              -VerifyOnly
+
+            $signedHash = (Get-FileHash -LiteralPath $signedCopy -Algorithm SHA256).Hash
+            if ($signedHash -eq $unsignedHash) {
+              throw "Authenticode signing did not change the disposable executable bytes."
+            }
+
+            $expectedHash = $signedHash.ToLowerInvariant()
             $expectedLine = "$expectedHash  DroidWebDisplay-signing-smoke.exe"
             $manifestLines = @(Get-Content -LiteralPath $checksumManifest)
             if ($manifestLines.Count -ne 1 -or $manifestLines[0] -ne $expectedLine) {
@@ -173,9 +145,7 @@ jobs:
           }
           finally {
             Write-Host "Cleaning disposable signing material."
-            Remove-CurrentUserCertificate -StoreName "TrustedPublisher" -Certificate $certificate
-            Remove-CurrentUserCertificate -StoreName "Root" -Certificate $certificate
-            Remove-CurrentUserCertificate -StoreName "My" -Certificate $certificate
+            Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
             Remove-Item $signedCopy, $checksumManifest -Force -ErrorAction SilentlyContinue
           }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

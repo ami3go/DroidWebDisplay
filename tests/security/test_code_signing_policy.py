@@ -23,6 +23,10 @@ def test_signing_helper_is_sha256_timestamped_and_fail_closed() -> None:
     assert "ChecksumManifest" in script
     assert "Get-FileHash" in script
     assert "Only Windows .exe release artifacts are accepted" in script
+    assert "CiSelfSignedSmoke" in script
+    assert "-CiSelfSignedSmoke is test-only and requires -SkipTimestamp" in script
+    assert "requires -CertificateThumbprint" in script
+    assert "CI self-signed smoke signer mismatch" in script
     assert ".pfx" not in script.lower()
     assert ".p12" not in script.lower()
 
@@ -35,13 +39,14 @@ def test_windows_ci_smokes_signing_on_disposable_copy_only() -> None:
     assert "DroidWebDisplay-signing-smoke.exe" in workflow
     assert "New-SelfSignedCertificate" in workflow
     assert "-Type CodeSigningCert" in workflow
-    assert "System.Security.Cryptography.X509Certificates.X509Store" in workflow
-    assert 'Add-CurrentUserCertificate -StoreName "Root"' in workflow
-    assert 'Add-CurrentUserCertificate -StoreName "TrustedPublisher"' in workflow
-    assert 'Remove-CurrentUserCertificate -StoreName "Root"' in workflow
-    assert 'Remove-CurrentUserCertificate -StoreName "TrustedPublisher"' in workflow
+    assert "-CiSelfSignedSmoke" in workflow
     assert "-SkipTimestamp" in workflow
     assert "-VerifyOnly" in workflow
+    assert "Authenticode signing did not change the disposable executable bytes" in workflow
+    assert "Cert:\\CurrentUser\\Root" not in workflow
+    assert "Cert:\\CurrentUser\\TrustedPublisher" not in workflow
+    assert "Add-CurrentUserCertificate" not in workflow
+    assert "Import-Certificate" not in workflow
     assert "Remove-Item $signedCopy" in workflow
     assert "path: dist/DroidWebDisplay.exe" in workflow
     assert "path: $signedCopy" not in workflow
@@ -58,6 +63,9 @@ def test_code_signing_policy_protects_private_keys_and_post_signing_checksums() 
     assert "Azure Artifact Signing" in policy
     assert "SignPath Foundation" in policy
     assert "Android SDK Platform-Tools" in policy
+    assert "deliberately **not** added to Trusted Root or Trusted Publishers" in policy
+    assert "does not claim public trust" in policy
+    assert "Production release signing must use an RFC 3161 timestamp" in policy
     assert "The normal package build and CI smoke remain unsigned" in packaging
     assert "PFX/P12 files in GitHub Actions secrets" in packaging
 

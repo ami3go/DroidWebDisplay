@@ -9,7 +9,7 @@ For a final Windows release:
 1. Build and smoke-test the Windows executable from the exact release commit using the normal Release Gate.
 2. Copy the validated executable to the controlled signing host or signing service.
 3. Sign the executable with a publicly trusted code-signing identity using SHA-256.
-4. Apply an RFC 3161 timestamp using SHA-256. Timestamping is required for production so the Authenticode signature can remain valid after the short-lived signing certificate or certificate validity period ends.
+4. Apply an RFC 3161 timestamp using SHA-256. Timestamping is required for production so the Authenticode signature can remain valid after the signing certificate expires.
 5. Verify the resulting Authenticode signature with the Windows Authenticode policy.
 6. Regenerate `SHA256SUMS.txt` after signing. Authenticode changes the executable bytes, so any checksum produced before signing is obsolete.
 7. Publish only the signed executable, the post-signing checksum manifest, and release notes that state the exact source commit and signing status.
@@ -73,13 +73,13 @@ Sign and update the checksum manifest:
   -ChecksumManifest .\release\SHA256SUMS.txt
 ```
 
-The helper performs all of the following:
+The normal production path performs all of the following:
 
 - signs only an `.exe` artifact;
 - uses SHA-256 for the Authenticode file digest;
 - uses RFC 3161 timestamping with SHA-256 for production signing;
 - runs `signtool verify /pa /all /v` after signing;
-- checks `Get-AuthenticodeSignature` returns `Valid`;
+- requires `Get-AuthenticodeSignature` to return `Valid`;
 - rewrites the checksum entry for the executable after signing.
 
 Verify an already signed executable without changing it:
@@ -92,11 +92,15 @@ Verify an already signed executable without changing it:
 
 ## CI signing smoke
 
-The Windows Release Gate creates a disposable copy of the CI executable, creates a temporary self-signed code-signing certificate, trusts it only inside the ephemeral runner, signs and verifies the copy, validates checksum rewriting, then deletes the copy and test certificate.
+The Windows Release Gate creates a disposable copy of the CI executable and a temporary self-signed code-signing certificate in the ephemeral runner's `CurrentUser\My` store. The self-signed certificate is deliberately **not** added to Trusted Root or Trusted Publishers.
 
-The uploaded `windows-package-smoke` artifact remains the original unsigned CI executable. The temporary CI certificate must never be used for a public release.
+CI invokes the same `signtool sign` code path on the disposable EXE, then uses the helper's explicit `-CiSelfSignedSmoke` mode to confirm that an Authenticode signer is embedded and that the signer certificate thumbprint exactly matches the disposable certificate. The smoke also confirms that signing changes the EXE bytes and that the post-signing SHA-256 manifest matches the signed copy.
 
-`-SkipTimestamp` exists only for this isolated CI smoke. Production release signing must use an RFC 3161 timestamp.
+This CI-only mode does not claim public trust and does not run the production trust-chain verification. It is fail-closed: `-CiSelfSignedSmoke` requires the expected certificate thumbprint and requires `-SkipTimestamp`. The normal production path remains unchanged and requires `signtool verify /pa /all /v` plus `Get-AuthenticodeSignature` status `Valid`.
+
+The uploaded `windows-package-smoke` artifact remains the original unsigned CI executable. The disposable signed copy and temporary certificate are deleted and must never be used for a public release.
+
+`-SkipTimestamp` and `-CiSelfSignedSmoke` exist only for this isolated CI test. Production release signing must use an RFC 3161 timestamp and must not use `-CiSelfSignedSmoke`.
 
 ## Release checklist
 
