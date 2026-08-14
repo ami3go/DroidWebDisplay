@@ -61,8 +61,6 @@
         
       </div>
       <div class="connection-row">
-        <select id="device" aria-label="Android device"></select>
-        <button id="connect" class="compact">Connect</button>
         <div id="connection-status" class="connection-status" data-state="disconnected" aria-live="polite" role="button" tabindex="0" title="Checking browser capabilities…">
           <span id="status-icon" class="connection-status-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
@@ -97,9 +95,9 @@
     </header>
     <div id="gb-single-drawer-root" data-version="1.1.0">
       <nav class="gb-rail" aria-label="DroidWebDisplay tools">
-        <button type="button" class="gb-rail-button" data-group="files" aria-selected="false" title="Files"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Files</span></button>
-        <button type="button" class="gb-rail-button" data-group="clipboard" aria-selected="false" title="Clipboard"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Clipboard</span></button>
         <button type="button" class="gb-rail-button" data-group="display" aria-selected="false" title="Display"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Display</span></button>
+        <button type="button" class="gb-rail-button" data-group="clipboard" aria-selected="false" title="Clipboard"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Clipboard</span></button>
+        <button type="button" class="gb-rail-button" data-group="files" aria-selected="false" title="Files"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Files</span></button>
         <button type="button" class="gb-rail-button" data-group="audio" aria-selected="false" title="Audio"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Audio</span></button>
         <button type="button" class="gb-rail-button" data-group="access" aria-selected="false" title="Access"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Access</span></button>
         <button type="button" class="gb-rail-button" data-group="diagnostics" aria-selected="false" title="Diagnostics"><span class="gb-rail-icon" aria-hidden="true"></span><span class="gb-rail-label">Diagnostics</span></button>
@@ -233,7 +231,15 @@
           <label>Maximum clipboard size, KiB<input id="clipboard-max-kib" type="number" min="1" max="256" value="256"></label>
           <p>With the Android screen focused, Ctrl+V pastes and Ctrl+C copies the Android selection. In this drawer, Ctrl+Enter types the text box into Android. Clipboard text is never written to diagnostics.</p>
         </div></div>
-          <div class="gb-drawer-slot" data-slot="display"><section class="help-card display-mode-card">
+          <div class="gb-drawer-slot" data-slot="display"><section class="help-card connect-card" aria-label="Android device connection">
+          <label>Android device
+            <select id="device" aria-label="Android device"></select>
+          </label>
+          <div class="button-grid connect-actions">
+            <button id="connect" class="compact">Connect</button>
+          </div>
+        </section>
+        <section class="help-card display-mode-card">
           <h2>Display mode</h2>
           <label>Mode
             <select id="display-mode">
@@ -330,8 +336,9 @@
     </div>
   </details>
   <p id="auth-security-status" class="running-app-status">Session protection active.</p>
-</section></div>
-          <div class="gb-drawer-slot" data-slot="network"><section id="network-card" class="help-card network-access-card" hidden aria-label="Network access settings">
+  <details class="gb-accordion" data-section-key="access-network">
+    <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Network access</span></summary>
+    <div class="gb-accordion-content"><section id="network-card" class="help-card network-access-card" hidden aria-label="Network access settings">
           <div class="section-heading">
             <h2>Network access</h2>
             <span id="network-mode-badge" class="network-mode-badge">Local only</span>
@@ -380,6 +387,8 @@
           <p id="network-status" class="running-app-status">Local-only access is active.</p>
           <p class="network-recovery-note">Recovery: <code>python tools\reset_network_access.py --local-only</code></p>
         </section></div>
+  </details>
+</section></div>
           <div class="gb-drawer-slot" data-slot="diagnostics"><section class="help-card statistics-card">
           <h2>Mode statistic</h2>
           <div class="device-diagnostic-summary" aria-label="Android device diagnostics">

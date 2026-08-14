@@ -12,6 +12,7 @@ const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf
 const transferSource = await readFile(resolve(root, "src/transfer-controller.ts"), "utf8");
 const autoDownloadSource = await readFile(resolve(root, "src/auto-download-controller.ts"), "utf8");
 const runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");
+const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.js"), "utf8");
 
 
 
@@ -165,22 +166,38 @@ test("connection status is a one-unit toolbar pill with state icons", () => {
   assert.match(mainSource, /statusContainer: required<HTMLElement>\("#connection-status"\)/);
 });
 
-test("compact header keeps device and Android controls beside the title", () => {
+test("compact header keeps Android controls while connection controls live directly in Display", () => {
   const headerStart = html.indexOf('<header class="topbar">');
   const headerEnd = html.indexOf('</header>', headerStart);
   const header = html.slice(headerStart, headerEnd);
-  for (const id of ["device", "connect", "back", "home", "recent", "rotate", "power", "fullscreen"]) {
+  for (const id of ["back", "home", "recent", "rotate", "power", "fullscreen"]) {
     assert.match(header, new RegExp(`id="${id}"`));
   }
+  assert.equal(header.includes('id="device"'), false);
+  assert.equal(header.includes('id="connect"'), false);
+  const displayStart = html.indexOf('data-slot="display"');
+  const audioStart = html.indexOf('data-slot="audio"', displayStart);
+  const display = html.slice(displayStart, audioStart);
+  assert.match(display, /id="device"/);
+  assert.match(display, /id="connect"/);
   assert.match(header, /class="topbar-brand"/);
   assert.match(header, /class="android-control-row"/);
   assert.match(css, /\.topbar \{ display: flex; align-items: center;/);
-  assert.match(css, /padding: 0\.52rem 0\.85rem/);
   assert.match(controllerSource, /DEVICE_DROPDOWN_REFRESH_STALE_MS/);
-  assert.match(controllerSource, /device\.addEventListener\(\"pointerdown\"/);
-  assert.equal(header.includes('id=\"refresh\"'), false);
-  assert.equal(header.includes('id=\"disconnect\"'), false);
-  assert.match(controllerSource, /connect\.textContent = connected \? \"Disconnect\" : \"Connect\"/);
+  assert.match(controllerSource, /device\.addEventListener\("pointerdown"/);
+  assert.equal(html.includes('id="refresh"'), false);
+  assert.equal(html.includes('id="disconnect"'), false);
+  assert.match(controllerSource, /connect\.textContent = connected \? "Disconnect" : "Connect"/);
+});
+
+test("single drawer ships final structure without legacy runtime migration", () => {
+  assert.equal(html.includes('data-slot="network"'), false);
+  const accessStart = html.indexOf('data-slot="access"');
+  const diagnosticsStart = html.indexOf('data-slot="diagnostics"', accessStart);
+  const access = html.slice(accessStart, diagnosticsStart);
+  assert.match(access, /data-section-key="access-network"/);
+  assert.match(access, /id="network-card"/);
+  assert.doesNotMatch(drawerSource, /ensureConnectionStyles|ensureDisplayConnectionUi|mergeNetworkIntoAccess|applyRailOrder|removeLegacyHeaderText/);
 });
 
 test("optional LAN access is explicit, authenticated and recoverable", () => {

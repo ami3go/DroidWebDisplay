@@ -457,3 +457,76 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
 @media (max-width: 560px) {
   #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer { display: none; }
 }
+
+/* Display drawer connection controls. */
+/* Compact connection controls at the top of the Display drawer. */
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-card {
+  display: grid;
+  gap: .46rem;
+  padding: .58rem !important;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-card > label {
+  min-width: 0;
+  display: grid;
+  gap: .26rem;
+  color: #9fb0c2;
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] #device {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 2rem;
+  min-height: 2rem;
+  padding: .3rem 1.65rem .3rem .5rem !important;
+  border-radius: 7px !important;
+  font-size: .72rem;
+  line-height: 1.05;
+}
+
+/* Override generic .button-grid and last-child spanning rules. */
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions {
+  width: 100%;
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: .3rem !important;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button:last-child {
+  grid-column: auto !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 2rem !important;
+  height: 2rem;
+  padding: .22rem .25rem !important;
+  border-radius: 7px !important;
+  font-size: .64rem !important;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+@media (max-width: 380px) {
+  :root { --gb-drawer-w: calc(100vw - var(--gb-rail-w)); }
+
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-card {
+    padding: .52rem !important;
+  }
+
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions {
+    gap: .22rem !important;
+  }
+
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button {
+    padding-inline: .16rem !important;
+    font-size: .6rem !important;
+  }
+}
