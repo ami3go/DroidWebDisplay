@@ -1,7 +1,8 @@
 import { BridgeApi } from "./api.js";
-import type { RunningGuiAppDto, SessionDto } from "./types.js";
+import type { AndroidDevice, RunningGuiAppDto, SessionDto } from "./types.js";
 
 const DROPDOWN_REFRESH_STALE_MS = 1500;
+const STORAGE_REFRESH_MS = 30_000;
 
 interface Elements {
   readonly device: HTMLSelectElement;
@@ -23,12 +24,45 @@ function formatBytes(value: number): string {
   return `${(value / (1024 ** 2)).toFixed(0)} MiB`;
 }
 
+function metadataBytes(device: AndroidDevice | null, key: string): number | null {
+  const raw = device?.metadata?.[key];
+  if (raw === undefined) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function formatStorage(freeBytes: number | null, totalBytes: number | null): string {
+  if (freeBytes === null) return "Unavailable";
+  if (totalBytes === null || totalBytes <= 0) return `${formatBytes(freeBytes)} free`;
+  return `${formatBytes(freeBytes)} free of ${formatBytes(totalBytes)}`;
+}
+
+function ensureDiagnosticValue(anchor: HTMLElement, id: string, label: string): HTMLElement {
+  const existing = document.getElementById(id);
+  if (existing) return existing;
+  const summary = anchor.closest<HTMLElement>(".device-diagnostic-summary");
+  if (!summary) throw new Error("Missing diagnostics summary container");
+  const row = document.createElement("div");
+  const caption = document.createElement("span");
+  const value = document.createElement("strong");
+  caption.textContent = label;
+  value.id = id;
+  value.textContent = "—";
+  row.append(caption, value);
+  summary.append(row);
+  return value;
+}
+
 export class RunningAppController {
   readonly #api: BridgeApi;
   readonly #elements: Elements;
+  readonly #diagnosticInternalStorage: HTMLElement;
+  readonly #diagnosticSdCard: HTMLElement;
   #apps: readonly RunningGuiAppDto[] = [];
   #activeSession: SessionDto | null = null;
   #virtualSession: SessionDto | null = null;
+  #deviceInfo: AndroidDevice | null = null;
+  #deviceInfoAt = 0;
   #refreshing = false;
   #moving = false;
   #timer: number | null = null;
@@ -40,6 +74,16 @@ export class RunningAppController {
   public constructor(elements: Elements, api = new BridgeApi()) {
     this.#elements = elements;
     this.#api = api;
+    this.#diagnosticInternalStorage = ensureDiagnosticValue(
+      elements.diagnosticRam,
+      "diagnostic-internal-storage",
+      "Internal storage",
+    );
+    this.#diagnosticSdCard = ensureDiagnosticValue(
+      elements.diagnosticRam,
+      "diagnostic-sd-card",
+      "SD card",
+    );
     elements.icon.addEventListener("click", () => {
       this.#dropdownActive = false;
       this.#refreshAfterDropdown = false;
@@ -53,6 +97,8 @@ export class RunningAppController {
       this.#dropdownActive = false;
       this.#refreshAfterDropdown = false;
       this.#lastRefreshAt = 0;
+      this.#deviceInfo = null;
+      this.#deviceInfoAt = 0;
       if (this.#refreshing) this.#refreshQueued = true;
       else void this.refresh();
     });
@@ -84,9 +130,11 @@ export class RunningAppController {
       this.#apps = [];
       this.#activeSession = null;
       this.#virtualSession = null;
+      this.#deviceInfo = null;
+      this.#deviceInfoAt = 0;
       this.#lastRefreshAt = 0;
       this.render();
-      this.renderDiagnostics(null);
+      this.renderDiagnostics(null, null);
       this.#elements.status.textContent = "Select an authorized Android device.";
       return;
     }
@@ -94,12 +142,17 @@ export class RunningAppController {
     this.#refreshing = true;
     if (!silent) this.#elements.status.textContent = "Reading running Android applications…";
     try {
-      const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
+      const [apps, sessions, deviceInfo] = await Promise.all([
+        this.#api.runningApps(serial),
+        this.#api.sessions(),
+        this.loadDeviceInfo(serial, !silent),
+      ]);
       if (this.#elements.device.value !== serial) {
         this.#refreshQueued = true;
         return;
       }
       this.#apps = apps.apps;
+      this.#deviceInfo = deviceInfo;
       const runningSessions = sessions.sessions.filter(
         (session) => session.serial === serial && session.state === "running",
       );
@@ -110,7 +163,7 @@ export class RunningAppController {
       this.#activeSession = this.#virtualSession ?? runningSessions[0] ?? null;
       this.#lastRefreshAt = Date.now();
       this.render();
-      this.renderDiagnostics(apps.freeMemoryBytes ?? null);
+      this.renderDiagnostics(apps.freeMemoryBytes ?? null, deviceInfo);
       const displayId = this.#virtualSession?.virtualDisplay.displayId;
       this.#elements.status.textContent = displayId === null || displayId === undefined
         ? `${this.#apps.length} GUI task(s) found. Start a virtual display to move one.`
@@ -120,8 +173,10 @@ export class RunningAppController {
       this.#apps = [];
       this.#activeSession = null;
       this.#virtualSession = null;
+      this.#deviceInfo = null;
+      this.#deviceInfoAt = 0;
       this.render();
-      this.renderDiagnostics(null);
+      this.renderDiagnostics(null, null);
       this.#elements.status.textContent = `Running-app query failed: ${errorMessage(error)}`;
     } finally {
       this.#refreshing = false;
@@ -130,6 +185,20 @@ export class RunningAppController {
         void this.refresh(true);
       }
     }
+  }
+
+  private async loadDeviceInfo(serial: string, force: boolean): Promise<AndroidDevice | null> {
+    if (
+      !force
+      && this.#deviceInfo?.serial === serial
+      && Date.now() - this.#deviceInfoAt < STORAGE_REFRESH_MS
+    ) {
+      return this.#deviceInfo;
+    }
+    const response = await this.#api.devices();
+    const device = response.devices.find((candidate) => candidate.serial === serial) ?? null;
+    this.#deviceInfoAt = Date.now();
+    return device;
   }
 
   private beginDropdownInteraction(): void {
@@ -244,10 +313,36 @@ export class RunningAppController {
     }
   }
 
-  private renderDiagnostics(freeMemoryBytes: number | null): void {
+  private renderDiagnostics(freeMemoryBytes: number | null, device: AndroidDevice | null): void {
     const displayId = this.#virtualSession?.virtualDisplay.displayId
       ?? (this.#activeSession?.displayMode === "physical" ? 0 : null);
     this.#elements.diagnosticDisplay.textContent = displayId === null ? "—" : String(displayId);
     this.#elements.diagnosticRam.textContent = freeMemoryBytes === null ? "—" : formatBytes(freeMemoryBytes);
+
+    if (device === null) {
+      this.#diagnosticInternalStorage.textContent = "—";
+      this.#diagnosticSdCard.textContent = "—";
+      this.#diagnosticSdCard.removeAttribute("title");
+      return;
+    }
+
+    this.#diagnosticInternalStorage.textContent = formatStorage(
+      metadataBytes(device, "internalStorageFreeBytes"),
+      metadataBytes(device, "internalStorageTotalBytes"),
+    );
+
+    const sdPresent = device.metadata?.sdCardPresent;
+    if (sdPresent === "false") {
+      this.#diagnosticSdCard.textContent = "Not detected";
+      this.#diagnosticSdCard.removeAttribute("title");
+      return;
+    }
+    this.#diagnosticSdCard.textContent = formatStorage(
+      metadataBytes(device, "sdCardFreeBytes"),
+      metadataBytes(device, "sdCardTotalBytes"),
+    );
+    const sdPath = device.metadata?.sdCardPath;
+    if (sdPath) this.#diagnosticSdCard.title = sdPath;
+    else this.#diagnosticSdCard.removeAttribute("title");
   }
 }

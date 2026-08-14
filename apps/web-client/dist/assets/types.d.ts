@@ -7,6 +7,7 @@ export interface AndroidDevice {
     readonly sdk: number | null;
     readonly ready: boolean;
     readonly authorizationRequired: boolean;
+    readonly metadata?: Readonly<Record<string, string>>;
 }
 export type DisplayMode = "physical" | "virtual";
 export type VirtualDisplaySizeMode = "fixed" | "flex";
