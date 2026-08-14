@@ -26,6 +26,8 @@ jobs:
           source = path.read_text(encoding='utf-8')
           source = source.replace('old = dedent(', 'old = class_block(')
           source = source.replace('new = dedent(', 'new = class_block(')
+          source = source.replace('old_display = dedent(', 'old_display = class_block(')
+          source = source.replace('new_display = dedent(', 'new_display = class_block(')
           path.write_text(source, encoding='utf-8')
           PY
           python tools/apply_server_ui_dashboard.py
