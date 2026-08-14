@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Recover and apply patcher
+      - name: Recover and apply product patcher
         shell: bash
         run: |
           git show d3a0b42384ca1671b067b0b406d668a38459ff0c:.github/workflows/agent-server-ui-dashboard.yml > /tmp/original-helper.yml
@@ -53,67 +53,71 @@ jobs:
           if failure not in script:
               raise SystemExit('replace_once failure anchor missing')
           script = script.replace(failure, tolerant, 1)
-
-          script += r'''
-          theme_path = Path("droid_web_display/desktop/theme.py")
-          theme = theme_path.read_text(encoding="utf-8")
-          if "QLabel#dashboardValue" not in theme:
-              dashboard_css = r'''
-          QFrame#card[dashboardCard="true"] {{
-              background-color: {c['surface_alt']};
-          }}
-
-          QLabel#dashboardValue {{
-              color: {c['text']};
-              font-size: 15pt;
-              font-weight: 700;
-          }}
-
-          QLabel#dashboardDetail {{
-              color: {c['text_muted']};
-              font-size: 9pt;
-          }}
-
-          QPushButton#deviceLink {{
-              min-height: 22px;
-              padding: 0;
-              border: 0;
-              background: transparent;
-              color: {c['focus']};
-              font-size: 15pt;
-              font-weight: 700;
-              text-align: left;
-          }}
-
-          QPushButton#deviceLink:hover {{
-              color: {c['text']};
-              background: transparent;
-          }}
-
-          '''
-              marker = "QLabel#healthStatus {{"
-              if marker not in theme:
-                  raise SystemExit("health theme insertion anchor missing")
-              theme = theme.replace(marker, dashboard_css + marker, 1)
-          if "QPlainTextEdit#timelineView {{" not in theme:
-              timeline_css = r'''
-          QPlainTextEdit#timelineView {{
-              min-height: 118px;
-              padding: 9px;
-              font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;
-              font-size: 9pt;
-          }}
-
-          '''
-              marker = "QMenu {{"
-              if marker not in theme:
-                  raise SystemExit("menu theme insertion anchor missing")
-              theme = theme.replace(marker, timeline_css + marker, 1)
-          theme_path.write_text(theme, encoding="utf-8")
-          '''
           Path('/tmp/apply_server_ui.py').write_text(script, encoding='utf-8')
           PY
           python /tmp/apply_server_ui.py
+      - name: Ensure dashboard and timeline theme
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('droid_web_display/desktop/theme.py')
+          theme = path.read_text(encoding='utf-8')
+          if 'QLabel#dashboardValue' not in theme:
+              css = """
+QFrame#card[dashboardCard=\"true\"] {{
+    background-color: {c['surface_alt']};
+}}
+
+QLabel#dashboardValue {{
+    color: {c['text']};
+    font-size: 15pt;
+    font-weight: 700;
+}}
+
+QLabel#dashboardDetail {{
+    color: {c['text_muted']};
+    font-size: 9pt;
+}}
+
+QPushButton#deviceLink {{
+    min-height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: {c['focus']};
+    font-size: 15pt;
+    font-weight: 700;
+    text-align: left;
+}}
+
+QPushButton#deviceLink:hover {{
+    color: {c['text']};
+    background: transparent;
+}}
+
+"""
+              marker = 'QLabel#healthStatus {{'
+              if marker not in theme:
+                  raise SystemExit('health theme anchor missing')
+              theme = theme.replace(marker, css + marker, 1)
+          if 'QPlainTextEdit#timelineView {{' not in theme:
+              css = """
+QPlainTextEdit#timelineView {{
+    min-height: 118px;
+    padding: 9px;
+    font-family: \"Cascadia Mono\", \"Consolas\", \"DejaVu Sans Mono\", monospace;
+    font-size: 9pt;
+}}
+
+"""
+              marker = 'QMenu {{'
+              if marker not in theme:
+                  raise SystemExit('menu theme anchor missing')
+              theme = theme.replace(marker, css + marker, 1)
+          path.write_text(theme, encoding='utf-8')
+          PY
       - name: Remove helper workflow from product commit
         run: rm .github/workflows/agent-server-ui-dashboard.yml
       - name: Install Qt Linux runtime libraries
