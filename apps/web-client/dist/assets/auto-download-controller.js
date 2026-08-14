@@ -31,7 +31,9 @@ export class AutoDownloadController {
             this.elements.destination.append(option);
         }
         this.applySnapshot(snapshot, true);
-        this.#timer = window.setInterval(() => void this.refresh(), 1000);
+        this.scheduleRefresh();
+        document.addEventListener("visibilitychange", () => this.scheduleRefresh(0));
+        document.querySelector('[data-group="files"]')?.addEventListener("click", () => this.scheduleRefresh(0));
     }
     bindEvents() {
         this.elements.device.addEventListener("change", () => void this.runAction(() => this.refreshRoots()));
@@ -76,6 +78,27 @@ export class AutoDownloadController {
             deleteAfterVerified: this.elements.deleteAfterVerified.checked,
         });
         this.applySnapshot(await this.#api.scanAutoDownload());
+    }
+    filesDrawerVisible() {
+        return document.visibilityState === "visible"
+            && document.querySelector('.gb-drawer')?.classList.contains("gb-open") === true
+            && document.querySelector('.gb-drawer-slot[data-slot="files"]')?.classList.contains("gb-active") === true;
+    }
+    refreshDelay() {
+        if (document.visibilityState !== "visible")
+            return 10_000;
+        if (this.filesDrawerVisible())
+            return 1500;
+        const monitoring = Boolean(this.#snapshot?.config.enabled || this.#snapshot?.config.pcToAndroidEnabled);
+        return monitoring ? 5000 : 10_000;
+    }
+    scheduleRefresh(delay = this.refreshDelay()) {
+        if (this.#timer !== null)
+            window.clearTimeout(this.#timer);
+        this.#timer = window.setTimeout(() => {
+            this.#timer = null;
+            void this.refresh().finally(() => this.scheduleRefresh());
+        }, Math.max(0, delay));
     }
     async refresh() {
         if (this.#refreshing)

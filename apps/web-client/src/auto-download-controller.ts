@@ -55,7 +55,9 @@ export class AutoDownloadController {
       this.elements.destination.append(option);
     }
     this.applySnapshot(snapshot, true);
-    this.#timer = window.setInterval(() => void this.refresh(), 1000);
+    this.scheduleRefresh();
+    document.addEventListener("visibilitychange", () => this.scheduleRefresh(0));
+    document.querySelector<HTMLButtonElement>('[data-group="files"]')?.addEventListener("click", () => this.scheduleRefresh(0));
   }
 
   private bindEvents(): void {
@@ -103,6 +105,27 @@ export class AutoDownloadController {
       deleteAfterVerified: this.elements.deleteAfterVerified.checked,
     });
     this.applySnapshot(await this.#api.scanAutoDownload());
+  }
+
+  private filesDrawerVisible(): boolean {
+    return document.visibilityState === "visible"
+      && document.querySelector('.gb-drawer')?.classList.contains("gb-open") === true
+      && document.querySelector('.gb-drawer-slot[data-slot="files"]')?.classList.contains("gb-active") === true;
+  }
+
+  private refreshDelay(): number {
+    if (document.visibilityState !== "visible") return 10_000;
+    if (this.filesDrawerVisible()) return 1500;
+    const monitoring = Boolean(this.#snapshot?.config.enabled || this.#snapshot?.config.pcToAndroidEnabled);
+    return monitoring ? 5000 : 10_000;
+  }
+
+  private scheduleRefresh(delay = this.refreshDelay()): void {
+    if (this.#timer !== null) window.clearTimeout(this.#timer);
+    this.#timer = window.setTimeout(() => {
+      this.#timer = null;
+      void this.refresh().finally(() => this.scheduleRefresh());
+    }, Math.max(0, delay));
   }
 
   private async refresh(): Promise<void> {

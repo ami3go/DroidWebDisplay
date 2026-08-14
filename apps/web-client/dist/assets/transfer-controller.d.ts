@@ -52,6 +52,9 @@ export declare class TransferController {
     private downloadDestination;
     private download;
     private downloadSelected;
+    private filesDrawerVisible;
+    private transferRefreshDelay;
+    private scheduleTransferRefresh;
     private refreshTransfers;
     private renderTransfers;
     private duplicatePolicy;
