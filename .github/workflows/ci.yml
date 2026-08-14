@@ -1,4 +1,4 @@
-name: Diagnose audited web UI optimization
+name: Apply audited web UI optimizations
 
 on:
   push:
@@ -7,8 +7,8 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
-    if: github.event.head_commit.message == 'Capture UI refactor gate output'
+  optimize:
+    if: github.event.head_commit.message == 'Continue UI optimization builder'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Install dependencies
@@ -27,18 +31,34 @@ jobs:
           $HOME/.local/bin/uv sync --locked --extra dev
           npm ci --prefix packages/scrcpy-protocol
           npm ci --prefix apps/web-client
-      - name: Apply phase one and capture gate evidence
+      - name: Configure commit identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          python tools/_ui_refactor_builder.py 1
+      - name: Verify phase one
+        run: |
           npm run build --prefix apps/web-client
-          set +e
-          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ui-refactor-1.json > evidence/release/gate-ui-refactor-1.log 2>&1
-          rc=$?
-          set -e
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ui-refactor-1-verified.json
+      - name: Phase 2 - harden asynchronous UI refreshes
+        run: |
+          python tools/_ui_refactor_builder.py 2
+          npm run build --prefix apps/web-client
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ui-refactor-2.json
           git add apps/web-client
-          git add -f evidence/release/gate-ui-refactor-1.json evidence/release/gate-ui-refactor-1.log
-          git commit -m "Capture phase one gate evidence"
-          git push origin HEAD:agent/web-ui-refactor-builder
-          exit $rc
+          git commit -m "Harden asynchronous UI refreshes"
+      - name: Phase 3 - optimize File Explorer selection rendering
+        run: |
+          python tools/_ui_refactor_builder.py 3
+          npm run build --prefix apps/web-client
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ui-refactor-3.json
+          git add apps/web-client
+          git commit -m "Optimize File Explorer selection rendering"
+      - name: Phase 4 - reduce idle browser polling
+        run: |
+          python tools/_ui_refactor_builder.py 4
+          npm run build --prefix apps/web-client
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ui-refactor-4.json
+          git add apps/web-client
+          git commit -m "Reduce idle browser polling"
+      - name: Push optimized commit stack
+        run: git push origin HEAD:agent/web-ui-refactor-builder
