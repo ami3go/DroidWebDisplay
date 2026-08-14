@@ -27,6 +27,8 @@ def test_signing_helper_is_sha256_timestamped_and_fail_closed() -> None:
     assert "-CiSelfSignedSmoke is test-only and requires -SkipTimestamp" in script
     assert "requires -CertificateThumbprint" in script
     assert "CI self-signed smoke signer mismatch" in script
+    assert "${LASTEXITCODE}:" in script
+    assert "$LASTEXITCODE:" not in script
     assert ".pfx" not in script.lower()
     assert ".p12" not in script.lower()
 

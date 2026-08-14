@@ -51,7 +51,7 @@ function Invoke-SignTool {
   Write-Host "SignTool $Operation starting."
   & $script:ResolvedSignTool @Arguments
   if ($LASTEXITCODE -ne 0) {
-    throw "signtool.exe $Operation failed with exit code $LASTEXITCODE: $($Arguments -join ' ')"
+    throw "signtool.exe $Operation failed with exit code ${LASTEXITCODE}: $($Arguments -join ' ')"
   }
   Write-Host "SignTool $Operation completed."
 }
