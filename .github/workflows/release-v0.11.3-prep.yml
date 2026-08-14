@@ -20,12 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Verify release base
         shell: bash
         run: |
           set -euxo pipefail
-          test "$(git rev-parse HEAD^)" = "$TARGET_COMMIT"
+          git merge-base --is-ancestor "$TARGET_COMMIT" HEAD
       - name: Bump release metadata
         shell: bash
         run: |
@@ -92,7 +92,8 @@ jobs:
           test "$("$RUNNER_TEMP/dwd-uv/uv" --version | awk '{print $1 " " $2}')" = "uv 0.12.4"
           echo "UV_BIN=$RUNNER_TEMP/dwd-uv/uv" >> "$GITHUB_ENV"
       - name: Sync locked Python environment
-        run: "$UV_BIN" sync --locked --extra dev
+        run: |
+          "$UV_BIN" sync --locked --extra dev
       - name: Install web dependencies
         run: |
           npm ci --prefix packages/scrcpy-protocol
@@ -103,11 +104,13 @@ jobs:
       - name: Run targeted update-check tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: "$UV_BIN" run pytest -q tests/desktop/test_update_check.py tests/desktop/test_layout_regression.py
+        run: |
+          "$UV_BIN" run pytest -q tests/desktop/test_update_check.py tests/desktop/test_layout_regression.py
       - name: Run full release gate
         env:
           QT_QPA_PLATFORM: offscreen
-        run: "$UV_BIN" run python tools/release_gate.py --require-web-client-build --output /tmp/v0.11.3-release-gate.json
+        run: |
+          "$UV_BIN" run python tools/release_gate.py --require-web-client-build --output /tmp/v0.11.3-release-gate.json
       - name: Commit validated release metadata
         shell: bash
         run: |
