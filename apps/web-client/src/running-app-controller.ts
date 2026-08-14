@@ -115,6 +115,7 @@ export class RunningAppController {
       this.#elements.status.textContent = displayId === null || displayId === undefined
         ? `${this.#apps.length} GUI task(s) found. Start a virtual display to move one.`
         : `${this.#apps.length} GUI task(s) found · target display ${displayId}.`;
+      this.updateSelectionStatus();
     } catch (error) {
       this.#apps = [];
       this.#activeSession = null;
@@ -155,15 +156,11 @@ export class RunningAppController {
     try {
       await this.moveSelected();
     } finally {
-      // This dropdown is an action picker, not persistent state. Returning to
-      // the placeholder lets the same application be selected again later.
-      this.#elements.select.value = "";
       await this.finishDropdownInteraction();
     }
   }
 
   private render(): void {
-    const previous = this.#elements.select.value;
     this.#elements.select.replaceChildren();
     this.#elements.count.textContent = String(this.#apps.length);
     this.#elements.icon.title = `Refresh running applications · ${this.#apps.length} GUI task(s)`;
@@ -182,11 +179,17 @@ export class RunningAppController {
       option.dataset.component = app.componentName;
       this.#elements.select.append(option);
     }
-    if ([...this.#elements.select.options].some((option) => option.value === previous)) {
-      this.#elements.select.value = previous;
-    }
+
+    const current = this.currentVirtualApp();
+    this.#elements.select.value = current ? String(current.taskId) : "";
     this.#elements.select.disabled = this.#apps.length === 0 || this.#moving;
     this.updateSelectionStatus();
+  }
+
+  private currentVirtualApp(): RunningGuiAppDto | null {
+    const displayId = this.#virtualSession?.virtualDisplay.displayId ?? null;
+    if (displayId === null) return null;
+    return this.#apps.find((app) => app.displayId === displayId && app.resumed) ?? null;
   }
 
   private selectedApp(): RunningGuiAppDto | null {
@@ -204,7 +207,7 @@ export class RunningAppController {
       return;
     }
     this.#elements.status.textContent = app.displayId === displayId
-      ? `${app.label} is already on virtual display ${displayId}.`
+      ? `${app.label} is active on virtual display ${displayId}.`
       : `${app.label} is ready to move to virtual display ${displayId}.`;
   }
 
@@ -231,7 +234,9 @@ export class RunningAppController {
         : `Launch request sent for ${result.app.label}; Android did not confirm relocation yet.`;
       await this.refresh(true);
     } catch (error) {
-      this.#elements.status.textContent = `Move failed: ${errorMessage(error)}`;
+      const message = `Move failed: ${errorMessage(error)}`;
+      await this.refresh(true);
+      this.#elements.status.textContent = message;
     } finally {
       this.#moving = false;
       this.#elements.select.disabled = this.#apps.length === 0;
