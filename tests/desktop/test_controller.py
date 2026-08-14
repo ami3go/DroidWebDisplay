@@ -88,3 +88,61 @@ def test_server_arguments_use_persistent_desktop_paths(tmp_path: Path) -> None:
     assert arguments[arguments.index("--download-directory") + 1] == str(paths.downloads_root)
     assert arguments[arguments.index("--log-directory") + 1] == str(paths.logs_root)
     assert arguments[-2:] == ["--port", "9000"]
+
+
+def test_device_summary_uses_shared_adb_parser(tmp_path: Path, monkeypatch) -> None:
+    controller = ServerController(
+        _paths(tmp_path),
+        server_runner=lambda _argv, _runtime: 0,
+        runtime_factory=FakeRuntime,
+    )
+
+    class Result:
+        returncode = 0
+        stdout = (
+            "List of devices attached\n"
+            "R58M123456 device product:x1s model:SM-G980F device:x1s transport_id:7\n"
+        )
+        stderr = ""
+
+    monkeypatch.setattr("droid_web_display.desktop.controller.subprocess.run", lambda *args, **kwargs: Result())
+
+    assert controller._device_summary() == "SM-G980F"
+
+
+def test_device_summary_ignores_non_ready_devices(tmp_path: Path, monkeypatch) -> None:
+    controller = ServerController(
+        _paths(tmp_path),
+        server_runner=lambda _argv, _runtime: 0,
+        runtime_factory=FakeRuntime,
+    )
+
+    class Result:
+        returncode = 0
+        stdout = (
+            "List of devices attached\n"
+            "USB SERIAL WITH SPACE unauthorized usb:1-2 transport_id:1\n"
+            "192.168.1.8:5555 device product:x1s model:SM-G980F device:x1s transport_id:2\n"
+        )
+        stderr = ""
+
+    monkeypatch.setattr("droid_web_display.desktop.controller.subprocess.run", lambda *args, **kwargs: Result())
+
+    assert controller._device_summary() == "SM-G980F"
+
+
+def test_device_summary_reports_adb_failure(tmp_path: Path, monkeypatch) -> None:
+    controller = ServerController(
+        _paths(tmp_path),
+        server_runner=lambda _argv, _runtime: 0,
+        runtime_factory=FakeRuntime,
+    )
+
+    class Result:
+        returncode = 1
+        stdout = ""
+        stderr = "adb failed"
+
+    monkeypatch.setattr("droid_web_display.desktop.controller.subprocess.run", lambda *args, **kwargs: Result())
+
+    assert controller._device_summary() == "ADB unavailable"

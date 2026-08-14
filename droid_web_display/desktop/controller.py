@@ -16,6 +16,7 @@ import webbrowser
 
 import psutil
 
+from droid_web_display.adb.devices import parse_adb_devices
 from droid_web_display.network_access import LAN_HTTPS, NetworkConfigStore
 
 PRODUCT_TITLE_MARKER = "<title>DroidWebDisplay</title>"
@@ -251,20 +252,16 @@ class ServerController:
             result = subprocess.run(command, **kwargs)
         except (OSError, subprocess.SubprocessError):
             return "ADB unavailable"
-        devices: list[str] = []
-        for raw_line in result.stdout.splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("List of devices") or "\tdevice" not in line:
-                continue
-            fields = line.split()
-            serial = fields[0]
-            model = next((field.split(":", 1)[1] for field in fields if field.startswith("model:")), None)
-            devices.append(model or serial)
-        if not devices:
+        if result.returncode != 0:
+            return "ADB unavailable"
+
+        ready_devices = [device for device in parse_adb_devices(result.stdout) if device.ready]
+        if not ready_devices:
             return "No device"
-        if len(devices) == 1:
-            return devices[0]
-        return f"{len(devices)} devices"
+        if len(ready_devices) == 1:
+            device = ready_devices[0]
+            return device.model or device.serial
+        return f"{len(ready_devices)} devices"
 
     def snapshot(self, *, include_device: bool = True) -> ServerSnapshot:
         network_mode, url = self._network_details()
