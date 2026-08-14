@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from contextlib import suppress
+import logging
 import os
 from pathlib import Path
 import socket
@@ -20,8 +21,10 @@ if str(ROOT) not in sys.path:
 
 import uvicorn
 
+from droid_web_display import __version__
 from droid_web_display.api import create_app
 from droid_web_display.config import BridgeConfig
+from droid_web_display.diagnostics import DiagnosticLoggingMiddleware, configure_server_logging
 from droid_web_display.network_access import (
     LAN_HTTPS,
     LOCAL_ONLY,
@@ -141,6 +144,7 @@ async def _serve_once(
     args: argparse.Namespace,
     network,
     websocket_backend: str,
+    logger: logging.Logger,
     *,
     open_browser: bool,
     runtime: BridgeServiceRuntime | None = None,
@@ -153,12 +157,21 @@ async def _serve_once(
 
     existing = _classify_existing_service(url, config.bind_host, config.bind_port)
     if existing == "current":
+        logger.info(
+            "DroidWebDisplay is already running at %s",
+            url,
+            extra={"event": "server.existing", "url": url, "network_mode": config.network_mode},
+        )
         print(f"DroidWebDisplay is already running at {url}")
         print("Existing listener serves the current DroidWebDisplay web UI marker.")
         if open_browser:
             webbrowser.open(url)
         return False
     if existing == "other":
+        logger.error(
+            "Configured listener is already used by another service",
+            extra={"event": "server.port_conflict", "url": url, "network_mode": config.network_mode},
+        )
         raise ExistingWebServiceError(
             f"Port {config.bind_port} on {config.bind_host} is already in use by an older or unrelated "
             "web service. "
@@ -171,17 +184,24 @@ async def _serve_once(
     def request_restart() -> None:
         nonlocal restart_requested
         restart_requested = True
+        logger.info(
+            "Server restart requested",
+            extra={"event": "server.restart_requested", "restart_requested": True},
+        )
         server = server_holder.get("server")
         if server is not None:
             server.should_exit = True
 
-    app = create_app(config=config)
-    app.state.request_restart = request_restart
+    fastapi_app = create_app(config=config)
+    fastapi_app.state.request_restart = request_restart
+    app = DiagnosticLoggingMiddleware(fastapi_app, logger=logger)
     uvicorn_config = uvicorn.Config(
         app,
         host=config.bind_host,
         port=config.bind_port,
-        log_level="info",
+        log_level=args.log_level.lower(),
+        log_config=None,
+        access_log=False,
         ssl_certfile=(
             str(config.tls_certificate_path)
             if config.tls_enabled and config.tls_certificate_path
@@ -206,7 +226,20 @@ async def _serve_once(
     print(f"Transfer concurrency: {config.transfer_concurrency}")
     print(f"Authentication store: {config.resolved_auth_data_file}")
     print(f"Network configuration: {config.resolved_network_config_file}")
+    print(f"Server diagnostics: {args.log_directory / 'server.log'}")
     print("Trust authority: this PC bridge (not the Android phone)")
+    logger.info(
+        "DroidWebDisplay server starting",
+        extra={
+            "event": "server.starting",
+            "pid": os.getpid(),
+            "version": __version__,
+            "url": url,
+            "network_mode": config.network_mode,
+            "websocket_backend": websocket_backend,
+            "log_file": str(args.log_directory / "server.log"),
+        },
+    )
 
     async def open_browser_after_start() -> None:
         while not server.started and not server.should_exit:
@@ -224,6 +257,19 @@ async def _serve_once(
                 await browser_task
         if runtime is not None:
             runtime.detach(server)
+        logger.info(
+            "DroidWebDisplay server stopped",
+            extra={
+                "event": "server.stopped",
+                "pid": os.getpid(),
+                "url": url,
+                "network_mode": config.network_mode,
+                "restart_requested": restart_requested,
+                "reason": "desktop-shutdown"
+                if runtime is not None and runtime.shutdown_requested
+                else ("configuration-restart" if restart_requested else "normal"),
+            },
+        )
     return restart_requested and not (runtime is not None and runtime.shutdown_requested)
 
 
@@ -256,6 +302,29 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Write the running service PID here and remove it on clean exit",
     )
+    parser.add_argument(
+        "--log-directory",
+        type=Path,
+        help="Directory for rotating server.log JSONL diagnostics",
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+        default=os.environ.get("DWD_LOG_LEVEL", "INFO").upper(),
+        help="Server diagnostic verbosity (or set DWD_LOG_LEVEL)",
+    )
+    parser.add_argument(
+        "--log-max-bytes",
+        type=int,
+        default=5 * 1024 * 1024,
+        help="Rotate server.log after this many bytes",
+    )
+    parser.add_argument(
+        "--log-backups",
+        type=int,
+        default=5,
+        help="Number of rotated server.log generations to retain",
+    )
     return parser
 
 
@@ -269,10 +338,38 @@ def main(argv: list[str] | None = None, runtime: BridgeServiceRuntime | None = N
         args.data_directory = args.data_directory.resolve()
     default_state = args.data_directory or (args.repo_root / "data")
     args.network_config = (args.network_config or (default_state / "network-access.json")).resolve()
+    args.log_directory = (args.log_directory or (default_state / "logs")).resolve()
+
+    try:
+        logger, log_path = configure_server_logging(
+            args.log_directory,
+            level=args.log_level,
+            maximum_bytes=args.log_max_bytes,
+            backup_count=args.log_backups,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"WARNING: server diagnostic logging could not be initialized: {exc}", file=sys.stderr)
+        logger = logging.getLogger("droid_web_display.server")
+        log_path = args.log_directory / "server.log"
+
+    logger.info(
+        "DroidWebDisplay service process initialized",
+        extra={
+            "event": "process.start",
+            "pid": os.getpid(),
+            "version": __version__,
+            "log_file": str(log_path),
+        },
+    )
 
     try:
         websocket_backend = require_websocket_backend()
     except RuntimeError as exc:
+        logger.error(
+            "WebSocket backend is unavailable: %s",
+            exc,
+            extra={"event": "server.dependency_error", "error_code": "websocket_backend"},
+        )
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
@@ -288,11 +385,24 @@ def main(argv: list[str] | None = None, runtime: BridgeServiceRuntime | None = N
     try:
         while True:
             if runtime is not None and runtime.shutdown_requested:
+                logger.info(
+                    "Shutdown requested before listener start",
+                    extra={"event": "server.shutdown_requested", "reason": "desktop-host"},
+                )
                 return 0
             try:
                 network = store.load()
                 network.validate(require_files=network.mode == LAN_HTTPS)
             except NetworkAccessError as exc:
+                logger.warning(
+                    "LAN configuration failed validation; falling back to local-only access: %s",
+                    exc,
+                    extra={
+                        "event": "network.validation_failed",
+                        "error_code": getattr(exc, "code", "network_error"),
+                        "network_mode": LAN_HTTPS,
+                    },
+                )
                 print(f"WARNING: LAN configuration failed validation: {exc}", file=sys.stderr)
                 print("Falling back to local-only access at 127.0.0.1.", file=sys.stderr)
                 network = store.reset_local_only(port=args.port or 8765)
@@ -302,11 +412,17 @@ def main(argv: list[str] | None = None, runtime: BridgeServiceRuntime | None = N
                         args,
                         network,
                         websocket_backend,
+                        logger,
                         open_browser=open_browser,
                         runtime=runtime,
                     )
                 )
             except ExistingWebServiceError as exc:
+                logger.error(
+                    "Service start blocked by an existing listener: %s",
+                    exc,
+                    extra={"event": "server.start_failed", "error_code": "port_in_use"},
+                )
                 print(f"ERROR: {exc}", file=sys.stderr)
                 print(
                     "The browser was not opened, so an older page cannot be mistaken for this checkout.",
@@ -315,12 +431,24 @@ def main(argv: list[str] | None = None, runtime: BridgeServiceRuntime | None = N
                 return 4
             except (OSError, SystemExit, ValueError) as exc:
                 if network.mode == LAN_HTTPS:
+                    logger.exception(
+                        "LAN listener failed; recovering to local-only mode",
+                        extra={
+                            "event": "server.listener_failed",
+                            "error_code": type(exc).__name__,
+                            "network_mode": network.mode,
+                        },
+                    )
                     print(f"ERROR: LAN listener failed: {exc}", file=sys.stderr)
                     FirewallManager().apply(network, remove=True)
                     store.reset_local_only(port=network.port)
                     print("Recovered to local-only mode. Restarting on 127.0.0.1.", file=sys.stderr)
                     open_browser = True
                     continue
+                logger.exception(
+                    "Service failed to start",
+                    extra={"event": "server.start_failed", "error_code": type(exc).__name__},
+                )
                 print(f"ERROR: service failed to start: {exc}", file=sys.stderr)
                 return 3
             if runtime is not None and runtime.shutdown_requested:
@@ -328,8 +456,16 @@ def main(argv: list[str] | None = None, runtime: BridgeServiceRuntime | None = N
             if not restart:
                 return 0
             open_browser = False
+            logger.info(
+                "Network configuration changed; restarting DroidWebDisplay",
+                extra={"event": "server.restarting", "reason": "network-configuration"},
+            )
             print("Network configuration changed; restarting DroidWebDisplay...")
     finally:
+        logger.info(
+            "DroidWebDisplay service process exiting",
+            extra={"event": "process.stop", "pid": os.getpid()},
+        )
         if pid_file:
             try:
                 if pid_file.read_text(encoding="ascii").strip() == str(os.getpid()):
