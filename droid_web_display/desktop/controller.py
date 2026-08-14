@@ -90,6 +90,8 @@ class DesktopPaths:
             str(self.downloads_root),
             "--network-config",
             str(self.network_config),
+            "--log-directory",
+            str(self.logs_root),
             "--adb",
             str(self.adb_executable),
             *(extra or []),
