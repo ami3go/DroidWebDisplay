@@ -10,9 +10,9 @@ Older release lines are not guaranteed to receive security updates. Users should
 
 Please do not publish exploit details, credentials, tokens, PINs, private keys, device identifiers, or other sensitive evidence in a public GitHub issue.
 
-GitHub private vulnerability reporting is not currently enabled for this repository. Until a private reporting channel is enabled, open a minimal public issue titled `Security contact request` that contains no vulnerability details and asks the maintainer to establish a private channel for the report.
+Use GitHub's private vulnerability reporting for this repository. Open the repository's **Security** area and choose **Report a vulnerability** to submit the report privately to the maintainer.
 
-Once a private channel is available, include enough information to reproduce and assess the issue:
+Include enough information to reproduce and assess the issue:
 
 - affected DroidWebDisplay version or commit SHA;
 - operating system and browser;
@@ -28,7 +28,7 @@ Do not send live credentials, authentication cookies, PINs, TLS private keys, or
 
 ## Disclosure and handling
 
-Please allow the maintainer a reasonable opportunity to reproduce, assess, fix, and release a correction before public disclosure. Coordinated disclosure timing should be agreed through the private reporting channel when one is available.
+Please allow the maintainer a reasonable opportunity to reproduce, assess, fix, and release a correction before public disclosure. Coordinated disclosure timing should be agreed through the private vulnerability report.
 
 Security fixes may be released on the active release line and may require users to upgrade rather than backporting fixes to older releases.
 
