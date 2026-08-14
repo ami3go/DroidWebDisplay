@@ -2,48 +2,65 @@ name: DroidWebDisplay Release Gate
 
 on:
   push:
+    branches: [main, agent/**]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
-  PYINSTALLER_VERSION: '6.21.0'
+  PYINSTALLER_VERSION: 6.21.0
 
 jobs:
   release:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: '3.11'
-      - uses: actions/setup-node@v4
+          python-version: '3.11.15'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
           cache: npm
           cache-dependency-path: |
             apps/web-client/package-lock.json
             packages/scrcpy-protocol/package-lock.json
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install verified uv
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python tools/fetch_verified_artifact.py uv-linux-x86_64 .tools/uv.tar.gz
+          mkdir -p .tools/uv
+          tar -xzf .tools/uv.tar.gz -C .tools/uv --strip-components=1
+          test "$(.tools/uv/uv --version)" = "uv 0.12.4"
       - name: Sync locked Python environment
-        run: $HOME/.local/bin/uv sync --locked --extra dev
-      - run: npm ci
-        working-directory: packages/scrcpy-protocol
-      - run: npm ci
-        working-directory: apps/web-client
+        run: .tools/uv/uv sync --locked --extra dev
+      - working-directory: packages/scrcpy-protocol
+        run: npm ci
+      - working-directory: apps/web-client
+        run: npm ci
       - name: Run release gate
-        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
+        run: .tools/uv/uv run python tools/release_gate.py --require-web-client-build --output /tmp/release-gate.json
+      - name: Generate build SBOM and license inventory
+        run: .tools/uv/uv run python tools/generate_sbom.py --output-dir evidence/supply-chain
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: supply-chain-evidence
+          path: evidence/supply-chain/*
+          if-no-files-found: error
 
   windows-package-smoke:
-    runs-on: windows-latest
-    timeout-minutes: 25
+    runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: '3.11'
-      - uses: actions/setup-node@v4
+          python-version: '3.11.15'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
           cache: npm
           cache-dependency-path: |
             apps/web-client/package-lock.json
@@ -59,16 +76,13 @@ jobs:
           npm ci
           npm run build
       - name: Install desktop build dependencies
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install . "pyinstaller==$env:PYINSTALLER_VERSION"
+        run: python -m pip install --disable-pip-version-check . "pyinstaller==$env:PYINSTALLER_VERSION"
       - name: Download verified scrcpy server
         run: python tools/download_server.py
-      - name: Download Android platform-tools
+      - name: Download verified Android platform-tools
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile platform-tools.zip
+          python tools/fetch_verified_artifact.py android-platform-tools-windows platform-tools.zip
           Expand-Archive -Path platform-tools.zip -DestinationPath platform-tools
           $adb = (Resolve-Path "platform-tools/platform-tools").Path
           "DWD_ADB_DIR=$adb" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -81,7 +95,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke-test Windows executable service
         run: python tools/smoke_desktop_package.py .\dist\DroidWebDisplay.exe --timeout 60
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-package-smoke
           path: dist/DroidWebDisplay.exe
@@ -89,15 +103,14 @@ jobs:
 
   linux-appimage-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: '3.11'
-      - uses: actions/setup-node@v4
+          python-version: '3.11.15'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
           cache: npm
           cache-dependency-path: |
             apps/web-client/package-lock.json
@@ -113,21 +126,21 @@ jobs:
           npm ci
           npm run build
       - name: Install desktop build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install . "pyinstaller==$PYINSTALLER_VERSION"
+        run: python -m pip install --disable-pip-version-check . "pyinstaller==$PYINSTALLER_VERSION"
       - name: Download verified scrcpy server
         run: python tools/download_server.py
-      - name: Download Android platform-tools
+      - name: Download verified Android platform-tools
+        shell: bash
         run: |
-          curl -fsSL "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o platform-tools.zip
+          set -euxo pipefail
+          python tools/fetch_verified_artifact.py android-platform-tools-linux platform-tools.zip
           unzip -q platform-tools.zip -d platform-tools
           echo "DWD_ADB_DIR=$PWD/platform-tools/platform-tools" >> "$GITHUB_ENV"
       - name: Build Linux frozen runtime
         run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplay.spec
       - name: Smoke-test frozen runtime CLI
         run: ./dist/DroidWebDisplay/DroidWebDisplay --help
-      - name: Build AppImage
+      - name: Build AppImage with verified toolchain
         shell: bash
         run: |
           set -euxo pipefail
@@ -152,16 +165,22 @@ jobs:
           EOF
           cp packaging/linux/droidwebdisplay.svg "$APPDIR/droidwebdisplay.svg"
           ln -s droidwebdisplay.svg "$APPDIR/.DirIcon"
-          curl -fsSL "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -o appimagetool-x86_64.AppImage
+
+          python tools/fetch_verified_artifact.py appimagetool-linux-x86_64 appimagetool-x86_64.AppImage
+          python tools/fetch_verified_artifact.py appimage-runtime-linux-x86_64 runtime-x86_64
           chmod +x appimagetool-x86_64.AppImage
+
           mkdir -p release
-          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool-x86_64.AppImage "$APPDIR" "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool-x86_64.AppImage \
+            --runtime-file "$PWD/runtime-x86_64" \
+            "$APPDIR" \
+            "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
           chmod +x release/DroidWebDisplay-ci-linux-x86_64.AppImage
       - name: Smoke-test AppImage CLI
         run: APPIMAGE_EXTRACT_AND_RUN=1 ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --help
       - name: Smoke-test AppImage service
         run: python tools/smoke_desktop_package.py ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --appimage-extract-and-run --timeout 60
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-appimage-smoke
           path: release/DroidWebDisplay-ci-linux-x86_64.AppImage
