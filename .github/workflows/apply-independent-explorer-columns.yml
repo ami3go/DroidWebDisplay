@@ -17,9 +17,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Prepare target branch and helper
+      - name: Prepare target branch and helpers
         run: |
           cp .github/scripts/apply_independent_explorer_columns.py /tmp/apply_independent_explorer_columns.py
+          cp .github/scripts/remove_stale_explorer_column_test.py /tmp/remove_stale_explorer_column_test.py
           git fetch origin stable_main
           git checkout -B agent/independent-explorer-columns origin/stable_main
           test "$(git rev-parse HEAD)" = "290f0cb0b4bb1311ea148a61cf6301a0cfb632b3"
@@ -43,6 +44,7 @@ jobs:
       - name: Apply independent column resizing
         run: |
           python /tmp/apply_independent_explorer_columns.py
+          python /tmp/remove_stale_explorer_column_test.py
           npm run build --prefix apps/web-client
           npm test --prefix apps/web-client
           $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-independent-explorer-columns.json
