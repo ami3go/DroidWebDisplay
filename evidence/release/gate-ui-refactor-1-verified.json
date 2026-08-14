@@ -1,0 +1,329 @@
+{
+  "adapter": "scrcpy-4.1",
+  "checks": {
+    "apiAndWebSocketProtection": {
+      "csrf": "session-bound-header",
+      "restProtected": true,
+      "status": "PASS",
+      "webSocketProtected": true
+    },
+    "auditRedaction": {
+      "pinLogged": false,
+      "rawTokenLogged": false,
+      "status": "PASS"
+    },
+    "authenticationSelfTest": {
+      "checks": {
+        "allDurations": true,
+        "configured": true,
+        "expiredRejected": true,
+        "globalRevocation": true,
+        "individualRevocation": true,
+        "rawSecretsAbsent": true
+      },
+      "durationChoices": [
+        "1-day",
+        "1-hour",
+        "1-month",
+        "1-week",
+        "1-year",
+        "browser-session",
+        "custom",
+        "forever"
+      ],
+      "status": "PASS"
+    },
+    "browserHil": {
+      "reason": "browser evidence not required",
+      "status": "SKIP"
+    },
+    "clipboardCompletion": {
+      "androidToPc": true,
+      "automaticSyncPaste": false,
+      "backgroundPermissionPromptLoopPrevented": true,
+      "maximumSizeConfigurable": true,
+      "pcToAndroid": true,
+      "status": "PASS"
+    },
+    "clipboardKeyboardShortcuts": {
+      "automaticSyncStillNonPasting": true,
+      "ctrlC": "remote-copy",
+      "ctrlV": "explicit-paste",
+      "status": "PASS"
+    },
+    "collapsibleCards": {
+      "legacyPanelsPresent": false,
+      "nativePersistedAccordions": true,
+      "obsoleteControlsCardRemoved": true,
+      "status": "PASS"
+    },
+    "compactConnectionStatus": {
+      "legacySideCardPresent": false,
+      "oneUnitHeight": "2.12rem",
+      "states": [
+        "connected",
+        "disconnected",
+        "connecting"
+      ],
+      "status": "PASS",
+      "toolbarPlacement": true,
+      "visualStyle": "animated-ring-status-chip"
+    },
+    "cookiePolicy": {
+      "httpOnly": true,
+      "lanSecure": true,
+      "localSecure": false,
+      "sameSite": "strict",
+      "status": "PASS"
+    },
+    "focusLayoutEscape": {
+      "dedicatedExitButton": false,
+      "permanentFocusStyle": true,
+      "selectorAlwaysVisible": false,
+      "selectorPresent": false,
+      "status": "PASS",
+      "toolbarPlacement": true
+    },
+    "loopbackTrustModel": {
+      "androidHelperIntroduced": false,
+      "bindDefault": "127.0.0.1",
+      "lanOptional": true,
+      "phoneAuthoritative": false,
+      "status": "PASS"
+    },
+    "networkAccessSelfTest": {
+      "checks": {
+        "atomicPersistence": true,
+        "certificateSan": true,
+        "clientAllowlist": true,
+        "firewallPrivateProfile": true,
+        "originAllowlist": true,
+        "specificBind": true
+      },
+      "status": "PASS"
+    },
+    "node": {
+      "argv": [
+        "/opt/hostedtoolcache/node/22.23.1/x64/bin/node",
+        "--version"
+      ],
+      "returncode": 0,
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "v22.23.1\n"
+    },
+    "openapi": {
+      "argv": [
+        "/home/runner/work/DroidWebDisplay/DroidWebDisplay/.venv/bin/python3",
+        "tools/generate_openapi.py",
+        "--check"
+      ],
+      "returncode": 0,
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "OpenAPI document is current: /home/runner/work/DroidWebDisplay/DroidWebDisplay/packages/bridge-api/openapi/openapi-v1.json\n"
+    },
+    "openapiSecurity": {
+      "scheme": {
+        "description": "Opaque PC-local trusted-session cookie. PINs and raw tokens are never logged.",
+        "in": "cookie",
+        "name": "droid_web_display_id",
+        "type": "apiKey"
+      },
+      "status": "PASS"
+    },
+    "optionalAudioPipeline": {
+      "codec": "opus",
+      "experimentalLabel": false,
+      "failureIsolation": true,
+      "latencyWarning": true,
+      "status": "PASS"
+    },
+    "optionalLanAccess": {
+      "clientNetworkAllowlist": true,
+      "defaultMode": "local-only",
+      "firewallOptional": true,
+      "hostAndOriginValidation": true,
+      "lanMode": "private-lan-https",
+      "pinRequired": true,
+      "recoveryTool": "tools/reset_network_access.py",
+      "secureCookies": true,
+      "specificInterfaceOnly": true,
+      "status": "PASS"
+    },
+    "packagingSelfTest": {
+      "checks": {
+        "launchers": true,
+        "licenses": true,
+        "migration": true,
+        "offlineReadinessExplicit": true,
+        "releaseTree": true,
+        "runtimeStateExcluded": true,
+        "versionManifest": true
+      },
+      "readyForOfflineUse": false,
+      "status": "PASS"
+    },
+    "phase11Packaging": {
+      "configurationMigration": true,
+      "licensesIncluded": true,
+      "offlineBundleRequiresExplicitPlatformArtifacts": true,
+      "runtimeStateExcluded": true,
+      "serverChecksumVerifiedAtPackaging": true,
+      "status": "PASS",
+      "targets": [
+        "windows",
+        "linux",
+        "source"
+      ]
+    },
+    "protocolTests": {
+      "argv": [
+        "/opt/hostedtoolcache/node/22.23.1/x64/bin/node",
+        "tools/run-tests.mjs"
+      ],
+      "returncode": 0,
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "TAP version 13\n# Subtest: adapter consumes first-channel handshake and writes control bytes\nok 1 - adapter consumes first-channel handshake and writes control bytes\n  ---\n  duration_ms: 5.103586\n  type: 'test'\n  ...\n# Subtest: adapter rejects incompatible server metadata\nok 2 - adapter rejects incompatible server metadata\n  ---\n  duration_ms: 0.177716\n  type: 'test'\n  ...\n# Subtest: adapter opens enabled channels in upstream video-audio-control order\nok 3 - adapter opens enabled channels in upstream video-audio-control order\n  ---\n  duration_ms: 0.916251\n  type: 'test'\n  ...\n# Subtest: explicitly disabled audio does not abort an otherwise valid session\nok 4 - explicitly disabled audio does not abort an otherwise valid session\n  ---\n  duration_ms: 1.111924\n  type: 'test'\n  ...\n# Subtest: audio configuration failure does not abort video or control\nok 5 - audio configuration failure does not abort video or control\n  ---\n  duration_ms: 0.842231\n  type: 'test'\n  ...\n# Subtest: UTF-8 truncation never splits a code point\nok 6 - UTF-8 truncation never splits a code point\n  ---\n  duration_ms: 1.155298\n  type: 'test'\n  ...\n# Subtest: fixed point conversion matches scrcpy boundaries\nok 7 - fixed point conversion matches scrcpy boundaries\n  ---\n  duration_ms: 0.346899\n  type: 'test'\n  ...\n# Subtest: inject keycode serialization matches the 14-byte upstream layout\nok 8 - inject keycode serialization matches the 14-byte upstream layout\n  ---\n  duration_ms: 4.014156\n  type: 'test'\n  ...\n# Subtest: touch message uses 32-byte big-endian layout\nok 9 - touch message uses 32-byte big-endian layout\n  ---\n  duration_ms: 0.584535\n  type: 'test'\n  ...\n# Subtest: clipboard and empty messages serialize correctly\nok 10 - clipboard and empty messages serialize correctly\n  ---\n  duration_ms: 0.55489\n  type: 'test'\n  ...\n# Subtest: scroll values are clamped to upstream range\nok 11 - scroll values are clamped to upstream range\n  ---\n  duration_ms: 0.310815\n  type: 'test'\n  ...\n# Subtest: device clipboard and ack messages parse across arbitrary chunks\nok 12 - device clipboard and ack messages parse across arbitrary chunks\n  ---\n  duration_ms: 3.30795\n  type: 'test'\n  ...\n# Subtest: unknown and truncated device messages fail deterministically\nok 13 - unknown and truncated device messages fail deterministically\n  ---\n  duration_ms: 0.803112\n  type: 'test'\n  ...\n# Subtest: Annex B SPS/PPS configuration is extracted for WebCodecs\nok 14 - Annex B SPS/PPS configuration is extracted for WebCodecs\n  ---\n  duration_ms: 2.115796\n  type: 'test'\n  ...\n# Subtest: configuration without SPS/PPS is rejected\nok 15 - configuration without SPS/PPS is rejected\n  ---\n  duration_ms: 0.71495\n  type: 'test'\n  ...\n# Subtest: video header, configuration and key frame parse\nok 16 - video header, configuration and key frame parse\n  ---\n  duration_ms: 5.054503\n  type: 'test'\n  ...\n# Subtest: malformed video session and zero-length packets are rejected\nok 17 - malformed video session and zero-length packets are rejected\n  ---\n  duration_ms: 1.012405\n  type: 'test'\n  ...\n# Subtest: truncated packet payload reports truncation\nok 18 - truncated packet payload reports truncation\n  ---\n  duration_ms: 0.368171\n  type: 'test'\n  ...\n# Subtest: rotation session packet is accepted and updates video dimensions\nok 19 - rotation session packet is accepted and updates video dimensions\n  ---\n  duration_ms: 0.523744\n  type: 'test'\n  ...\n# Subtest: upstream v4.1 inject-keycode vector matches byte-for-byte\nok 20 - upstream v4.1 inject-keycode vector matches byte-for-byte\n  ---\n  duration_ms: 1.632442\n  type: 'test'\n  ...\n# Subtest: upstream v4.1 touch and scroll vectors match byte-for-byte\nok 21 - upstream v4.1 touch and scroll vectors match byte-for-byte\n  ---\n  duration_ms: 0.504375\n  type: 'test'\n  ...\n# Subtest: upstream v4.1 clipboard, UHID and utility vectors match\nok 22 - upstream v4.1 clipboard, UHID and utility vectors match\n  ---\n  duration_ms: 0.365667\n  type: 'test'\n  ...\n# Subtest: upstream v4.1 device-message vectors parse byte-for-byte\nok 23 - upstream v4.1 device-message vectors parse byte-for-byte\n  ---\n  duration_ms: 2.305369\n  type: 'test'\n  ...\n# Subtest: runtime-invalid control values are rejected instead of wrapping\nok 24 - runtime-invalid control values are rejected instead of wrapping\n  ---\n  duration_ms: 0.459327\n  type: 'test'\n  ...\n1..24\n# tests 24\n# suites 0\n# pass 24\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 212.777898\n"
+    },
+    "pythonTests": {
+      "argv": [
+        "/home/runner/work/DroidWebDisplay/DroidWebDisplay/.venv/bin/python3",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "returncode": 0,
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "........................................................................ [ 59%]\n.................................................                        [100%]\n121 passed in 10.87s\n"
+    },
+    "reconnectAndLayout": {
+      "automaticReconnect": true,
+      "fullscreen": true,
+      "keyboardFocus": true,
+      "manualReconnect": true,
+      "permanentNativeLayout": true,
+      "status": "PASS"
+    },
+    "revocation": {
+      "global": true,
+      "individual": true,
+      "status": "PASS"
+    },
+    "settingsRoundTrip": {
+      "schemaVersion": 1,
+      "status": "PASS"
+    },
+    "singlePageVerticalScroll": {
+      "nativeWorkspace": true,
+      "pageScrollbarOnly": true,
+      "rightPanelOwnScrollbar": false,
+      "status": "PASS",
+      "workspaceTopAligned": true
+    },
+    "staticClient": {
+      "checkedFiles": 91,
+      "errors": [],
+      "manifest": "/home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/dist-manifest.json",
+      "status": "PASS"
+    },
+    "storageAndUiAdjustments": {
+      "compactButtonLabels": true,
+      "documentsCanonicalPath": "/sdcard/Documents",
+      "externalSdDiscovery": true,
+      "mouseCursor": "default",
+      "oldGateCheckboxesPresent": false,
+      "status": "PASS",
+      "uniformButtonHeight": true
+    },
+    "trustDurations": {
+      "choices": [
+        "browser-session",
+        "1-hour",
+        "1-day",
+        "1-week",
+        "1-month",
+        "1-year",
+        "forever",
+        "custom"
+      ],
+      "customValidated": true,
+      "status": "PASS"
+    },
+    "twoWayFolderSync": {
+      "androidToPc": true,
+      "disabledByDefault": true,
+      "loopPrevention": "bidirectional-fingerprints",
+      "nonRecursive": true,
+      "pcToAndroid": true,
+      "stableFileDetection": true,
+      "status": "PASS"
+    },
+    "upstreamUpdateAutomation": {
+      "evidenceGatedPromotion": true,
+      "patchFailureIsFatal": true,
+      "separateExperimentalAdapterPolicy": true,
+      "stableAdapter": "scrcpy-4.1",
+      "stableVersionPreserved": true,
+      "status": "PASS",
+      "toolFiles": [
+        "tools/update_scrcpy.py",
+        "tools/inspect_scrcpy_protocol.py",
+        "tools/scaffold_scrcpy_adapter.py",
+        "tools/apply_scrcpy_patches.py",
+        "tools/build_scrcpy_server.py",
+        "tools/promote_scrcpy_adapter.py",
+        "docs/UPSTREAM_UPDATE.md",
+        ".gitmodules"
+      ]
+    },
+    "upstreamUpdateSelfTest": {
+      "checks": {
+        "experimentalByDefault": true,
+        "matchingServerBuilt": true,
+        "patchFailureStopsAndResets": true,
+        "protocolAreasDetected": true,
+        "revisionSelectionClean": true,
+        "separateAdapterCreated": true,
+        "stableAdapterPreserved": true,
+        "stablePromotionBlockedWithoutEvidence": true,
+        "upstreamClean": true
+      },
+      "status": "PASS"
+    },
+    "virtualKeyboardSuppression": {
+      "physicalDisplayAffected": false,
+      "policy": "hide",
+      "status": "PASS",
+      "virtualDisplayOnly": true
+    },
+    "webClientBuild": {
+      "argv": [
+        "/opt/hostedtoolcache/node/22.23.1/x64/bin/node",
+        "tools/build.mjs"
+      ],
+      "compiler": "/home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/node_modules/typescript/bin/tsc",
+      "returncode": 0,
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "Built web client with 91 files using /home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/node_modules/typescript/bin/tsc\n"
+    },
+    "webClientTests": {
+      "argv": [
+        "/opt/hostedtoolcache/node/22.23.1/x64/bin/node",
+        "tools/run-tests.mjs"
+      ],
+      "returncode": 1,
+      "status": "FAIL",
+      "stderr": "file:///home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/tools/run-tests.mjs:17\n  child.on(\"exit\", (code) => code === 0 ? resolvePromise() : reject(new Error(`tests exited ${code}`)));\n                                                                    ^\n\nError: tests exited 1\n    at ChildProcess.<anonymous> (file:///home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/tools/run-tests.mjs:17:69)\n    at ChildProcess.emit (node:events:519:28)\n    at ChildProcess._handle.onexit (node:internal/child_process:293:12)\n\nNode.js v22.23.1\n",
+      "stdout": "TAP version 13\n# Subtest: session request uses the versioned API and approved defaults\nok 1 - session request uses the versioned API and approved defaults\n  ---\n  duration_ms: 37.206359\n  type: 'test'\n  ...\n# Subtest: API errors preserve HTTP status and server details\nok 2 - API errors preserve HTTP status and server details\n  ---\n  duration_ms: 1.171303\n  type: 'test'\n  ...\n# Subtest: default fetch preserves the Window/global binding\nok 3 - default fetch preserves the Window/global binding\n  ---\n  duration_ms: 1.425463\n  type: 'test'\n  ...\n# Subtest: file transfer API uses structured versioned endpoints\nok 4 - file transfer API uses structured versioned endpoints\n  ---\n  duration_ms: 1.340947\n  type: 'test'\n  ...\n# Subtest: automatic download API uses persistent versioned endpoints\nok 5 - automatic download API uses persistent versioned endpoints\n  ---\n  duration_ms: 1.32315\n  type: 'test'\n  ...\n# Subtest: running-app API lists GUI tasks and requests relocation to a virtual display\nok 6 - running-app API lists GUI tasks and requests relocation to a virtual display\n  ---\n  duration_ms: 1.357181\n  type: 'test'\n  ...\n# Subtest: authentication API keeps setup public and adds CSRF to protected writes\nok 7 - authentication API keeps setup public and adds CSRF to protected writes\n  ---\n  duration_ms: 2.284999\n  type: 'test'\n  ...\n# Subtest: authentication setup supports every required trust choice\nok 8 - authentication setup supports every required trust choice\n  ---\n  duration_ms: 0.621841\n  type: 'test'\n  ...\n# Subtest: network access API validates and applies authenticated HTTPS configuration\nok 9 - network access API validates and applies authenticated HTTPS configuration\n  ---\n  duration_ms: 1.298933\n  type: 'test'\n  ...\n# Subtest: reports all mandatory Chromium/WebCodecs capabilities\nok 10 - reports all mandatory Chromium/WebCodecs capabilities\n  ---\n  duration_ms: 1.863499\n  type: 'test'\n  ...\n# Subtest: rejects a browser without WebCodecs\nok 11 - rejects a browser without WebCodecs\n  ---\n  duration_ms: 0.303163\n  type: 'test'\n  ...\n# Subtest: reports optional audio independently from mandatory video support\nok 12 - reports optional audio independently from mandatory video support\n  ---\n  duration_ms: 0.316364\n  type: 'test'\n  ...\n# Subtest: decoder backlog never drops an arbitrary H.264 delta frame\nok 13 - decoder backlog never drops an arbitrary H.264 delta frame\n  ---\n  duration_ms: 0.184166\n  type: 'test'\n  ...\n# Subtest: decoder backlog recovery is allowed only at a fresh keyframe\nok 14 - decoder backlog recovery is allowed only at a fresh keyframe\n  ---\n  duration_ms: 0.161352\n  type: 'test'\n  ...\n# node:internal/fs/promises:639\n#   return new FileHandle(await PromisePrototypeThen(\n#                         ^\n# Error: ENOENT: no such file or directory, open '/home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/static/droidwebdisplay-connect-drawer.css'\n#     at async open (node:internal/fs/promises:639:25)\n#     at async readFile (node:internal/fs/promises:1252:14)\n#     at async file:///home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/tests/connect-drawer.test.mjs:9:20 {\n#   errno: -2,\n#   code: 'ENOENT',\n#   syscall: 'open',\n#   path: '/home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/static/droidwebdisplay-connect-drawer.css'\n# }\n# Node.js v22.23.1\n# Subtest: /home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/tests/connect-drawer.test.mjs\nnot ok 3 - /home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/tests/connect-drawer.test.mjs\n  ---\n  duration_ms: 53.268751\n  type: 'test'\n  location: '/home/runner/work/DroidWebDisplay/DroidWebDisplay/apps/web-client/tests/connect-drawer.test.mjs:1:1'\n  failureType: 'testCodeFailure'\n  exitCode: 1\n  signal: ~\n  error: 'test failed'\n  code: 'ERR_TEST_FAILURE'\n  ...\n# Subtest: recommended virtual-display profile is deterministic\nok 16 - recommended virtual-display profile is deterministic\n  ---\n  duration_ms: 1.268388\n  type: 'test'\n  ...\n# Subtest: virtual-display request maps typed values\nok 17 - virtual-display request maps typed values\n  ---\n  duration_ms: 0.752085\n  type: 'test'\n  ...\n# Subtest: invalid package and dimensions are rejected before API launch\nok 18 - invalid package and dimensions are rejected before API launch\n  ---\n  duration_ms: 0.369493\n  type: 'test'\n  ...\n# Subtest: flex resize is bounded, aligned and aspect-ratio aware\nok 19 - flex resize is bounded, aligned and aspect-ratio aware\n  ---\n  duration_ms: 1.370971\n  type: 'test'\n  ...\n# Subtest: virtual keyboard suppression maps to hide and never changes physical mode\nok 20 - virtual keyboard suppression maps to hide and never changes physical mode\n  ---\n  duration_ms: 0.281731\n  type: 'test'\n  ...\n# Subtest: maps pointer coordinates and clamps outside positions\nok 21 - maps pointer coordinates and clamps outside positions\n  ---\n  duration_ms: 1.446193\n  type: 'test'\n  ...\n# Subtest: rotation dimensions immediately change coordinate mapping\nok 22 - rotation dimensions immediately change coordinate mapping\n  ---\n  duration_ms: 0.281992\n  type: 'test'\n  ...\n# Subtest: keyboard and Android navigation messages are deterministic\nok 23 - keyboard and Android navigation messages are deterministic\n  ---\n  duration_ms: 0.375552\n  type: 'test'\n  ...\n# Subtest: legacy text fallback splits UTF-8 without breaking code points\nok 24 - legacy text fallback splits UTF-8 without breaking code points\n  ---\n  duration_ms: 1.576949\n  type: 'test'\n  ...\n# Subtest: automatic clipboard synchronization can update Android without requesting paste\nok 25 - automatic clipboard synchronization can update Android without requesting paste\n  ---\n  duration_ms: 0.371075\n  type: 'test'\n  ...\n# Subtest: Ctrl+C stays explicit while Ctrl/Cmd+V is left to the native paste event\nok 26 - Ctrl+C stays explicit while Ctrl/Cmd+V is left to the native paste event\n  ---\n  duration_ms: 0.250785\n  type: 'test'\n  ...\n# Subtest: workspace is the native single-stage production layout\nok 27 - workspace is the native single-stage production layout\n  ---\n  duration_ms: 1.177752\n  type: 'test'\n  ...\n# Subtest: Display Mode controls are contained inside their card\nok 28 - Display Mode controls are contained inside their card\n  ---\n  duration_ms: 0.538316\n  type: 'test'\n  ...\n# Subtest: Display Mode numeric fields collapse safely on narrow viewports\nok 29 - Display Mode numeric fields collapse safely on narrow viewports\n  ---\n  duration_ms: 0.232709\n  type: 'test'\n  ...\n# Subtest: running applications are compact header controls with automatic relocation\nok 30 - running applications are compact header controls with automatic relocation\n  ---\n  duration_ms: 0.265197\n  type: 'test'\n  ...\n# Subtest: PIN gate and PC-local trust wording are present\nok 31 - PIN gate and PC-local trust wording are present\n  ---\n  duration_ms: 0.1604\n  type: 'test'\n  ...\n# Subtest: file controls use the accepted production labels\nok 32 - file controls use the accepted production labels\n  ---\n  duration_ms: 0.356955\n  type: 'test'\n  ...\n# Subtest: audio reconnect clipboard and settings controls are present without layout modes\nok 33 - audio reconnect clipboard and settings controls are present without layout modes\n  ---\n  duration_ms: 0.421581\n  type: 'test'\n  ...\n# Subtest: native drawer uses persisted accordions only for multi-section groups\nok 34 - native drawer uses persisted accordions only for multi-section groups\n  ---\n  duration_ms: 0.263134\n  type: 'test'\n  ...\n# Subtest: Focus-style workspace is permanent and has no layout selector\nok 35 - Focus-style workspace is permanent and has no layout selector\n  ---\n  duration_ms: 0.380319\n  type: 'test'\n  ...\n# Subtest: audio card uses the concise label without the experimental badge\nok 36 - audio card uses the concise label without the experimental badge\n  ---\n  duration_ms: 0.432467\n  type: 'test'\n  ...\n# Subtest: Android File Explorer accepts PC file drag and drop\nok 37 - Android File Explorer accepts PC file drag and drop\n  ---\n  duration_ms: 0.2073\n  type: 'test'\n  ...\n# Subtest: Android File Explorer refreshes when stale\nok 38 - Android File Explorer refreshes when stale\n  ---\n  duration_ms: 0.108983\n  type: 'test'\n  ...\n# Subtest: File sync keeps Save primary and moves uncommon actions into overflow\nok 39 - File sync keeps Save primary and moves uncommon actions into overflow\n  ---\n  duration_ms: 0.10705\n  type: 'test'\n  ...\n# Subtest: File sync controls are present\nok 40 - File sync controls are present\n  ---\n  duration_ms: 0.151046\n  type: 'test'\n  ...\n# Subtest: connection status is a one-unit toolbar pill with state icons\nok 41 - connection status is a one-unit toolbar pill with state icons\n  ---\n  duration_ms: 0.212799\n  type: 'test'\n  ...\n# Subtest: compact header keeps Android controls while connection controls live directly in Display\nok 42 - compact header keeps Android controls while connection controls live directly in Display\n  ---\n  duration_ms: 0.272518\n  type: 'test'\n  ...\n# Subtest: single drawer ships final structure without legacy runtime migration\nok 43 - single drawer ships final structure without legacy runtime migration\n  ---\n  duration_ms: 0.225016\n  type: 'test'\n  ...\n# Subtest: optional LAN access is explicit, authenticated and recoverable\nok 44 - optional LAN access is explicit, authenticated and recoverable\n  ---\n  duration_ms: 0.293199\n  type: 'test'\n  ...\n# Subtest: Clipboard drawer supports focused Ctrl+Enter Type\nok 45 - Clipboard drawer supports focused Ctrl+Enter Type\n  ---\n  duration_ms: 0.817153\n  type: 'test'\n  ...\n# Subtest: automatic clipboard sync never triggers Android paste\nok 46 - automatic clipboard sync never triggers Android paste\n  ---\n  duration_ms: 0.27352\n  type: 'test'\n  ...\n# Subtest: automatic clipboard polling never prompts from the background\nok 47 - automatic clipboard polling never prompts from the background\n  ---\n  duration_ms: 0.159589\n  type: 'test'\n  ...\n# Subtest: virtual keyboard suppression is virtual-display-only and Ctrl+V is explicit\nok 48 - virtual keyboard suppression is virtual-display-only and Ctrl+V is explicit\n  ---\n  duration_ms: 0.261451\n  type: 'test'\n  ...\n# Subtest: Android File Explorer prioritizes destination then storage navigation\nok 49 - Android File Explorer prioritizes destination then storage navigation\n  ---\n  duration_ms: 0.130355\n  type: 'test'\n  ...\n# Subtest: Files drawer uses Explorer-only transfers with custom PC destination\nok 50 - Files drawer uses Explorer-only transfers with custom PC destination\n  ---\n  duration_ms: 0.1139\n  type: 'test'\n  ...\n# Subtest: formats transfer sizes deterministically\nok 51 - formats transfer sizes deterministically\n  ---\n  duration_ms: 1.632172\n  type: 'test'\n  ...\n# Subtest: Android storage parent navigation stays inside the active shared root\nok 52 - Android storage parent navigation stays inside the active shared root\n  ---\n  duration_ms: 0.308662\n  type: 'test'\n  ...\n# Subtest: Explorer breadcrumbs preserve the selected Android shared root\nok 53 - Explorer breadcrumbs preserve the selected Android shared root\n  ---\n  duration_ms: 0.879726\n  type: 'test'\n  ...\n# Subtest: Explorer sorting keeps folders first and supports details columns\nok 54 - Explorer sorting keeps folders first and supports details columns\n  ---\n  duration_ms: 8.044015\n  type: 'test'\n  ...\n1..54\n# tests 54\n# suites 0\n# pass 53\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 241.352782\n"
+    }
+  },
+  "packageVersion": "0.11.2",
+  "phase": 11,
+  "schemaVersion": 1,
+  "scrcpyVersion": "4.1",
+  "status": "FAIL"
+}
