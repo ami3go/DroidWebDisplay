@@ -29,6 +29,50 @@ def _read_log(path: Path) -> str:
         return ""
 
 
+def _pid_from_file(pid_file: Path) -> int | None:
+    try:
+        value = int(pid_file.read_text(encoding="ascii").strip())
+        return value if value > 0 else None
+    except (OSError, ValueError):
+        return None
+
+
+def _wait_or_kill(process: subprocess.Popen[str]) -> None:
+    try:
+        process.wait(timeout=10)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    if process.poll() is None:
+        process.terminate()
+    try:
+        process.wait(timeout=5)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    if process.poll() is None:
+        process.kill()
+    process.wait(timeout=5)
+
+
+def _stop_process(process: subprocess.Popen[str], pid_file: Path) -> None:
+    if os.name == "nt":
+        service_pid = _pid_from_file(pid_file)
+        kill_pid = service_pid or process.pid
+        subprocess.run(
+            ["taskkill", "/PID", str(kill_pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        _wait_or_kill(process)
+        return
+
+    if process.poll() is None:
+        process.terminate()
+    _wait_or_kill(process)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Launch a frozen DroidWebDisplay package and probe its web UI")
     parser.add_argument("executable", type=Path)
@@ -48,6 +92,7 @@ def main() -> int:
         temp_root = Path(temporary)
         stdout_path = temp_root / "stdout.log"
         stderr_path = temp_root / "stderr.log"
+        pid_file = temp_root / "service.pid"
         environment = os.environ.copy()
         if os.name == "nt":
             environment["LOCALAPPDATA"] = str(temp_root / "LocalAppData")
@@ -56,7 +101,14 @@ def main() -> int:
         if args.appimage_extract_and_run:
             environment["APPIMAGE_EXTRACT_AND_RUN"] = "1"
 
-        command = [str(executable), "--no-browser", "--port", str(port)]
+        command = [
+            str(executable),
+            "--no-browser",
+            "--port",
+            str(port),
+            "--pid-file",
+            str(pid_file),
+        ]
         print(f"Launching package smoke test: {' '.join(command)}")
         print(f"Probing: {url}")
 
@@ -100,13 +152,7 @@ def main() -> int:
                         last_error = str(exc)
                     time.sleep(0.25)
             finally:
-                if process.poll() is None:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=10)
+                _stop_process(process, pid_file)
 
         stdout_text = _read_log(stdout_path)
         stderr_text = _read_log(stderr_path)
