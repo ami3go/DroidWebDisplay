@@ -41,7 +41,7 @@ DroidWebDisplay --headless         # server only; no desktop GUI and no automati
 DroidWebDisplay --headless --open-browser
 ```
 
-Additional server arguments such as `--port 9000` are forwarded by the desktop host.
+Additional server arguments such as `--port 9000`, `--log-level DEBUG`, `--log-max-bytes 10485760`, and `--log-backups 8` are forwarded by the desktop host.
 
 ## Lifecycle and cleanup
 
@@ -57,4 +57,21 @@ A separately started/headless DroidWebDisplay server is detected as an external 
 
 ## Logs
 
-Desktop/server output is written to `desktop-host.log` under the platform state log directory. The file rotates at approximately 2 MiB and keeps three older generations.
+The **Open Logs** button opens the platform state log directory. Two complementary logs are kept there:
+
+- `desktop-host.log` — human-readable stdout/stderr from the desktop launcher and embedded server. It rotates at approximately 2 MiB and keeps three older generations.
+- `server.log` — structured JSON Lines diagnostics from the server. It rotates at 5 MiB by default and keeps five older generations (`server.log.1` through `server.log.5`).
+
+`server.log` records server/process startup and shutdown, listener/restart failures, sanitized API requests, HTTP status and timing, structured API error codes, WebSocket connect/close/exception events, client IP addresses, and uncaught server exception traces. Successful `/api/v1/health` polling and static web assets are DEBUG-level to avoid flooding the normal INFO log.
+
+Diagnostic logging deliberately does **not** record request bodies or query strings. PINs, authentication/CSRF tokens, cookies, and Authorization values are redacted if they appear in a message. Uvicorn's raw access log is disabled so it cannot reintroduce full request targets containing query parameters.
+
+For a temporary high-detail reproduction, launch with:
+
+```text
+DroidWebDisplay --log-level DEBUG
+```
+
+or set `DWD_LOG_LEVEL=DEBUG` before starting the service. Return to INFO after reproducing the issue because DEBUG records more request lifecycle activity.
+
+For source/headless runs that do not specify `--log-directory`, `server.log` is written below the service data directory's `logs` subdirectory. Packaged desktop runs explicitly route it to the same platform Logs folder used by **Open Logs**.
