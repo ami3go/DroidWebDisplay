@@ -373,7 +373,7 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
 }
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-header,
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-row {
-  grid-template-columns: 26px minmax(80px, 1fr) 54px 78px 26px;
+  grid-template-columns: 26px minmax(80px, 1fr) var(--dwd-explorer-size-w, 54px) var(--dwd-explorer-modified-w, 78px) 26px;
 }
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-header {
   min-height: 1.85rem;
@@ -424,4 +424,35 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .context-menu button:hover:not(:disabled) {
   border: 0 !important;
   background: #142037 !important;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-header-button { position: relative; overflow: visible; }
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: 2px;
+  background: transparent;
+  transition: background .12s ease;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer:hover::after,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer:focus-visible::after,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-frame.column-resizing .explorer-column-resizer::after { background: var(--dwd-cyan); }
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer:focus-visible { outline: none; }
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-frame.column-resizing,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-frame.column-resizing * { cursor: col-resize !important; user-select: none !important; }
+@media (max-width: 560px) {
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-column-resizer { display: none; }
 }

@@ -80,3 +80,16 @@ test("drawer width is user resizable and persisted", () => {
   assert.match(drawerCss, /\.gb-drawer-resize-handle \{/);
   assert.match(drawerCss, /cursor: ew-resize/);
 });
+
+test("Android File Explorer columns are user resizable", () => {
+  assert.match(drawerSource, /EXPLORER_COLUMNS_KEY = 'droidwebdisplay\.ui\.explorer\.columns\.v1'/);
+  assert.match(drawerSource, /function bindExplorerColumnResize\(\)/);
+  assert.match(drawerSource, /explorer-column-resizer/);
+  assert.match(drawerSource, /name-size/);
+  assert.match(drawerSource, /size-modified/);
+  assert.match(drawerSource, /addEventListener\('pointermove'/);
+  assert.match(drawerSource, /localStorage\.removeItem\(EXPLORER_COLUMNS_KEY\)/);
+  assert.match(drawerCss, /--dwd-explorer-size-w/);
+  assert.match(drawerCss, /--dwd-explorer-modified-w/);
+  assert.match(drawerCss, /cursor: col-resize/);
+});
