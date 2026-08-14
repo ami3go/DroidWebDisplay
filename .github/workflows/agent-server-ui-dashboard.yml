@@ -83,6 +83,305 @@ jobs:
           Path('/tmp/apply_server_ui.py').write_text(script, encoding='utf-8')
           PY
           python /tmp/apply_server_ui.py
+      - name: Repair generated dashboard methods
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('droid_web_display/desktop/gui.py')
+          gui = path.read_text(encoding='utf-8')
+          start_marker = '    def _preference_enabled(self, key: str) -> bool:\n'
+          end_marker = '    @property\n    def open_browser_on_start(self) -> bool:\n'
+          start = gui.index(start_marker)
+          end = gui.index(end_marker, start)
+          methods = r'''    def _preference_enabled(self, key: str) -> bool:
+              default = bool(SETTING_DEFAULTS.get(key, True))
+              return self._settings.value(key, default, type=bool)
+
+          @staticmethod
+          def _device_is_connected(value: str) -> bool:
+              return bool(value) and value not in {
+                  "No device",
+                  "Checking…",
+                  "—",
+                  "ADB unavailable",
+              }
+
+          def _notify(self, preference: str, message: str, *, warning: bool = False) -> None:
+              if self.tray is None or not self._preference_enabled(preference):
+                  return
+              icon = (
+                  QSystemTrayIcon.MessageIcon.Warning
+                  if warning
+                  else QSystemTrayIcon.MessageIcon.Information
+              )
+              self.tray.showMessage("DroidWebDisplay", message, icon, 5000)
+
+          def _record_runtime_event(self, message: str, *, kind: str = "info") -> None:
+              timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace(
+                  "+00:00", "Z"
+              )
+              self._runtime_timeline.append(
+                  TimelineEvent(
+                      key=f"runtime-{uuid.uuid4().hex}",
+                      timestamp=timestamp,
+                      message=message,
+                      kind=kind,
+                  )
+              )
+              self._runtime_timeline = self._runtime_timeline[-30:]
+              self._refresh_timeline_display(self._last_log_events)
+
+          def _refresh_timeline_display(self, log_events: list[TimelineEvent]) -> None:
+              self._last_log_events = list(log_events)
+              merged = {event.key: event for event in (*log_events, *self._runtime_timeline)}
+              events = sorted(merged.values(), key=lambda event: event.timestamp)[-40:]
+              self._timeline_view.setPlainText("\n".join(event.display_line() for event in events))
+              scrollbar = self._timeline_view.verticalScrollBar()
+              scrollbar.setValue(scrollbar.maximum())
+
+          def _show_android_details(self) -> None:
+              self._device_button.setEnabled(False)
+
+              def completed(result: object) -> None:
+                  self._device_button.setEnabled(True)
+                  if not isinstance(result, AndroidDeviceDetails):
+                      QMessageBox.information(
+                          self,
+                          "Android device details",
+                          "No Android device is currently visible to ADB.",
+                      )
+                      return
+                  QMessageBox.information(self, "Android device details", result.summary_text())
+
+              def failed(message: str) -> None:
+                  self._device_button.setEnabled(True)
+                  QMessageBox.warning(
+                      self,
+                      "Android device details",
+                      f"Could not read Android device details:\n{message}",
+                  )
+
+              self._start_support_task(
+                  lambda: collect_android_device_details(Path(self.controller.paths.adb_executable)),
+                  on_ready=completed,
+                  on_failed=failed,
+              )
+
+          def _export_settings(self) -> None:
+              default_target = self.controller.paths.downloads_root / "DroidWebDisplay-settings.json"
+              selected, _filter = QFileDialog.getSaveFileName(
+                  self,
+                  "Export DroidWebDisplay settings",
+                  str(default_target),
+                  "JSON files (*.json)",
+              )
+              if not selected:
+                  return
+              try:
+                  target = export_desktop_settings(self._settings, Path(selected))
+              except Exception as exc:
+                  QMessageBox.warning(self, "DroidWebDisplay", f"Could not export settings:\n{exc}")
+                  return
+              QMessageBox.information(self, "DroidWebDisplay", f"Settings exported:\n{target}")
+
+          def _apply_settings_controls(self) -> None:
+              controls = (
+                  (self._open_browser_checkbox, "openBrowserOnStart"),
+                  (self._start_minimized_checkbox, "startMinimized"),
+              )
+              for control, key in controls:
+                  control.blockSignals(True)
+                  control.setChecked(
+                      self._settings.value(key, bool(SETTING_DEFAULTS[key]), type=bool)
+                  )
+                  control.blockSignals(False)
+              for key, control in self._notification_checkboxes.items():
+                  control.blockSignals(True)
+                  control.setChecked(
+                      self._settings.value(key, bool(SETTING_DEFAULTS[key]), type=bool)
+                  )
+                  control.blockSignals(False)
+              channel = str(self._settings.value("updateChannel", "Stable"))
+              self._update_channel.blockSignals(True)
+              self._update_channel.setCurrentText(
+                  channel if channel in {"Stable", "Pre-release"} else "Stable"
+              )
+              self._update_channel.blockSignals(False)
+              selected_tab = self._settings.value("selectedTab", 0, type=int)
+              self._tabs.setCurrentIndex(max(0, min(self._tabs.count() - 1, selected_tab)))
+
+          def _import_settings(self) -> None:
+              selected, _filter = QFileDialog.getOpenFileName(
+                  self,
+                  "Import DroidWebDisplay settings",
+                  str(self.controller.paths.downloads_root),
+                  "JSON files (*.json)",
+              )
+              if not selected:
+                  return
+              try:
+                  imported = import_desktop_settings(self._settings, Path(selected))
+              except Exception as exc:
+                  QMessageBox.warning(self, "DroidWebDisplay", f"Could not import settings:\n{exc}")
+                  return
+              self._apply_settings_controls()
+              QMessageBox.information(
+                  self,
+                  "DroidWebDisplay",
+                  f"Imported {len(imported)} desktop settings. Security sessions were not changed.",
+              )
+
+          def _reset_settings(self) -> None:
+              answer = QMessageBox.question(
+                  self,
+                  "Reset desktop settings",
+                  "Reset desktop-host settings to defaults? Trusted sessions and authentication data will not be changed.",
+                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                  QMessageBox.StandardButton.No,
+              )
+              if answer != QMessageBox.StandardButton.Yes:
+                  return
+              reset_desktop_settings(self._settings)
+              self._apply_settings_controls()
+              QMessageBox.information(self, "DroidWebDisplay", "Desktop settings were reset to defaults.")
+
+          def _check_for_updates(self) -> None:
+              channel = self._update_channel.currentText()
+              self._check_updates_button.setEnabled(False)
+              self._update_status.setText(f"Checking {channel} releases…")
+
+              def completed(result: object) -> None:
+                  self._check_updates_button.setEnabled(True)
+                  if not isinstance(result, ReleaseInfo):
+                      self._update_status.setText("GitHub returned an unexpected release result.")
+                      return
+                  self._latest_release_url = result.url
+                  self._open_release_button.setEnabled(True)
+                  release_type = "pre-release" if result.prerelease else "stable release"
+                  self._update_status.setText(
+                      f"Current {__version__} · Latest {release_type}: {result.tag}"
+                  )
+
+              def failed(message: str) -> None:
+                  self._check_updates_button.setEnabled(True)
+                  self._update_status.setText(f"Update check failed: {message}")
+
+              self._start_support_task(
+                  lambda: check_latest_release(channel),
+                  on_ready=completed,
+                  on_failed=failed,
+              )
+
+          def _open_latest_release(self) -> None:
+              if self._latest_release_url:
+                  QDesktopServices.openUrl(QUrl(self._latest_release_url))
+
+          def _refresh_monitor(self) -> None:
+              if self._monitor_running:
+                  return
+              snapshot = self._last_snapshot
+              self._monitor_running = True
+
+              def task() -> object:
+                  resource = self._resource_monitor.sample(
+                      server_url=snapshot.url,
+                      uptime_seconds=snapshot.uptime_seconds,
+                      adb_executable=Path(self.controller.paths.adb_executable),
+                  )
+                  timeline = read_timeline_events(self.controller.paths.logs_root, limit=40)
+                  return resource, timeline
+
+              def completed(result: object) -> None:
+                  self._monitor_running = False
+                  if not isinstance(result, tuple) or len(result) != 2:
+                      return
+                  resource, timeline = result
+                  if not isinstance(resource, ResourceSnapshot) or not isinstance(timeline, list):
+                      return
+                  self._apply_resource_snapshot(resource, timeline)
+
+              def failed(_message: str) -> None:
+                  self._monitor_running = False
+
+              self._start_support_task(task, on_ready=completed, on_failed=failed)
+
+          def _apply_resource_snapshot(
+              self,
+              resource: ResourceSnapshot,
+              timeline: list[TimelineEvent],
+          ) -> None:
+              self._last_resource = resource
+              self._metric_cpu.setText(f"{resource.cpu_percent:.1f}%")
+              self._metric_ram.setText(format_bytes(resource.memory_bytes))
+              self._metric_uptime.setText(_format_uptime(resource.uptime_seconds))
+              self._metric_network.setText(
+                  f"↓ {format_bytes(resource.network_rx_per_second)}/s  "
+                  f"↑ {format_bytes(resource.network_tx_per_second)}/s"
+              )
+              self._metric_clients.setText(str(resource.client_count))
+              self._metric_adb.setText(resource.adb_process_state)
+
+              count = resource.client_count
+              self._dashboard_clients.setText(f"{count} connected")
+              if resource.client_hosts:
+                  self._dashboard_clients_detail.setText(" · ".join(resource.client_hosts))
+              else:
+                  self._dashboard_clients_detail.setText("No active browser clients")
+              connection = resource.android_connection or "Unknown"
+              state = (
+                  "Connected"
+                  if resource.android_state == "device"
+                  else resource.android_state.title()
+              )
+              if self._device_is_connected(self._cached_device):
+                  self._dashboard_android_detail.setText(f"{connection} · {state}")
+              elif resource.unauthorized_devices:
+                  self._dashboard_android_detail.setText("USB / ADB · Authorization required")
+              else:
+                  self._dashboard_android_detail.setText("No connected Android device")
+
+              current_clients = set(resource.client_hosts)
+              if self._last_client_hosts is not None:
+                  for host in sorted(current_clients - self._last_client_hosts):
+                      self._notify("notifyNewClient", f"New browser client connected: {host}")
+              self._last_client_hosts = current_clients
+
+              unauthorized = set(resource.unauthorized_devices)
+              if self._last_unauthorized_devices is not None:
+                  for serial in sorted(unauthorized - self._last_unauthorized_devices):
+                      self._notify(
+                          "notifyUnauthorized",
+                          f"Android device requires USB debugging authorization: {serial}",
+                          warning=True,
+                      )
+                      self._record_runtime_event(
+                          f"Android device {serial} requires authorization",
+                          kind="android",
+                      )
+              self._last_unauthorized_devices = unauthorized
+
+              if not self._timeline_seeded:
+                  self._seen_timeline_keys.update(event.key for event in timeline)
+                  self._timeline_seeded = True
+              else:
+                  for event in timeline:
+                      if event.key in self._seen_timeline_keys:
+                          continue
+                      self._seen_timeline_keys.add(event.key)
+                      if event.kind == "transfer_failed":
+                          self._notify("notifyTransferFailure", event.message, warning=True)
+              self._seen_timeline_keys.intersection_update(
+                  {event.key for event in timeline}
+                  | {event.key for event in self._runtime_timeline}
+              )
+              self._refresh_timeline_display(timeline)
+
+'''
+          gui = gui[:start] + methods + gui[end:]
+          path.write_text(gui, encoding='utf-8')
+          PY
       - name: Ensure dashboard and timeline theme
         shell: bash
         run: |
