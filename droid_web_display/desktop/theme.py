@@ -151,6 +151,38 @@ QLabel#cardTitle {{
     font-weight: 700;
 }}
 
+
+QFrame#card[dashboardCard="true"] {{
+    background-color: {c['surface_alt']};
+}}
+
+QLabel#dashboardValue {{
+    color: {c['text']};
+    font-size: 15pt;
+    font-weight: 700;
+}}
+
+QLabel#dashboardDetail {{
+    color: {c['text_muted']};
+    font-size: 9pt;
+}}
+
+QPushButton#deviceLink {{
+    min-height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: {c['focus']};
+    font-size: 15pt;
+    font-weight: 700;
+    text-align: left;
+}}
+
+QPushButton#deviceLink:hover {{
+    color: {c['text']};
+    background: transparent;
+}}
+
 QLabel#healthStatus {{
     min-height: 18px;
     padding: 4px 10px;
@@ -297,6 +329,14 @@ QComboBox QAbstractItemView {{
 }}
 
 QPlainTextEdit#logView {{
+    padding: 9px;
+    font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 9pt;
+}}
+
+
+QPlainTextEdit#timelineView {{
+    min-height: 118px;
     padding: 9px;
     font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;
     font-size: 9pt;

@@ -26,6 +26,8 @@ class ResourceSnapshot:
     network_tx_per_second: float
     client_hosts: tuple[str, ...]
     adb_process_state: str
+    android_connection: str
+    android_state: str
     unauthorized_devices: tuple[str, ...]
 
     @property
@@ -73,10 +75,16 @@ class TimelineEvent:
 
     def display_line(self) -> str:
         stamp = self.timestamp
-        if "T" in stamp:
-            stamp = stamp.split("T", 1)[1]
-        stamp = stamp.replace("Z", "")
-        stamp = stamp[:5] if len(stamp) >= 5 else stamp
+        try:
+            normalized = stamp.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(normalized)
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone()
+            stamp = parsed.strftime("%H:%M")
+        except ValueError:
+            if "T" in stamp:
+                stamp = stamp.split("T", 1)[1]
+            stamp = stamp.replace("Z", "")[:5]
         return f"{stamp:>5}  {self.message}".rstrip()
 
 
@@ -159,13 +167,18 @@ class ResourceMonitor:
         return "Idle"
 
     @staticmethod
-    def _unauthorized_devices(adb_executable: Path) -> tuple[str, ...]:
+    def _adb_inventory(adb_executable: Path) -> tuple[str, str, tuple[str, ...]]:
         devices = _list_adb_devices(adb_executable)
-        return tuple(
-            device.serial
-            for device in devices
-            if device.authorization_required
+        unauthorized = tuple(
+            device.serial for device in devices if device.authorization_required
         )
+        ready = next((device for device in devices if device.ready), None)
+        if ready is not None:
+            return _connection_label(ready.connection_type), ready.state, unauthorized
+        if devices:
+            first = devices[0]
+            return _connection_label(first.connection_type), first.state, unauthorized
+        return "Unknown", "disconnected", unauthorized
 
     def sample(
         self,
@@ -190,6 +203,8 @@ class ResourceMonitor:
             cpu = 0.0
             memory = 0
 
+        android_connection, android_state, unauthorized = self._adb_inventory(adb_executable)
+
         return ResourceSnapshot(
             cpu_percent=cpu,
             memory_bytes=memory,
@@ -198,7 +213,9 @@ class ResourceMonitor:
             network_tx_per_second=tx_rate,
             client_hosts=self._client_hosts(server_url),
             adb_process_state=self._adb_process_state(adb_executable),
-            unauthorized_devices=self._unauthorized_devices(adb_executable),
+            android_connection=android_connection,
+            android_state=android_state,
+            unauthorized_devices=unauthorized,
         )
 
 
