@@ -66,7 +66,7 @@ QLabel[fieldValue="true"] {{
     font-weight: 600;
 }}
 
-QLabel#errorValue="true"] {{
+QLabel[errorValue="true"] {{
     color: {c['text_secondary']};
 }}
 
