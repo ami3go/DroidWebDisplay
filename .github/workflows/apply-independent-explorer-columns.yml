@@ -1,0 +1,55 @@
+name: Apply Independent Explorer Columns
+
+on:
+  push:
+    branches:
+      - agent/connect-drawer
+    paths:
+      - .github/workflows/apply-independent-explorer-columns.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepare target branch and helper
+        run: |
+          cp .github/scripts/apply_independent_explorer_columns.py /tmp/apply_independent_explorer_columns.py
+          git fetch origin stable_main
+          git checkout -B agent/independent-explorer-columns origin/stable_main
+          test "$(git rev-parse HEAD)" = "290f0cb0b4bb1311ea148a61cf6301a0cfb632b3"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: |
+          $HOME/.local/bin/uv sync --locked --extra dev
+          npm ci --prefix packages/scrcpy-protocol
+          npm ci --prefix apps/web-client
+      - name: Apply independent column resizing
+        run: |
+          python /tmp/apply_independent_explorer_columns.py
+          npm run build --prefix apps/web-client
+          npm test --prefix apps/web-client
+          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-independent-explorer-columns.json
+      - name: Commit and publish verified product change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A apps/web-client
+          git commit -m "Resize File Explorer fields independently"
+          git push origin HEAD:agent/independent-explorer-columns
