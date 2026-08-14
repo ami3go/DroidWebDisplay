@@ -333,7 +333,7 @@ def main() -> int:
         "schemaVersion": 1,
     }
     old_gate_tokens = ("data-gate4-check", "data-gate5-check", "data-gate6-check", "data-gate7-check", "Gate 4 verification", "Gate 5 verification", "Gate 6 verification", "Gate 7 verification")
-    compact_labels = all(token in html_source for token in (">Load<", ">Browse<", ">Download<", ">Reset<", ">Save<", ">Scan now<")) and ">Upload<" not in html_source
+    compact_labels = all(token in html_source for token in (">Download<", ">Reset<", ">Save<", ">Scan now<")) and all(token not in html_source for token in (">Load<", ">Browse<", ">Upload<")) and "Android File Explorer" in html_source and "Custom PC folder" in html_source
     checks["storageAndUiAdjustments"] = {
         "status": "PASS" if compact_labels and all(token not in html_source for token in old_gate_tokens) and all(token in path_source + adb_source + css_source for token in (
             "/sdcard/Documents", "external_storage_roots", "SD card ·", "#screen { cursor: default; }", ".uniform-buttons > button",
@@ -362,9 +362,9 @@ def main() -> int:
 
     drawer_source = (root / "apps/web-client/static/droidwebdisplay-main-drawer.js").read_text(encoding="utf-8")
     native_accordion_contract = all(token in html_source for token in (
-        'id="gb-single-drawer-root"', 'data-section-key="files-load"', 'data-section-key="files-sync"',
+        'id="gb-single-drawer-root"', 'data-section-key="files-explorer"', 'data-section-key="files-sync"', 'data-section-key="files-queue"',
         'data-section-key="access-web-browser"', 'data-section-key="access-pin"', 'data-section-key="access-revoke-all"',
-    )) and "droidwebdisplay.ui.drawer.accordions.v1" in drawer_source
+    )) and 'data-section-key="files-load"' not in html_source and "droidwebdisplay.ui.drawer.accordions.v1" in drawer_source
     checks["collapsibleCards"] = {
         "status": "PASS" if native_accordion_contract and permanent_native_layout and "initializeCollapsibleCards" not in main_source else "FAIL",
         "nativePersistedAccordions": native_accordion_contract,

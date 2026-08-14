@@ -3,12 +3,10 @@ import type { AndroidStorageEntryDto, DuplicatePolicy, TransferDto } from "./typ
 
 interface TransferElements {
   readonly device: HTMLSelectElement;
-  readonly file: HTMLInputElement;
   readonly contextUploadFile: HTMLInputElement;
-  readonly uploadDirectory: HTMLSelectElement;
+  readonly customDestinationRow: HTMLElement;
+  readonly customDestinationPath: HTMLInputElement;
   readonly duplicatePolicy: HTMLSelectElement;
-  readonly upload: HTMLButtonElement;
-  readonly openUploadFolder: HTMLButtonElement;
   readonly storageRoot: HTMLSelectElement;
   readonly storagePath: HTMLInputElement;
   readonly storageBreadcrumbs: HTMLElement;
@@ -62,25 +60,23 @@ export class TransferController {
       option.textContent = `${profile.id} · ${profile.path}`;
       this.elements.destinationProfile.append(option);
     }
+    const custom = document.createElement("option");
+    custom.value = "__custom__";
+    custom.textContent = "Custom PC folder…";
+    this.elements.destinationProfile.append(custom);
+    const savedPath = localStorage.getItem("droidwebdisplay-custom-download-path-v1") ?? "";
+    const savedDestination = localStorage.getItem("droidwebdisplay-download-destination-v1") ?? "";
+    this.elements.customDestinationPath.value = savedPath;
+    if ([...this.elements.destinationProfile.options].some((option) => option.value === savedDestination)) this.elements.destinationProfile.value = savedDestination;
+    this.updateDestinationUi();
     this.elements.storageRoot.replaceChildren();
     ANDROID_ROOTS = roots.roots.map((root) => root.path);
-    const currentUpload = this.elements.uploadDirectory.value;
-    this.elements.uploadDirectory.replaceChildren();
-    const inbox = document.createElement("option");
-    inbox.value = "/sdcard/Download/DroidWebDisplayInbox";
-    inbox.textContent = "Internal storage · Download · DroidWebDisplayInbox";
-    this.elements.uploadDirectory.append(inbox);
     for (const root of roots.roots) {
       const rootOption = document.createElement("option");
       rootOption.value = root.path;
       rootOption.textContent = root.label;
       this.elements.storageRoot.append(rootOption);
-      const uploadOption = document.createElement("option");
-      uploadOption.value = root.path;
-      uploadOption.textContent = root.label;
-      this.elements.uploadDirectory.append(uploadOption);
     }
-    if ([...this.elements.uploadDirectory.options].some((option) => option.value === currentUpload)) this.elements.uploadDirectory.value = currentUpload;
     this.elements.storageRoot.value = roots.defaultPath;
     await Promise.allSettled([this.browse(roots.defaultPath), this.refreshTransfers()]);
     this.#pollTimer = window.setInterval(() => void this.refreshTransfers(), 750);
@@ -88,12 +84,10 @@ export class TransferController {
 
   private bindEvents(): void {
     this.elements.device.addEventListener("change", () => void this.runAction(async () => { await this.refreshStorageRoots(); await this.browse(); }));
-    this.elements.upload.addEventListener("click", () => void this.runAction(() => this.uploadFiles(this.elements.uploadDirectory.value, [...(this.elements.file.files ?? [])])));
     this.elements.contextUploadFile.addEventListener("change", () => {
       if (!(this.elements.contextUploadFile.files?.length)) return;
       void this.runAction(() => this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])]));
     });
-    this.elements.openUploadFolder.addEventListener("click", () => void this.runAction(() => this.browse(this.elements.uploadDirectory.value)));
     this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));
     document.querySelector<HTMLButtonElement>('[data-group="files"]')?.addEventListener("click", () => { void this.runAction(() => this.refreshExplorerIfStale()); });
     const explorerSection = document.querySelector<HTMLDetailsElement>('[data-section-key="files-explorer"]');
@@ -109,8 +103,17 @@ export class TransferController {
       this.renderStorage(this.#currentEntries);
     });
     this.elements.downloadSelected.addEventListener("click", () => void this.runAction(() => this.downloadSelected()));
+    this.elements.destinationProfile.addEventListener("change", () => {
+      localStorage.setItem("droidwebdisplay-download-destination-v1", this.elements.destinationProfile.value);
+      this.updateDestinationUi();
+    });
+    this.elements.customDestinationPath.addEventListener("change", () => {
+      localStorage.setItem("droidwebdisplay-custom-download-path-v1", this.elements.customDestinationPath.value.trim());
+    });
     this.elements.openPcFolder.addEventListener("click", () => void this.runAction(async () => {
-      await this.#api.openDestinationProfile(this.elements.destinationProfile.value);
+      const destination = this.downloadDestination();
+      if (destination.destinationPath) await this.#api.openDestinationPath(destination.destinationPath);
+      else await this.#api.openDestinationProfile(destination.destinationProfile);
       this.setStatus("Opened PC destination folder");
     }));
     this.elements.storageRoot.addEventListener("change", () => void this.runAction(() => this.browse(this.elements.storageRoot.value)));
@@ -190,25 +193,14 @@ export class TransferController {
     const roots = await this.#api.androidStorageRoots(this.elements.device.value || undefined);
     const currentRoot = this.elements.storageRoot.value;
     this.elements.storageRoot.replaceChildren();
-    const currentUpload = this.elements.uploadDirectory.value;
-    this.elements.uploadDirectory.replaceChildren();
-    const inbox = document.createElement("option");
-    inbox.value = "/sdcard/Download/DroidWebDisplayInbox";
-    inbox.textContent = "Internal storage · Download · DroidWebDisplayInbox";
-    this.elements.uploadDirectory.append(inbox);
     for (const root of roots.roots) {
       const option = document.createElement("option");
       option.value = root.path;
       option.textContent = root.label;
       this.elements.storageRoot.append(option);
-      const upload = document.createElement("option");
-      upload.value = root.path;
-      upload.textContent = root.label;
-      this.elements.uploadDirectory.append(upload);
     }
     ANDROID_ROOTS = roots.roots.map((root) => root.path);
     this.elements.storageRoot.value = [...this.elements.storageRoot.options].some((item) => item.value === currentRoot) ? currentRoot : roots.defaultPath;
-    this.elements.uploadDirectory.value = [...this.elements.uploadDirectory.options].some((item) => item.value === currentUpload) ? currentUpload : inbox.value;
   }
 
   private async refreshExplorerIfStale(): Promise<void> {
@@ -461,31 +453,39 @@ export class TransferController {
   private async uploadFiles(destinationPath: string, files: readonly File[]): Promise<void> {
     const serial = this.requireSerial();
     if (!files.length) throw new Error("Choose one or more PC files to upload");
-    this.elements.upload.disabled = true;
-    try {
-      for (const file of files) {
-        await this.#api.uploadFile({
-          serial,
-          file,
-          destinationPath,
-          duplicatePolicy: this.duplicatePolicy(),
-        });
-      }
-      this.elements.file.value = "";
-      this.elements.contextUploadFile.value = "";
-      await this.refreshTransfers();
-      this.setStatus(`Queued ${files.length} upload(s) to ${destinationPath}`);
-    } finally {
-      this.elements.upload.disabled = false;
+    for (const file of files) {
+      await this.#api.uploadFile({
+        serial,
+        file,
+        destinationPath,
+        duplicatePolicy: this.duplicatePolicy(),
+      });
     }
+    this.elements.contextUploadFile.value = "";
+    await this.refreshTransfers();
+    this.setStatus(`Queued ${files.length} upload(s) to ${destinationPath}`);
+  }
+
+  private updateDestinationUi(): void {
+    const custom = this.elements.destinationProfile.value === "__custom__";
+    this.elements.customDestinationRow.hidden = !custom;
+  }
+
+  private downloadDestination(): { destinationProfile: string; destinationPath?: string } {
+    if (this.elements.destinationProfile.value !== "__custom__") return { destinationProfile: this.elements.destinationProfile.value };
+    const destinationPath = this.elements.customDestinationPath.value.trim();
+    if (!destinationPath) throw new Error("Enter an absolute PC destination folder path");
+    localStorage.setItem("droidwebdisplay-custom-download-path-v1", destinationPath);
+    return { destinationProfile: "default-downloads", destinationPath };
   }
 
   private async download(sourcePath: string): Promise<void> {
     const serial = this.requireSerial();
+    const destination = this.downloadDestination();
     await this.#api.downloadFile({
       serial,
       sourcePath,
-      destinationProfile: this.elements.destinationProfile.value,
+      ...destination,
       duplicatePolicy: this.duplicatePolicy(),
     });
     await this.refreshTransfers();

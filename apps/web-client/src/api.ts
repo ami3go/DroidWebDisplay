@@ -244,6 +244,14 @@ export class BridgeApi {
     return this.request(`/api/v1/destination-profiles/${encodeURIComponent(profileId)}/open`, { method: "POST" });
   }
 
+  public async openDestinationPath(path: string): Promise<{ path: string; opened: boolean }> {
+    return this.request("/api/v1/destination-path/open", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+  }
+
   public async uploadFile(request: { serial: string; file: File; destinationPath: string; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
     const form = new FormData();
     form.set("serial", request.serial);
@@ -253,7 +261,7 @@ export class BridgeApi {
     return this.request<TransferDto>("/api/v1/transfers/upload", { method: "POST", body: form });
   }
 
-  public async downloadFile(request: { serial: string; sourcePath: string; destinationProfile: string; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
+  public async downloadFile(request: { serial: string; sourcePath: string; destinationProfile: string; destinationPath?: string; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
     return this.request<TransferDto>("/api/v1/transfers/download", {
       method: "POST",
       headers: { "content-type": "application/json" },

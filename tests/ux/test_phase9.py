@@ -10,10 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_requested_button_labels_and_legacy_gate_controls_are_removed() -> None:
     html = (ROOT / "apps/web-client/dist/index.html").read_text(encoding="utf-8")
-    assert '>Load<' in html
-    assert '>Browse<' in html
+    assert '>Load<' not in html
+    assert '>Browse<' not in html
     assert '>Download<' in html
     assert '>Reset<' in html
+    assert "Android File Explorer" in html
+    assert "Custom PC folder" in html
     for old in ("Upload selected file(s)", "Browse upload folder", "Download selected", "Reset history", ">Upload<"):
         assert old not in html
     assert "data-gate4-check" not in html

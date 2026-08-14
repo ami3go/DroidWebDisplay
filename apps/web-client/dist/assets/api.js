@@ -154,6 +154,13 @@ export class BridgeApi {
     async openDestinationProfile(profileId) {
         return this.request(`/api/v1/destination-profiles/${encodeURIComponent(profileId)}/open`, { method: "POST" });
     }
+    async openDestinationPath(path) {
+        return this.request("/api/v1/destination-path/open", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ path }),
+        });
+    }
     async uploadFile(request) {
         const form = new FormData();
         form.set("serial", request.serial);

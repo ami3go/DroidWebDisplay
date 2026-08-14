@@ -113,36 +113,19 @@
           <button type="button" class="gb-drawer-close" aria-label="Close drawer" title="Close drawer">×</button>
         </div>
         <div class="gb-drawer-body">
-          <div class="gb-drawer-slot" data-slot="files"><details class="gb-accordion" data-section-key="files-load" open>
-  <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Load</span></summary>
-  <div class="gb-accordion-content">
-<p>Files are transferred through structured ADB Sync. The PC does not need Internet access.</p>
-          <input id="upload-file" type="file" multiple>
-          <input id="context-upload-file" type="file" multiple hidden>
-          <label>Android destination folder
-            <select id="upload-directory">
-              <option value="/sdcard/Download/DroidWebDisplayInbox">DroidWebDisplayInbox</option>
-              <option value="/sdcard/Download">Internal storage · Download</option>
-              <option value="/sdcard/Documents">Internal storage · Documents</option>
-              <option value="/sdcard/Pictures">Internal storage · Pictures</option>
-            </select>
-          </label>
-          <label>Duplicate handling
-            <select id="duplicate-policy">
-              <option value="rename">Rename safely</option>
-              <option value="overwrite">Overwrite</option>
-              <option value="fail">Fail</option>
-            </select>
-          </label>
-          <div class="two-button-row uniform-buttons"><button id="upload-file-button">Load</button><button id="open-upload-folder" class="secondary">Browse</button></div></div>
-</details>
-<details class="gb-accordion" data-section-key="files-explorer" open>
+          <div class="gb-drawer-slot" data-slot="files"><details class="gb-accordion" data-section-key="files-explorer" open>
   <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Android File Explorer</span></summary>
   <div class="gb-accordion-content">
+          <input id="context-upload-file" type="file" multiple hidden>
           <div class="explorer-options">
             <label>Destination folder
               <select id="destination-profile"></select>
             </label>
+            <div id="custom-destination-row" hidden>
+              <label>Custom PC folder
+                <input id="custom-destination-path" type="text" placeholder="Absolute PC folder path" spellcheck="false">
+              </label>
+            </div>
             <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>
           </div>
           <label>Storage location
@@ -164,6 +147,16 @@
             </div>
             <div id="storage-body" class="storage-list explorer-body" role="rowgroup"><p class="empty-state">Select a device.</p></div>
           </div>
+          <details class="explorer-transfer-options">
+            <summary>Transfer options</summary>
+            <label>Duplicate handling
+              <select id="duplicate-policy">
+                <option value="rename" selected>Rename safely</option>
+                <option value="overwrite">Overwrite</option>
+                <option value="fail">Fail</option>
+              </select>
+            </label>
+          </details>
           <p class="explorer-help">Drag PC files onto a folder to upload there, or onto empty Explorer space to upload to the current folder. Right-click remains available for all actions.</p></div>
 </details>
 <div id="storage-context-menu" class="context-menu" role="menu" tabindex="-1" hidden>

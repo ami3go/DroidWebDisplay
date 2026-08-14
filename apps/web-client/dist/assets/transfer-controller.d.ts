@@ -1,12 +1,10 @@
 import type { AndroidStorageEntryDto } from "./types.js";
 interface TransferElements {
     readonly device: HTMLSelectElement;
-    readonly file: HTMLInputElement;
     readonly contextUploadFile: HTMLInputElement;
-    readonly uploadDirectory: HTMLSelectElement;
+    readonly customDestinationRow: HTMLElement;
+    readonly customDestinationPath: HTMLInputElement;
     readonly duplicatePolicy: HTMLSelectElement;
-    readonly upload: HTMLButtonElement;
-    readonly openUploadFolder: HTMLButtonElement;
     readonly storageRoot: HTMLSelectElement;
     readonly storagePath: HTMLInputElement;
     readonly storageBreadcrumbs: HTMLElement;
@@ -49,6 +47,8 @@ export declare class TransferController {
     private clearDropTarget;
     private chooseUploadFiles;
     private uploadFiles;
+    private updateDestinationUi;
+    private downloadDestination;
     private download;
     private downloadSelected;
     private refreshTransfers;

@@ -113,6 +113,10 @@ export declare class BridgeApi {
         path: string;
         opened: boolean;
     }>;
+    openDestinationPath(path: string): Promise<{
+        path: string;
+        opened: boolean;
+    }>;
     uploadFile(request: {
         serial: string;
         file: File;
@@ -123,6 +127,7 @@ export declare class BridgeApi {
         serial: string;
         sourcePath: string;
         destinationProfile: string;
+        destinationPath?: string;
         duplicatePolicy: DuplicatePolicy;
     }): Promise<TransferDto>;
     cancelTransfer(transferId: string): Promise<TransferDto>;

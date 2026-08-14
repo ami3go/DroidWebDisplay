@@ -155,12 +155,10 @@ async function bootstrap(): Promise<void> {
     });
     const transferController = new TransferController({
       device: required<HTMLSelectElement>("#device"),
-      file: required<HTMLInputElement>("#upload-file"),
       contextUploadFile: required<HTMLInputElement>("#context-upload-file"),
-      uploadDirectory: required<HTMLSelectElement>("#upload-directory"),
+      customDestinationRow: required<HTMLElement>("#custom-destination-row"),
+      customDestinationPath: required<HTMLInputElement>("#custom-destination-path"),
       duplicatePolicy: required<HTMLSelectElement>("#duplicate-policy"),
-      upload: required<HTMLButtonElement>("#upload-file-button"),
-      openUploadFolder: required<HTMLButtonElement>("#open-upload-folder"),
       storageRoot: required<HTMLSelectElement>("#storage-root"),
       storagePath: required<HTMLInputElement>("#storage-path"),
       storageBreadcrumbs: required<HTMLElement>("#storage-breadcrumbs"),

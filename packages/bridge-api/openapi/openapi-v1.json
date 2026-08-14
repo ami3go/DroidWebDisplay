@@ -266,6 +266,22 @@
         "title": "Body_transfer_upload_api_v1_transfers_upload_post",
         "type": "object"
       },
+      "CustomDestinationPathRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "CustomDestinationPathRequest",
+        "type": "object"
+      },
       "DisplayImePolicy": {
         "enum": [
           "default",
@@ -287,6 +303,17 @@
       "DownloadTransferRequest": {
         "additionalProperties": false,
         "properties": {
+          "destinationPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destinationpath"
+          },
           "destinationProfile": {
             "default": "default-downloads",
             "title": "Destinationprofile",
@@ -1193,6 +1220,51 @@
           }
         ],
         "summary": "Browser Support"
+      }
+    },
+    "/api/v1/destination-path/open": {
+      "post": {
+        "operationId": "destination_path_open_api_v1_destination_path_open_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomDestinationPathRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Destination Path Open Api V1 Destination Path Open Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Destination Path Open"
       }
     },
     "/api/v1/destination-profiles": {

@@ -169,7 +169,13 @@ class DownloadTransferRequest(BaseModel):
     serial: str
     source_path: str = Field(alias="sourcePath")
     destination_profile: str = Field(default="default-downloads", alias="destinationProfile")
+    destination_path: str | None = Field(default=None, alias="destinationPath")
     duplicate_policy: DuplicatePolicy = Field(default=DuplicatePolicy.RENAME, alias="duplicatePolicy")
+
+
+class CustomDestinationPathRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    path: str = Field(min_length=1, max_length=4096)
 
 
 class AutoDownloadConfigRequest(BaseModel):
@@ -846,6 +852,11 @@ def create_app(
         path = container.transfers.open_destination_profile(profile_id)
         return {"profileId": profile_id, "path": str(path), "opened": True}
 
+    @app.post("/api/v1/destination-path/open")
+    async def destination_path_open(body: CustomDestinationPathRequest, container: Annotated[ServiceContainer, Depends(get_container)]) -> dict:
+        path = container.transfers.open_destination_path(body.path)
+        return {"path": str(path), "opened": True}
+
     @app.get("/api/v1/transfers")
     async def transfer_list(container: Annotated[ServiceContainer, Depends(get_container)]) -> dict:
         return {"transfers": [item.to_dict() for item in container.transfers.list_records()]}
@@ -885,6 +896,7 @@ def create_app(
             serial=body.serial,
             source_path=body.source_path,
             destination_profile=body.destination_profile,
+            destination_path=body.destination_path,
             duplicate_policy=body.duplicate_policy,
         )
         return record.to_dict()

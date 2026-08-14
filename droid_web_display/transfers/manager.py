@@ -101,7 +101,12 @@ class TransferManager:
         return self._profile(profile_id)
 
     def open_destination_profile(self, profile_id: str) -> Path:
-        path = self._profile(profile_id)
+        return self._open_local_folder(self._profile(profile_id))
+
+    def open_destination_path(self, destination_path: str) -> Path:
+        return self._open_local_folder(self._custom_destination(destination_path))
+
+    def _open_local_folder(self, path: Path) -> Path:
         path.mkdir(parents=True, exist_ok=True)
         try:
             if sys.platform == "win32":
@@ -223,11 +228,13 @@ class TransferManager:
         serial: str,
         source_path: str,
         destination_profile: str = "default-downloads",
+        destination_path: str | None = None,
         duplicate_policy: DuplicatePolicy = DuplicatePolicy.RENAME,
     ) -> TransferRecord:
         self._check_queue_capacity()
         normalized = normalize_android_path(source_path)
-        profile_path = self._profile(destination_profile)
+        profile_path = self._custom_destination(destination_path) if destination_path else self._profile(destination_profile)
+        destination_label = "custom" if destination_path else destination_profile
         filename = sanitize_filename(PurePosixPath(normalized).name)
         destination = resolve_duplicate(profile_path / filename, duplicate_policy)
         record = TransferRecord(
@@ -239,7 +246,7 @@ class TransferManager:
             filename=filename,
             created_at=time.time(),
             duplicate_policy=duplicate_policy,
-            destination_profile=destination_profile,
+            destination_profile=destination_label,
             internal_local_path=str(destination),
         )
         record.add_event(record.created_at, "queued")
@@ -444,6 +451,15 @@ class TransferManager:
                 "unknown destination profile",
                 details={"destinationProfile": profile_id, "available": sorted(self.destination_profiles)},
             ) from exc
+
+    def _custom_destination(self, destination_path: str) -> Path:
+        raw = Path(destination_path).expanduser()
+        if not raw.is_absolute():
+            raise TransferValidationError("custom destination must be an absolute PC path", details={"destinationPath": destination_path})
+        path = raw.resolve()
+        if path.exists() and not path.is_dir():
+            raise TransferValidationError("custom destination is not a folder", details={"destinationPath": str(path)})
+        return path
 
     async def _load_state(self) -> None:
         if not self.state_file.is_file():

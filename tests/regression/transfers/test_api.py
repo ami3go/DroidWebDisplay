@@ -103,6 +103,18 @@ def test_phase5_storage_and_transfer_endpoints(tmp_path: Path) -> None:
         assert completed["state"] == "completed"
         assert (tmp_path / "downloads" / "result.txt").read_bytes() == b"result"
 
+
+        custom_dir = tmp_path / "custom-downloads"
+        custom_download = client.post(
+            "/api/v1/transfers/download",
+            json={"serial": "PHONE", "sourcePath": "/sdcard/Download/result.txt", "destinationPath": str(custom_dir), "duplicatePolicy": "rename"},
+        )
+        assert custom_download.status_code == 202
+        custom_completed = wait_completed(client, custom_download.json()["transferId"])
+        assert custom_completed["state"] == "completed"
+        assert custom_completed["destinationProfile"] == "custom"
+        assert (custom_dir / "result.txt").read_bytes() == b"result"
+
         diagnostics = client.get("/api/v1/diagnostics").json()
         assert diagnostics["transferEngine"] == "direct-adb-sync-v1"
         assert diagnostics["transferConsoleParsing"] is False
