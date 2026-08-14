@@ -1,90 +1,31 @@
-name: Apply File Explorer control reorder
+name: DroidWebDisplay Release Gate
+
 on:
   push:
-    branches: [agent/connect-drawer]
-    paths: [.github/workflows/ci.yml]
-permissions:
-  contents: write
+  pull_request:
+
 jobs:
-  apply:
+  release:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: stable_main
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          $HOME/.local/bin/uv sync --locked --extra dev
-          npm ci --prefix packages/scrcpy-protocol
-          npm run build --prefix packages/scrcpy-protocol
-          npm ci --prefix apps/web-client
-      - name: Reorder Android File Explorer controls
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('apps/web-client/static/index.html')
-          s = p.read_text()
-          section = s.index('data-section-key="files-explorer"')
-          start = s.index('  <div class="gb-accordion-content"><div class="section-heading">', section)
-          end = s.index('          <div class="explorer-frame"', start)
-          lines = [
-              '  <div class="gb-accordion-content">',
-              '          <div class="explorer-options">',
-              '            <label>Destination folder',
-              '              <select id="destination-profile"></select>',
-              '            </label>',
-              '            <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>',
-              '          </div>',
-              '          <label>Storage location',
-              '            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>',
-              '          </label>',
-              '          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">',
-              '          <div class="explorer-toolbar">',
-              '            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>',
-              '            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>',
-              '            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>',
-              '          </div>',
-          ]
-          p.write_text(s[:start] + '\n'.join(lines) + '\n' + s[end:])
-          t = Path('apps/web-client/tests/layout.test.mjs')
-          ts = t.read_text()
-          if 'Android File Explorer prioritizes destination then storage navigation' not in ts:
-              lines = [
-                  '',
-                  'test("Android File Explorer prioritizes destination then storage navigation", () => {',
-                  '  const destination = html.indexOf(\'id="destination-profile"\');',
-                  '  const download = html.indexOf(\'id="download-selected"\');',
-                  '  const pcFolder = html.indexOf(\'id="open-pc-folder"\');',
-                  '  const storage = html.indexOf(\'id="storage-root"\');',
-                  '  const path = html.indexOf(\'id="storage-path"\');',
-                  '  const up = html.indexOf(\'id="storage-up"\');',
-                  '  const breadcrumbs = html.indexOf(\'id="storage-breadcrumbs"\');',
-                  '  const refresh = html.indexOf(\'id="storage-refresh"\');',
-                  '  const table = html.indexOf(\'class="explorer-frame"\');',
-                  '  assert.ok(destination < download && download < pcFolder);',
-                  '  assert.ok(pcFolder < storage && storage < path);',
-                  '  assert.ok(path < up && up < breadcrumbs && breadcrumbs < refresh);',
-                  '  assert.ok(refresh < table);',
-                  '});',
-                  '',
-              ]
-              t.write_text(ts + '\n'.join(lines))
-          PY
-          npm run build --prefix apps/web-client
-          npm test --prefix apps/web-client
-          $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output /tmp/gate.json
-      - name: Commit verified UI reorder
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A apps/web-client
-          git commit -m "Reorder Android File Explorer controls"
-          git push origin HEAD:stable_main
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Sync locked Python environment
+        run: $HOME/.local/bin/uv sync --locked --extra dev
+      - run: npm ci
+        working-directory: packages/scrcpy-protocol
+      - run: npm ci
+        working-directory: apps/web-client
+      - name: Run release gate
+        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
