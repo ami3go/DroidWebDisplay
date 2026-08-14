@@ -31,6 +31,7 @@ jobs:
           end = source.index(end_marker, start)
           script_lines = source[start:end]
           script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script_lines) + '\n'
+
           exact = 'gui = replace_once(gui, old_apply, new_apply, "snapshot dashboard")'
           resilient = '''gui, count = re.subn(
               r"    def _apply_snapshot\\(self, snapshot: ServerSnapshot\\) -> None:\\n.*?(?=        running = snapshot.state)",
@@ -44,6 +45,72 @@ jobs:
           if exact not in script:
               raise SystemExit('snapshot replacement anchor missing from recovered patcher')
           script = script.replace(exact, resilient, 1)
+
+          failure = 'raise SystemExit(f"{label}: expected exactly one match, got {text.count(old)}")'
+          tolerant = '''if label in {"dashboard theme", "timeline theme"}:
+                      return text
+                  raise SystemExit(f"{label}: expected exactly one match, got {text.count(old)}")'''
+          if failure not in script:
+              raise SystemExit('replace_once failure anchor missing')
+          script = script.replace(failure, tolerant, 1)
+
+          script += r'''
+          theme_path = Path("droid_web_display/desktop/theme.py")
+          theme = theme_path.read_text(encoding="utf-8")
+          if "QLabel#dashboardValue" not in theme:
+              dashboard_css = r'''
+          QFrame#card[dashboardCard="true"] {{
+              background-color: {c['surface_alt']};
+          }}
+
+          QLabel#dashboardValue {{
+              color: {c['text']};
+              font-size: 15pt;
+              font-weight: 700;
+          }}
+
+          QLabel#dashboardDetail {{
+              color: {c['text_muted']};
+              font-size: 9pt;
+          }}
+
+          QPushButton#deviceLink {{
+              min-height: 22px;
+              padding: 0;
+              border: 0;
+              background: transparent;
+              color: {c['focus']};
+              font-size: 15pt;
+              font-weight: 700;
+              text-align: left;
+          }}
+
+          QPushButton#deviceLink:hover {{
+              color: {c['text']};
+              background: transparent;
+          }}
+
+          '''
+              marker = "QLabel#healthStatus {{"
+              if marker not in theme:
+                  raise SystemExit("health theme insertion anchor missing")
+              theme = theme.replace(marker, dashboard_css + marker, 1)
+          if "QPlainTextEdit#timelineView {{" not in theme:
+              timeline_css = r'''
+          QPlainTextEdit#timelineView {{
+              min-height: 118px;
+              padding: 9px;
+              font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;
+              font-size: 9pt;
+          }}
+
+          '''
+              marker = "QMenu {{"
+              if marker not in theme:
+                  raise SystemExit("menu theme insertion anchor missing")
+              theme = theme.replace(marker, timeline_css + marker, 1)
+          theme_path.write_text(theme, encoding="utf-8")
+          '''
           Path('/tmp/apply_server_ui.py').write_text(script, encoding='utf-8')
           PY
           python /tmp/apply_server_ui.py
