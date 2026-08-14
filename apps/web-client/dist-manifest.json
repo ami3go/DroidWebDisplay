@@ -239,9 +239,14 @@
       "sha256": "23a8fb9507153ae473fa602400aa8a3fee819377aefe70a2aaeff2cee239e3d0"
     },
     {
+      "path": "favicon.svg",
+      "bytes": 328,
+      "sha256": "0f7ee6fcc369edd2ca0fcfbe571c41e034677102d6b5b619cdaf878fdb279301"
+    },
+    {
       "path": "index.html",
-      "bytes": 30370,
-      "sha256": "e32a2945b6286a5ec455ef5112e1081255cc7c8587c61488a018ef8c866c349d"
+      "bytes": 30431,
+      "sha256": "16b222d59a35da4d56e9f50240d7af0c06cf8e007eb43be53feec2b1794d4c02"
     },
     {
       "path": "styles.css",
