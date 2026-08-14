@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import monotonic
 from typing import Protocol
+from weakref import WeakKeyDictionary
+
+
+_STORAGE_CACHE_SECONDS = 30.0
+_STORAGE_CACHE: WeakKeyDictionary[object, dict[str, tuple[float, dict[str, str]]]] = WeakKeyDictionary()
 
 
 @dataclass(frozen=True)
@@ -63,9 +69,7 @@ async def _filesystem_usage(adb: StorageAdb, serial: str, path: str) -> StorageU
     return parse_df_storage_usage(result.stdout)
 
 
-async def collect_storage_metadata(adb: StorageAdb, serial: str) -> dict[str, str]:
-    """Collect user-visible internal-storage and removable-SD capacity data."""
-
+async def _collect_storage_metadata_uncached(adb: StorageAdb, serial: str) -> dict[str, str]:
     metadata: dict[str, str] = {}
     internal = await _filesystem_usage(adb, serial, "/sdcard")
     if internal is not None:
@@ -94,4 +98,18 @@ async def collect_storage_metadata(adb: StorageAdb, serial: str) -> dict[str, st
                 "sdCardFreeBytes": str(usage.free_bytes),
             }
         )
+    return metadata
+
+
+async def collect_storage_metadata(adb: StorageAdb, serial: str) -> dict[str, str]:
+    """Collect user-visible storage capacity data with a short ADB probe cache."""
+
+    now = monotonic()
+    per_device = _STORAGE_CACHE.setdefault(adb, {})
+    cached = per_device.get(serial)
+    if cached is not None and now - cached[0] < _STORAGE_CACHE_SECONDS:
+        return dict(cached[1])
+
+    metadata = await _collect_storage_metadata_uncached(adb, serial)
+    per_device[serial] = (now, dict(metadata))
     return metadata
