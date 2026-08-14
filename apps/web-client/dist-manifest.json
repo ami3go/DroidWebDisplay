@@ -245,8 +245,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 30695,
-      "sha256": "0ada51cfc68cd637f3d905121cadb3780c356032fb6829cef8298ca529398970"
+      "bytes": 30588,
+      "sha256": "6c38003d3335187dcf51edd74de36eb88f91da58a9695348af13afffa14631ac"
     },
     {
       "path": "styles.css",

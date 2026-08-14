@@ -138,23 +138,21 @@
 </details>
 <details class="gb-accordion" data-section-key="files-explorer" open>
   <summary class="gb-accordion-summary"><span class="gb-accordion-triangle" aria-hidden="true">▸</span><span class="gb-accordion-label">Android File Explorer</span></summary>
-  <div class="gb-accordion-content"><div class="section-heading">
-<span>Double-click to open · Right-click for actions</span>
-          </div>
-          <div class="explorer-toolbar">
-            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
-            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
-            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
-          </div>
-          <label>Storage location
-            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
-          </label>
-          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
+  <div class="gb-accordion-content">
           <div class="explorer-options">
             <label>Destination folder
               <select id="destination-profile"></select>
             </label>
             <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>
+          </div>
+          <label>Storage location
+            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
+          </label>
+          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
+          <div class="explorer-toolbar">
+            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
+            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
+            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
           </div>
           <div class="explorer-frame" role="table" aria-label="Android files">
             <div class="explorer-header" role="row">

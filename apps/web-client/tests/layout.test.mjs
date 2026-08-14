@@ -224,3 +224,19 @@ test("virtual keyboard suppression is virtual-display-only and Ctrl+V is explici
   assert.match(controllerSource, /shortcut === "copy"[\s\S]*androidClipboardCopyMessage\(\)/);
   assert.match(controllerSource, /hideVirtualKeyboard\.checked \? "hide"/);
 });
+
+test("Android File Explorer prioritizes destination then storage navigation", () => {
+  const destination = html.indexOf('id="destination-profile"');
+  const download = html.indexOf('id="download-selected"');
+  const pcFolder = html.indexOf('id="open-pc-folder"');
+  const storage = html.indexOf('id="storage-root"');
+  const path = html.indexOf('id="storage-path"');
+  const up = html.indexOf('id="storage-up"');
+  const breadcrumbs = html.indexOf('id="storage-breadcrumbs"');
+  const refresh = html.indexOf('id="storage-refresh"');
+  const table = html.indexOf('class="explorer-frame"');
+  assert.ok(destination < download && download < pcFolder);
+  assert.ok(pcFolder < storage && storage < path);
+  assert.ok(path < up && up < breadcrumbs && breadcrumbs < refresh);
+  assert.ok(refresh < table);
+});
