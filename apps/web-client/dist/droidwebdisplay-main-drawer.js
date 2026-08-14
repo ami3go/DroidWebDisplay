@@ -9,7 +9,6 @@
   const DRAWER_MIN_WIDTH = 280;
   const DRAWER_MAX_WIDTH = 720;
   const ROOT_ID = 'gb-single-drawer-root';
-  const CONNECTION_STYLE_ID = 'droidwebdisplay-connect-drawer-css';
   const GROUPS = ['display','clipboard','files','audio','access','diagnostics','settings'];
   let activeGroup = null;
   let pinned = false;
@@ -19,79 +18,6 @@
   function set(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
   function storedPinned() { return get(PIN_KEY, '0') === '1'; }
   function storedGroup() { const value = get(LAST_GROUP_KEY, 'display'); return GROUPS.includes(value) ? value : 'display'; }
-  function ensureConnectionStyles() {
-    if (document.getElementById(CONNECTION_STYLE_ID)) return;
-    const link = document.createElement('link');
-    link.id = CONNECTION_STYLE_ID;
-    link.rel = 'stylesheet';
-    link.href = './droidwebdisplay-connect-drawer.css?v=0.11.2-connect2';
-    document.head.append(link);
-  }
-  function removeLegacyHeaderText() {
-    const eyebrow = document.querySelector('.topbar-brand .eyebrow');
-    if (eyebrow?.textContent?.trim().toUpperCase() === 'LOCAL USB BRIDGE') eyebrow.remove();
-  }
-  function ensureDisplayConnectionUi() {
-    const ui = root();
-    if (!ui) return;
-    const displaySlot = ui.querySelector('.gb-drawer-slot[data-slot="display"]');
-    if (!displaySlot) return;
-
-    const device = document.getElementById('device');
-    const connect = document.getElementById('connect');
-    if (!device || !connect) return;
-
-    if (displaySlot.querySelector('.connect-card')) return;
-
-    const card = document.createElement('section');
-    card.className = 'help-card connect-card';
-    card.setAttribute('aria-label', 'Android device connection');
-
-    const deviceLabel = document.createElement('label');
-    deviceLabel.append(document.createTextNode('Android device'), device);
-
-    const actions = document.createElement('div');
-    actions.className = 'button-grid connect-actions';
-    actions.append(connect);
-
-    card.append(deviceLabel, actions);
-    displaySlot.insertBefore(card, displaySlot.firstElementChild);
-  }
-  function mergeNetworkIntoAccess() {
-    const ui = root();
-    const accessSlot = ui?.querySelector('.gb-drawer-slot[data-slot="access"]');
-    const networkSlot = ui?.querySelector('.gb-drawer-slot[data-slot="network"]');
-    if (!ui || !accessSlot || !networkSlot || accessSlot.querySelector('[data-section-key="access-network"]')) return;
-    const details = document.createElement('details');
-    details.className = 'gb-accordion';
-    details.dataset.sectionKey = 'access-network';
-    const summary = document.createElement('summary');
-    summary.className = 'gb-accordion-summary';
-    const triangle = document.createElement('span');
-    triangle.className = 'gb-accordion-triangle';
-    triangle.setAttribute('aria-hidden', 'true');
-    triangle.textContent = '▸';
-    const label = document.createElement('span');
-    label.className = 'gb-accordion-label';
-    label.textContent = 'Network access';
-    summary.append(triangle, label);
-    const content = document.createElement('div');
-    content.className = 'gb-accordion-content';
-    while (networkSlot.firstChild) content.append(networkSlot.firstChild);
-    details.append(summary, content);
-    accessSlot.append(details);
-    networkSlot.remove();
-    ui.querySelector('.gb-rail-button[data-group="network"]')?.remove();
-  }
-  function applyRailOrder() {
-    const rail = root()?.querySelector('.gb-rail');
-    if (!rail) return;
-    const spacer = rail.querySelector('.gb-rail-spacer');
-    GROUPS.forEach(group => {
-      const button = rail.querySelector(`.gb-rail-button[data-group="${group}"]`);
-      if (button) rail.insertBefore(button, spacer);
-    });
-  }
   function applyPinned(value, persist = true) {
     pinned = Boolean(value);
     document.documentElement.classList.toggle('gb-single-drawer-pinned', pinned);
@@ -346,11 +272,6 @@
   function boot() {
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
-    ensureConnectionStyles();
-    removeLegacyHeaderText();
-    ensureDisplayConnectionUi();
-    mergeNetworkIntoAccess();
-    applyRailOrder();
     bindStatusShortcut();
     bindDrawerKeyboard();
     bindDrawerResize();
