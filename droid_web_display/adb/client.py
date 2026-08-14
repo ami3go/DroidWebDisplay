@@ -13,6 +13,7 @@ from droid_web_display.models import AndroidDevice
 
 from .devices import parse_adb_devices
 from .running_apps import RunningGuiApp, parse_running_gui_apps, validate_component_name
+from .storage_metrics import collect_storage_metadata
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,7 @@ class AdbClient:
                     "ro.build.version.sdk",
                 ),
             )
+            storage_metadata = await collect_storage_metadata(self, device.serial)
             sdk_value = properties.get("ro.build.version.sdk")
             try:
                 sdk = int(sdk_value) if sdk_value else None
@@ -170,7 +172,7 @@ class AdbClient:
                     android_version=properties.get("ro.build.version.release"),
                     sdk=sdk,
                     connection_type=device.connection_type,
-                    metadata=device.metadata,
+                    metadata={**device.metadata, **storage_metadata},
                 )
             )
         return enriched
