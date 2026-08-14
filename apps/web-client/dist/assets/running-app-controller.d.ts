@@ -18,6 +18,7 @@ export declare class RunningAppController {
     private finishDropdownInteraction;
     private handleSelectionChange;
     private render;
+    private currentVirtualApp;
     private selectedApp;
     private updateSelectionStatus;
     private moveSelected;

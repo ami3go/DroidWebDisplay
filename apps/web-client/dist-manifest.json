@@ -155,18 +155,18 @@
     },
     {
       "path": "assets/running-app-controller.d.ts",
-      "bytes": 804,
-      "sha256": "c059aecc9d9f9ff4708d202bb26ff0cb02bb932cc0ed7e19e01157749bd6671e"
+      "bytes": 835,
+      "sha256": "1171bbdac76860fb6f7ab6f52291a641f106a102d381edb344b6aa687489d2eb"
     },
     {
       "path": "assets/running-app-controller.js",
-      "bytes": 9687,
-      "sha256": "574600363e1bb0c65cc148e1e10ce6c366b5a0d31e3fcd90c929a107e81dd029"
+      "bytes": 9771,
+      "sha256": "62971d75442b505d5770432ffb0d096e50dbf578b815bfbc282038c6748c8741"
     },
     {
       "path": "assets/running-app-controller.js.map",
-      "bytes": 9450,
-      "sha256": "0c02b31c019cdfe9d3fd2be67d7e0eac01d1b41264412c2c3f49ab9014af4d9e"
+      "bytes": 9650,
+      "sha256": "dda0c2621d1b8ce197937e2044d7cb4424bf15040f995bb28bd186e37dd51eaf"
     },
     {
       "path": "assets/transfer-controller.d.ts",
