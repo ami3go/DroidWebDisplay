@@ -101,9 +101,44 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $signedCopy = Join-Path $env:RUNNER_TEMP "DroidWebDisplay-signing-smoke.exe"
-          $certificateFile = Join-Path $env:RUNNER_TEMP "DroidWebDisplay-signing-smoke.cer"
           $checksumManifest = Join-Path $env:RUNNER_TEMP "SHA256SUMS-signing-smoke.txt"
           Copy-Item .\dist\DroidWebDisplay.exe $signedCopy
+
+          function Add-CurrentUserCertificate {
+            param(
+              [Parameter(Mandatory = $true)][string]$StoreName,
+              [Parameter(Mandatory = $true)]$Certificate
+            )
+            $store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
+              $StoreName,
+              [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+            )
+            try {
+              $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+              $store.Add($Certificate)
+            }
+            finally {
+              $store.Close()
+            }
+          }
+
+          function Remove-CurrentUserCertificate {
+            param(
+              [Parameter(Mandatory = $true)][string]$StoreName,
+              [Parameter(Mandatory = $true)]$Certificate
+            )
+            $store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
+              $StoreName,
+              [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+            )
+            try {
+              $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+              $store.Remove($Certificate)
+            }
+            finally {
+              $store.Close()
+            }
+          }
 
           Write-Host "Creating disposable CI code-signing certificate."
           $certificate = New-SelfSignedCertificate `
@@ -112,12 +147,13 @@ jobs:
             -CertStoreLocation "Cert:\CurrentUser\My" `
             -HashAlgorithm SHA256 `
             -NotAfter (Get-Date).AddDays(1)
-          Write-Host "Exporting and trusting disposable CI certificate."
-          Export-Certificate -Cert $certificate -FilePath $certificateFile -Force | Out-Null
-          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\Root" -Confirm:$false | Out-Null
-          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" -Confirm:$false | Out-Null
 
           try {
+            Write-Host "Trusting disposable CI certificate through CurrentUser X509 stores."
+            Add-CurrentUserCertificate -StoreName "Root" -Certificate $certificate
+            Add-CurrentUserCertificate -StoreName "TrustedPublisher" -Certificate $certificate
+            Write-Host "Disposable CI certificate trusted."
+
             Write-Host "Invoking signing helper on disposable EXE copy."
             .\tools\sign_windows_release.ps1 `
               -File $signedCopy `
@@ -137,10 +173,10 @@ jobs:
           }
           finally {
             Write-Host "Cleaning disposable signing material."
-            Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
-            Remove-Item "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
-            Remove-Item "Cert:\CurrentUser\TrustedPublisher\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
-            Remove-Item $signedCopy, $certificateFile, $checksumManifest -Force -ErrorAction SilentlyContinue
+            Remove-CurrentUserCertificate -StoreName "TrustedPublisher" -Certificate $certificate
+            Remove-CurrentUserCertificate -StoreName "Root" -Certificate $certificate
+            Remove-CurrentUserCertificate -StoreName "My" -Certificate $certificate
+            Remove-Item $signedCopy, $checksumManifest -Force -ErrorAction SilentlyContinue
           }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

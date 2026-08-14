@@ -31,11 +31,15 @@ def test_windows_ci_smokes_signing_on_disposable_copy_only() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
     assert "Smoke-test Windows Authenticode signing helper" in workflow
-    assert 'DroidWebDisplay-signing-smoke.exe' in workflow
+    assert "timeout-minutes: 2" in workflow
+    assert "DroidWebDisplay-signing-smoke.exe" in workflow
     assert "New-SelfSignedCertificate" in workflow
     assert "-Type CodeSigningCert" in workflow
-    assert 'Cert:\\CurrentUser\\Root' in workflow
-    assert 'Cert:\\CurrentUser\\TrustedPublisher' in workflow
+    assert "System.Security.Cryptography.X509Certificates.X509Store" in workflow
+    assert 'Add-CurrentUserCertificate -StoreName "Root"' in workflow
+    assert 'Add-CurrentUserCertificate -StoreName "TrustedPublisher"' in workflow
+    assert 'Remove-CurrentUserCertificate -StoreName "Root"' in workflow
+    assert 'Remove-CurrentUserCertificate -StoreName "TrustedPublisher"' in workflow
     assert "-SkipTimestamp" in workflow
     assert "-VerifyOnly" in workflow
     assert "Remove-Item $signedCopy" in workflow
