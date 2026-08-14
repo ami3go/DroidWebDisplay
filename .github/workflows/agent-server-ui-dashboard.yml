@@ -65,53 +65,53 @@ jobs:
           path = Path('droid_web_display/desktop/theme.py')
           theme = path.read_text(encoding='utf-8')
           if 'QLabel#dashboardValue' not in theme:
-              css = """
-QFrame#card[dashboardCard=\"true\"] {{
-    background-color: {c['surface_alt']};
-}}
-
-QLabel#dashboardValue {{
-    color: {c['text']};
-    font-size: 15pt;
-    font-weight: 700;
-}}
-
-QLabel#dashboardDetail {{
-    color: {c['text_muted']};
-    font-size: 9pt;
-}}
-
-QPushButton#deviceLink {{
-    min-height: 22px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: {c['focus']};
-    font-size: 15pt;
-    font-weight: 700;
-    text-align: left;
-}}
-
-QPushButton#deviceLink:hover {{
-    color: {c['text']};
-    background: transparent;
-}}
-
-"""
+              css = '\n'.join([
+                  'QFrame#card[dashboardCard="true"] {{',
+                  "    background-color: {c['surface_alt']};",
+                  '}}',
+                  '',
+                  'QLabel#dashboardValue {{',
+                  "    color: {c['text']};",
+                  '    font-size: 15pt;',
+                  '    font-weight: 700;',
+                  '}}',
+                  '',
+                  'QLabel#dashboardDetail {{',
+                  "    color: {c['text_muted']};",
+                  '    font-size: 9pt;',
+                  '}}',
+                  '',
+                  'QPushButton#deviceLink {{',
+                  '    min-height: 22px;',
+                  '    padding: 0;',
+                  '    border: 0;',
+                  '    background: transparent;',
+                  "    color: {c['focus']};",
+                  '    font-size: 15pt;',
+                  '    font-weight: 700;',
+                  '    text-align: left;',
+                  '}}',
+                  '',
+                  'QPushButton#deviceLink:hover {{',
+                  "    color: {c['text']};",
+                  '    background: transparent;',
+                  '}}',
+                  '',
+              ]) + '\n'
               marker = 'QLabel#healthStatus {{'
               if marker not in theme:
                   raise SystemExit('health theme anchor missing')
               theme = theme.replace(marker, css + marker, 1)
           if 'QPlainTextEdit#timelineView {{' not in theme:
-              css = """
-QPlainTextEdit#timelineView {{
-    min-height: 118px;
-    padding: 9px;
-    font-family: \"Cascadia Mono\", \"Consolas\", \"DejaVu Sans Mono\", monospace;
-    font-size: 9pt;
-}}
-
-"""
+              css = '\n'.join([
+                  'QPlainTextEdit#timelineView {{',
+                  '    min-height: 118px;',
+                  '    padding: 9px;',
+                  '    font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;',
+                  '    font-size: 9pt;',
+                  '}}',
+                  '',
+              ]) + '\n'
               marker = 'QMenu {{'
               if marker not in theme:
                   raise SystemExit('menu theme anchor missing')
