@@ -147,12 +147,68 @@ export class TransferController {
       void this.runAction(() => this.uploadFiles(destination, files));
     });
     this.elements.storageBody.addEventListener("click", (event) => {
-      if (event.target === this.elements.storageBody) this.clearSelection();
+      const target = event.target as Element | null;
+      if (event.target === this.elements.storageBody) {
+        this.clearSelection();
+        return;
+      }
+      const row = target?.closest<HTMLElement>(".explorer-row[data-path]") ?? null;
+      if (!row) return;
+      if (target?.closest(".storage-select")) return;
+      const entry = this.entryForRow(row);
+      if (!entry) return;
+      const menuButton = target?.closest<HTMLButtonElement>(".row-menu-button");
+      if (menuButton) {
+        event.stopPropagation();
+        const rectangle = menuButton.getBoundingClientRect();
+        this.prepareContextSelection(entry);
+        this.showContextMenu(rectangle.right, rectangle.bottom, entry);
+        return;
+      }
+      const index = Number.parseInt(row.dataset.index ?? "", 10);
+      if (Number.isInteger(index)) this.handleRowSelection(entry, index, event);
+    });
+    this.elements.storageBody.addEventListener("change", (event) => {
+      const selector = (event.target as Element | null)?.closest<HTMLInputElement>(".storage-select");
+      const row = selector?.closest<HTMLElement>(".explorer-row[data-path]");
+      const path = row?.dataset.path;
+      if (selector && path) this.setFileSelected(path, selector.checked);
+    });
+    this.elements.storageBody.addEventListener("dblclick", (event) => {
+      const target = event.target as Element | null;
+      if (target?.closest(".storage-select, .row-menu-button")) return;
+      const row = target?.closest<HTMLElement>(".explorer-row[data-path]") ?? null;
+      const entry = this.entryForRow(row);
+      if (!entry) return;
+      void this.runAction(async () => {
+        if (entry.isDirectory) await this.browse(entry.path);
+        else await this.download(entry.path);
+      });
     });
     this.elements.storageBody.addEventListener("contextmenu", (event) => {
-      if (event.target !== this.elements.storageBody) return;
       event.preventDefault();
-      this.showContextMenu(event.clientX, event.clientY, null);
+      const row = (event.target as Element | null)?.closest<HTMLElement>(".explorer-row[data-path]") ?? null;
+      const entry = this.entryForRow(row);
+      if (entry) this.prepareContextSelection(entry);
+      this.showContextMenu(event.clientX, event.clientY, entry);
+    });
+    this.elements.storageBody.addEventListener("keydown", (event) => {
+      const row = (event.target as Element | null)?.closest<HTMLElement>(".explorer-row[data-path]") ?? null;
+      if (!row || event.target !== row) return;
+      const entry = this.entryForRow(row);
+      if (!entry) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void this.runAction(async () => {
+          if (entry.isDirectory) await this.browse(entry.path);
+          else await this.download(entry.path);
+        });
+      } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+        event.preventDefault();
+        this.prepareContextSelection(entry);
+        const rectangle = row.getBoundingClientRect();
+        this.showContextMenu(rectangle.left + 32, rectangle.top + 24, entry);
+      }
     });
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-storage-sort]")) {
       button.addEventListener("click", () => {
@@ -266,10 +322,6 @@ export class TransferController {
       const empty = document.createElement("div");
       empty.className = "explorer-empty";
       empty.innerHTML = "<strong>This folder is empty.</strong><span>Right-click here to upload files.</span>";
-      empty.addEventListener("contextmenu", (event) => {
-        event.preventDefault();
-        this.showContextMenu(event.clientX, event.clientY, null);
-      });
       this.elements.storageBody.append(empty);
       return;
     }
@@ -279,6 +331,7 @@ export class TransferController {
       row.className = "explorer-row";
       row.dataset.path = entry.path;
       row.dataset.kind = entry.isDirectory ? "folder" : "file";
+      row.dataset.index = String(index);
       row.tabIndex = 0;
       row.setAttribute("role", "row");
       row.setAttribute("aria-selected", String(this.#selectedDownloads.has(entry.path)));
@@ -292,8 +345,6 @@ export class TransferController {
       selector.disabled = entry.isDirectory;
       selector.checked = this.#selectedDownloads.has(entry.path);
       selector.ariaLabel = `Select ${entry.name}`;
-      selector.addEventListener("click", (event) => event.stopPropagation());
-      selector.addEventListener("change", () => this.setFileSelected(entry.path, selector.checked));
       selectorCell.append(selector);
 
       const nameCell = document.createElement("div");
@@ -322,41 +373,17 @@ export class TransferController {
       menuButton.className = "row-menu-button";
       menuButton.textContent = "⋯";
       menuButton.title = "Actions";
-      menuButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const rectangle = menuButton.getBoundingClientRect();
-        this.prepareContextSelection(entry);
-        this.showContextMenu(rectangle.right, rectangle.bottom, entry);
-      });
       menuCell.append(menuButton);
 
       row.append(selectorCell, nameCell, sizeCell, modifiedCell, menuCell);
-      row.addEventListener("click", (event) => this.handleRowSelection(entry, index, event));
-      row.addEventListener("dblclick", () => void this.runAction(async () => {
-        if (entry.isDirectory) await this.browse(entry.path);
-        else await this.download(entry.path);
-      }));
-      row.addEventListener("contextmenu", (event) => {
-        event.preventDefault();
-        this.prepareContextSelection(entry);
-        this.showContextMenu(event.clientX, event.clientY, entry);
-      });
-      row.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          void this.runAction(async () => {
-            if (entry.isDirectory) await this.browse(entry.path);
-            else await this.download(entry.path);
-          });
-        } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-          event.preventDefault();
-          this.prepareContextSelection(entry);
-          const rectangle = row.getBoundingClientRect();
-          this.showContextMenu(rectangle.left + 32, rectangle.top + 24, entry);
-        }
-      });
       this.elements.storageBody.append(row);
     });
+  }
+
+  private entryForRow(row: HTMLElement | null): AndroidStorageEntryDto | null {
+    const path = row?.dataset.path;
+    if (!path) return null;
+    return this.#currentEntries.find((entry) => entry.path === path) ?? null;
   }
 
   private handleRowSelection(entry: AndroidStorageEntryDto, index: number, event: MouseEvent): void {

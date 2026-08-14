@@ -123,6 +123,17 @@ test("audio card uses the concise label without the experimental badge", () => {
   assert.equal(css.includes(".experimental-badge"), false);
 });
 
+test("Android File Explorer delegates row interaction listeners", () => {
+  assert.match(transferSource, /storageBody\.addEventListener\("click"/);
+  assert.match(transferSource, /storageBody\.addEventListener\("dblclick"/);
+  assert.match(transferSource, /storageBody\.addEventListener\("contextmenu"/);
+  assert.match(transferSource, /storageBody\.addEventListener\("keydown"/);
+  assert.match(transferSource, /row\.dataset\.index = String\(index\)/);
+  assert.doesNotMatch(transferSource, /row\.addEventListener\(/);
+  assert.doesNotMatch(transferSource, /selector\.addEventListener\(/);
+  assert.doesNotMatch(transferSource, /menuButton\.addEventListener\(/);
+});
+
 test("Android File Explorer updates selection without rebuilding every row", () => {
   assert.match(transferSource, /private updateSelectionUi\(\): void/);
   assert.match(transferSource, /querySelectorAll<HTMLElement>\("\.explorer-row\[data-path\]"\)/);
