@@ -30,6 +30,7 @@ export declare class TransferController {
     private readonly elements;
     constructor(elements: TransferElements);
     initialize(): Promise<void>;
+    close(): void;
     private bindEvents;
     private refreshStorageRoots;
     private refreshExplorerIfStale;

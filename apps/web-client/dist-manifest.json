@@ -50,18 +50,18 @@
     },
     {
       "path": "assets/auto-download-controller.d.ts",
-      "bytes": 1374,
-      "sha256": "4b22ac68cf620cfb8910bf556a25dce71d0a5f384806c4767c1452e950553e2e"
+      "bytes": 1393,
+      "sha256": "ed32f90b79f8c9ff43af33934e273a7040449f9e4ea02e41009d7e3426efcc66"
     },
     {
       "path": "assets/auto-download-controller.js",
-      "bytes": 11067,
-      "sha256": "9c66e4a625ee29520f9a992f4af338c43d2a7d5f2347f71122f1bc2b36c8d1ed"
+      "bytes": 11291,
+      "sha256": "57337ebf7a023afa1c12f6788cb27779aef2d3644bdd9116a29e0a462eef0598"
     },
     {
       "path": "assets/auto-download-controller.js.map",
-      "bytes": 11080,
-      "sha256": "1daa7d477033d087947e4f324e9b351f7f32ef3ff56e61c2e77e200a2aceb50a"
+      "bytes": 11320,
+      "sha256": "4f5f221906ec6494312293b56d3a12a8a8b3b626531e2956c8777dfc187dcd91"
     },
     {
       "path": "assets/browser-support.d.ts",
@@ -130,13 +130,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 11035,
-      "sha256": "5837ee815ae91cd617cfd35e3b2e26c45b38fb7e40c0c98b3ec9f669f5c9348f"
+      "bytes": 11095,
+      "sha256": "1be7a5112d4ec07546a7c5b46b7f4a801417d7b73452ddf7990135f770bcd0e2"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 8296,
-      "sha256": "5fbffd55366abee21cb1b97534bcf7827d0d02fe65b92946f3de0020b9a1f4c9"
+      "bytes": 8360,
+      "sha256": "7b55a69966b32924b33d62ac7fd7d468fff3c81e211f82b4976db57716e391f7"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -170,18 +170,18 @@
     },
     {
       "path": "assets/transfer-controller.d.ts",
-      "bytes": 2733,
-      "sha256": "377ddce0db5e955370f7ead11c06bae5e2a7a9aaa06d2ff53559cb18028c2caf"
+      "bytes": 2752,
+      "sha256": "63aa500245924e678514c613e0b7da04cc36eae06466cc67bae673385f00c94e"
     },
     {
       "path": "assets/transfer-controller.js",
-      "bytes": 35483,
-      "sha256": "0d38feb2aa881786cc071da68ae8c8235f0e582418676df411c844dd5e1ffb53"
+      "bytes": 35756,
+      "sha256": "aa94eb7fe8470cd9e3d4be0ed7948a43b1e92a570b0378654f147697826e90b9"
     },
     {
       "path": "assets/transfer-controller.js.map",
-      "bytes": 36125,
-      "sha256": "ab299d334a57c65effe93bdc28e5d47c95ac636a80c03bcd7ef3351427db3902"
+      "bytes": 36404,
+      "sha256": "afc1fbd63898f171f8dd4eff2eed9c145ec30d5286ff692043949e6bd54e4d2c"
     },
     {
       "path": "assets/types.d.ts",
@@ -230,18 +230,18 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.css",
-      "bytes": 27547,
-      "sha256": "2ecfd01a61c11139cee2f55d1ba419f46b11f232ca5881b64804cae34d72b41c"
+      "bytes": 27104,
+      "sha256": "8bc304be85b8fcdd8f21d51ab708b5a24e1102938dc16c651ec01bcb6fb6a3c7"
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
       "bytes": 13008,
-      "sha256": "5bc4f3c3b361f684a65845338fc2becd55be19989d14cd3555ef00d22d8914a2"
+      "sha256": "23a8fb9507153ae473fa602400aa8a3fee819377aefe70a2aaeff2cee239e3d0"
     },
     {
       "path": "index.html",
       "bytes": 30370,
-      "sha256": "abd55264b91ee394115d8f9416ea083ae98322a2fd648f79ab4c99e4b580de23"
+      "sha256": "e32a2945b6286a5ec455ef5112e1081255cc7c8587c61488a018ef8c866c349d"
     },
     {
       "path": "styles.css",

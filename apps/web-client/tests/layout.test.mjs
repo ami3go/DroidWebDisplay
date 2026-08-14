@@ -13,6 +13,7 @@ const transferSource = await readFile(resolve(root, "src/transfer-controller.ts"
 const autoDownloadSource = await readFile(resolve(root, "src/auto-download-controller.ts"), "utf8");
 const runningAppSource = await readFile(resolve(root, "src/running-app-controller.ts"), "utf8");
 const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.js"), "utf8");
+const drawerCssSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.css"), "utf8");
 
 
 
@@ -158,6 +159,17 @@ test("device-dependent UI refreshes reject stale or overlapping results", () => 
 test("Android File Explorer refreshes when stale", () => {
   assert.match(transferSource, /EXPLORER_REFRESH_STALE_MS = 3000/);
   assert.match(transferSource, /refreshExplorerIfStale/);
+});
+
+test("polling controllers stop cleanly and static asset versions advance", () => {
+  assert.match(transferSource, /public close\(\): void/);
+  assert.match(transferSource, /if \(this\.#closed\) return/);
+  assert.match(autoDownloadSource, /public close\(\): void/);
+  assert.match(mainSource, /transferController\.close\(\); autoDownloadController\.close\(\)/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native2/);
+  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native5/);
+  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native5/);
+  assert.doesNotMatch(drawerCssSource, /data-group="apps"/);
 });
 
 test("idle file polling is adaptive and visibility aware", () => {

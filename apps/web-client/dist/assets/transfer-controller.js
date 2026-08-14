@@ -18,6 +18,7 @@ export class TransferController {
     #lastBrowseAt = 0;
     #browseGeneration = 0;
     #refreshTransfersBusy = false;
+    #closed = false;
     constructor(elements) {
         this.elements = elements;
         this.bindEvents();
@@ -53,6 +54,13 @@ export class TransferController {
         await Promise.allSettled([this.browse(roots.defaultPath), this.refreshTransfers()]);
         this.scheduleTransferRefresh();
         document.addEventListener("visibilitychange", () => this.scheduleTransferRefresh(0));
+    }
+    close() {
+        this.#closed = true;
+        this.#browseGeneration += 1;
+        if (this.#pollTimer !== null)
+            window.clearTimeout(this.#pollTimer);
+        this.#pollTimer = null;
     }
     bindEvents() {
         this.elements.device.addEventListener("change", () => void this.runAction(async () => { await this.refreshStorageRoots(); await this.browse(); }));
@@ -555,6 +563,8 @@ export class TransferController {
         return this.filesDrawerVisible() ? 2500 : 8000;
     }
     scheduleTransferRefresh(delay = this.transferRefreshDelay()) {
+        if (this.#closed)
+            return;
         if (this.#pollTimer !== null)
             window.clearTimeout(this.#pollTimer);
         this.#pollTimer = window.setTimeout(() => {

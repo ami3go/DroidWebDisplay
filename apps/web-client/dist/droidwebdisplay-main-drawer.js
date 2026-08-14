@@ -1,4 +1,4 @@
-/* DroidWebDisplay native single-drawer controller v1.7.0 */
+/* DroidWebDisplay native single-drawer controller v1.8.0 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
