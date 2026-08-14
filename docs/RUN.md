@@ -12,10 +12,12 @@ Always download the platform binary and `SHA256SUMS.txt` from the same release a
 
 ### Windows x86_64
 
-Run the downloaded executable:
+Resolve and run the downloaded executable in PowerShell:
 
 ```powershell
-.\DroidWebDisplay-*-windows-x86_64.exe
+$exe = Get-ChildItem .\DroidWebDisplay-*-windows-x86_64.exe | Select-Object -First 1
+if (-not $exe) { throw "DroidWebDisplay Windows executable not found" }
+& $exe.FullName
 ```
 
 The executable starts the local service and opens the browser UI automatically. Keep the process running while using DroidWebDisplay.

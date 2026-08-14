@@ -24,22 +24,24 @@ During release-candidate qualification, published builds may be marked **Pre-rel
 ### Windows x86_64
 
 1. Download the matching `DroidWebDisplay-...-windows-x86_64.exe` and `SHA256SUMS.txt` from the same GitHub Release.
-2. Verify the executable hash in PowerShell:
+2. Resolve the downloaded executable and verify its hash in PowerShell:
 
 ```powershell
-Get-FileHash .\DroidWebDisplay-*-windows-x86_64.exe -Algorithm SHA256
+$exe = Get-ChildItem .\DroidWebDisplay-*-windows-x86_64.exe | Select-Object -First 1
+if (-not $exe) { throw "DroidWebDisplay Windows executable not found" }
+Get-FileHash $exe.FullName -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
 Confirm that the SHA-256 shown by `Get-FileHash` matches the line for the executable in `SHA256SUMS.txt`.
 
-3. Start the executable, for example:
+3. Start the executable:
 
 ```powershell
-.\DroidWebDisplay-0.11.2-windows-x86_64.exe
+& $exe.FullName
 ```
 
-The exact filename may include a release-candidate suffix. DroidWebDisplay starts the local bridge service and opens the browser interface automatically. Keep the DroidWebDisplay process running while using the browser UI.
+DroidWebDisplay starts the local bridge service and opens the browser interface automatically. Keep the DroidWebDisplay process running while using the browser UI.
 
 Local state is stored under `%LOCALAPPDATA%\DroidWebDisplay`. Browser downloads default to `%USERPROFILE%\Downloads\DroidWebDisplay`.
 
