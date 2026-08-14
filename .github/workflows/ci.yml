@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    if: github.event.head_commit.message == 'Build current virtual app selector'
+    if: github.event.head_commit.message == 'Rebuild current virtual app selector'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web-client/dist apps/web-client/dist-manifest.json
+          git add -f apps/web-client/dist
+          git add apps/web-client/dist-manifest.json
           if ! git diff --cached --quiet; then
             git commit -m "Rebuild current virtual app selector"
           fi
