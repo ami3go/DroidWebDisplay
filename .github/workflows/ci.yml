@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+env:
+  PYINSTALLER_VERSION: '6.21.0'
+
 jobs:
   release:
     runs-on: ubuntu-24.04
@@ -29,3 +32,137 @@ jobs:
         working-directory: apps/web-client
       - name: Run release gate
         run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
+
+  windows-package-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Build protocol package
+        working-directory: packages/scrcpy-protocol
+        run: |
+          npm ci
+          npm run build
+      - name: Build web client
+        working-directory: apps/web-client
+        run: |
+          npm ci
+          npm run build
+      - name: Install desktop build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . "pyinstaller==$env:PYINSTALLER_VERSION"
+      - name: Download verified scrcpy server
+        run: python tools/download_server.py
+      - name: Download Android platform-tools
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile platform-tools.zip
+          Expand-Archive -Path platform-tools.zip -DestinationPath platform-tools
+          $adb = (Resolve-Path "platform-tools/platform-tools").Path
+          "DWD_ADB_DIR=$adb" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Build Windows executable
+        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplay.spec
+      - name: Smoke-test Windows executable CLI
+        shell: pwsh
+        run: |
+          & .\dist\DroidWebDisplay.exe --help | Out-Host
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke-test Windows executable service
+        run: python tools/smoke_desktop_package.py .\dist\DroidWebDisplay.exe --timeout 60
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package-smoke
+          path: dist/DroidWebDisplay.exe
+          if-no-files-found: error
+
+  linux-appimage-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web-client/package-lock.json
+            packages/scrcpy-protocol/package-lock.json
+      - name: Build protocol package
+        working-directory: packages/scrcpy-protocol
+        run: |
+          npm ci
+          npm run build
+      - name: Build web client
+        working-directory: apps/web-client
+        run: |
+          npm ci
+          npm run build
+      - name: Install desktop build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . "pyinstaller==$PYINSTALLER_VERSION"
+      - name: Download verified scrcpy server
+        run: python tools/download_server.py
+      - name: Download Android platform-tools
+        run: |
+          curl -fsSL "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o platform-tools.zip
+          unzip -q platform-tools.zip -d platform-tools
+          echo "DWD_ADB_DIR=$PWD/platform-tools/platform-tools" >> "$GITHUB_ENV"
+      - name: Build Linux frozen runtime
+        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplay.spec
+      - name: Smoke-test frozen runtime CLI
+        run: ./dist/DroidWebDisplay/DroidWebDisplay --help
+      - name: Build AppImage
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APPDIR="$PWD/AppDir"
+          mkdir -p "$APPDIR/usr/lib/droidwebdisplay"
+          cp -a dist/DroidWebDisplay/. "$APPDIR/usr/lib/droidwebdisplay/"
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/usr/bin/env sh
+          HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          exec "$HERE/usr/lib/droidwebdisplay/DroidWebDisplay" "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+          cat > "$APPDIR/droidwebdisplay.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=DroidWebDisplay
+          Comment=Open the local DroidWebDisplay browser interface
+          Exec=DroidWebDisplay
+          Icon=droidwebdisplay
+          Terminal=false
+          Categories=Development;Utility;
+          EOF
+          cp packaging/linux/droidwebdisplay.svg "$APPDIR/droidwebdisplay.svg"
+          ln -s droidwebdisplay.svg "$APPDIR/.DirIcon"
+          curl -fsSL "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -o appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          mkdir -p release
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool-x86_64.AppImage "$APPDIR" "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
+          chmod +x release/DroidWebDisplay-ci-linux-x86_64.AppImage
+      - name: Smoke-test AppImage CLI
+        run: APPIMAGE_EXTRACT_AND_RUN=1 ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --help
+      - name: Smoke-test AppImage service
+        run: python tools/smoke_desktop_package.py ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --appimage-extract-and-run --timeout 60
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage-smoke
+          path: release/DroidWebDisplay-ci-linux-x86_64.AppImage
+          if-no-files-found: error
