@@ -40,6 +40,7 @@ export declare class TransferController {
     private prepareContextSelection;
     private setFileSelected;
     private clearSelection;
+    private updateSelectionUi;
     private updateSelectionControls;
     private updateSortHeaders;
     private showContextMenu;
