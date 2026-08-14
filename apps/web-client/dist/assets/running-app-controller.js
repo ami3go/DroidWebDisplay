@@ -1,5 +1,6 @@
 import { BridgeApi } from "./api.js";
 const DROPDOWN_REFRESH_STALE_MS = 1500;
+const STORAGE_REFRESH_MS = 30_000;
 function errorMessage(error) {
     return error instanceof Error ? error.message : String(error);
 }
@@ -9,12 +10,47 @@ function formatBytes(value) {
         return `${gib.toFixed(2)} GiB`;
     return `${(value / (1024 ** 2)).toFixed(0)} MiB`;
 }
+function metadataBytes(device, key) {
+    const raw = device?.metadata?.[key];
+    if (raw === undefined)
+        return null;
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : null;
+}
+function formatStorage(freeBytes, totalBytes) {
+    if (freeBytes === null)
+        return "Unavailable";
+    if (totalBytes === null || totalBytes <= 0)
+        return `${formatBytes(freeBytes)} free`;
+    return `${formatBytes(freeBytes)} free of ${formatBytes(totalBytes)}`;
+}
+function ensureDiagnosticValue(anchor, id, label) {
+    const existing = document.getElementById(id);
+    if (existing)
+        return existing;
+    const summary = anchor.closest(".device-diagnostic-summary");
+    if (!summary)
+        throw new Error("Missing diagnostics summary container");
+    const row = document.createElement("div");
+    const caption = document.createElement("span");
+    const value = document.createElement("strong");
+    caption.textContent = label;
+    value.id = id;
+    value.textContent = "—";
+    row.append(caption, value);
+    summary.append(row);
+    return value;
+}
 export class RunningAppController {
     #api;
     #elements;
+    #diagnosticInternalStorage;
+    #diagnosticSdCard;
     #apps = [];
     #activeSession = null;
     #virtualSession = null;
+    #deviceInfo = null;
+    #deviceInfoAt = 0;
     #refreshing = false;
     #moving = false;
     #timer = null;
@@ -25,6 +61,8 @@ export class RunningAppController {
     constructor(elements, api = new BridgeApi()) {
         this.#elements = elements;
         this.#api = api;
+        this.#diagnosticInternalStorage = ensureDiagnosticValue(elements.diagnosticRam, "diagnostic-internal-storage", "Internal storage");
+        this.#diagnosticSdCard = ensureDiagnosticValue(elements.diagnosticRam, "diagnostic-sd-card", "SD card");
         elements.icon.addEventListener("click", () => {
             this.#dropdownActive = false;
             this.#refreshAfterDropdown = false;
@@ -38,6 +76,8 @@ export class RunningAppController {
             this.#dropdownActive = false;
             this.#refreshAfterDropdown = false;
             this.#lastRefreshAt = 0;
+            this.#deviceInfo = null;
+            this.#deviceInfoAt = 0;
             if (this.#refreshing)
                 this.#refreshQueued = true;
             else
@@ -70,9 +110,11 @@ export class RunningAppController {
             this.#apps = [];
             this.#activeSession = null;
             this.#virtualSession = null;
+            this.#deviceInfo = null;
+            this.#deviceInfoAt = 0;
             this.#lastRefreshAt = 0;
             this.render();
-            this.renderDiagnostics(null);
+            this.renderDiagnostics(null, null);
             this.#elements.status.textContent = "Select an authorized Android device.";
             return;
         }
@@ -80,19 +122,24 @@ export class RunningAppController {
         if (!silent)
             this.#elements.status.textContent = "Reading running Android applications…";
         try {
-            const [apps, sessions] = await Promise.all([this.#api.runningApps(serial), this.#api.sessions()]);
+            const [apps, sessions, deviceInfo] = await Promise.all([
+                this.#api.runningApps(serial),
+                this.#api.sessions(),
+                this.loadDeviceInfo(serial, !silent),
+            ]);
             if (this.#elements.device.value !== serial) {
                 this.#refreshQueued = true;
                 return;
             }
             this.#apps = apps.apps;
+            this.#deviceInfo = deviceInfo;
             const runningSessions = sessions.sessions.filter((session) => session.serial === serial && session.state === "running");
             this.#virtualSession = runningSessions.find((session) => session.displayMode === "virtual"
                 && typeof session.virtualDisplay.displayId === "number") ?? null;
             this.#activeSession = this.#virtualSession ?? runningSessions[0] ?? null;
             this.#lastRefreshAt = Date.now();
             this.render();
-            this.renderDiagnostics(apps.freeMemoryBytes ?? null);
+            this.renderDiagnostics(apps.freeMemoryBytes ?? null, deviceInfo);
             const displayId = this.#virtualSession?.virtualDisplay.displayId;
             this.#elements.status.textContent = displayId === null || displayId === undefined
                 ? `${this.#apps.length} GUI task(s) found. Start a virtual display to move one.`
@@ -103,8 +150,10 @@ export class RunningAppController {
             this.#apps = [];
             this.#activeSession = null;
             this.#virtualSession = null;
+            this.#deviceInfo = null;
+            this.#deviceInfoAt = 0;
             this.render();
-            this.renderDiagnostics(null);
+            this.renderDiagnostics(null, null);
             this.#elements.status.textContent = `Running-app query failed: ${errorMessage(error)}`;
         }
         finally {
@@ -114,6 +163,17 @@ export class RunningAppController {
                 void this.refresh(true);
             }
         }
+    }
+    async loadDeviceInfo(serial, force) {
+        if (!force
+            && this.#deviceInfo?.serial === serial
+            && Date.now() - this.#deviceInfoAt < STORAGE_REFRESH_MS) {
+            return this.#deviceInfo;
+        }
+        const response = await this.#api.devices();
+        const device = response.devices.find((candidate) => candidate.serial === serial) ?? null;
+        this.#deviceInfoAt = Date.now();
+        return device;
     }
     beginDropdownInteraction() {
         this.#dropdownActive = true;
@@ -225,11 +285,30 @@ export class RunningAppController {
             this.updateSelectionStatus();
         }
     }
-    renderDiagnostics(freeMemoryBytes) {
+    renderDiagnostics(freeMemoryBytes, device) {
         const displayId = this.#virtualSession?.virtualDisplay.displayId
             ?? (this.#activeSession?.displayMode === "physical" ? 0 : null);
         this.#elements.diagnosticDisplay.textContent = displayId === null ? "—" : String(displayId);
         this.#elements.diagnosticRam.textContent = freeMemoryBytes === null ? "—" : formatBytes(freeMemoryBytes);
+        if (device === null) {
+            this.#diagnosticInternalStorage.textContent = "—";
+            this.#diagnosticSdCard.textContent = "—";
+            this.#diagnosticSdCard.removeAttribute("title");
+            return;
+        }
+        this.#diagnosticInternalStorage.textContent = formatStorage(metadataBytes(device, "internalStorageFreeBytes"), metadataBytes(device, "internalStorageTotalBytes"));
+        const sdPresent = device.metadata?.sdCardPresent;
+        if (sdPresent === "false") {
+            this.#diagnosticSdCard.textContent = "Not detected";
+            this.#diagnosticSdCard.removeAttribute("title");
+            return;
+        }
+        this.#diagnosticSdCard.textContent = formatStorage(metadataBytes(device, "sdCardFreeBytes"), metadataBytes(device, "sdCardTotalBytes"));
+        const sdPath = device.metadata?.sdCardPath;
+        if (sdPath)
+            this.#diagnosticSdCard.title = sdPath;
+        else
+            this.#diagnosticSdCard.removeAttribute("title");
     }
 }
 //# sourceMappingURL=running-app-controller.js.map
