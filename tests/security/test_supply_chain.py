@@ -14,7 +14,8 @@ COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 def test_supply_chain_lock_is_complete_and_fail_closed() -> None:
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     assert lock["schemaVersion"] == 1
-    assert lock["tools"]["python"] == "3.11.15"
+    assert lock["tools"]["python-linux-x86_64"] == "3.11.15"
+    assert lock["tools"]["python-windows-x86_64"] == "3.11.9"
     assert lock["tools"]["node"] == "22.23.2"
     assert lock["tools"]["uv"] == "0.12.4"
     assert lock["tools"]["pyinstaller"] == "6.21.0"
@@ -46,6 +47,7 @@ def test_release_workflow_uses_only_pinned_actions_and_verified_artifact_fetches
     assert "windows-latest" not in workflow
     assert "windows-2025" in workflow
     assert "python-version: '3.11.15'" in workflow
+    assert "python-version: '3.11.9'" in workflow
     assert "node-version: '22.23.2'" in workflow
     assert "--runtime-file" in workflow
 
