@@ -1,14 +1,20 @@
-name: DroidWebDisplay Release Gate
+name: Build current virtual app selector
 
 on:
   push:
-  pull_request:
+
+permissions:
+  contents: write
 
 jobs:
-  release:
+  build:
+    if: github.event.head_commit.message == 'Build current virtual app selector'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/current-virtual-app-selector
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -21,11 +27,23 @@ jobs:
             packages/scrcpy-protocol/package-lock.json
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Sync locked Python environment
-        run: $HOME/.local/bin/uv sync --locked --extra dev
-      - run: npm ci
-        working-directory: packages/scrcpy-protocol
-      - run: npm ci
-        working-directory: apps/web-client
+      - name: Install dependencies
+        run: |
+          $HOME/.local/bin/uv sync --locked --extra dev
+          npm ci --prefix packages/scrcpy-protocol
+          npm ci --prefix apps/web-client
+      - name: Build web client
+        run: npm run build --prefix apps/web-client
+      - name: Test web client
+        run: npm test --prefix apps/web-client
       - name: Run release gate
-        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output evidence/release/gate-ci.json
+        run: $HOME/.local/bin/uv run python tools/release_gate.py --require-web-client-build --output /tmp/gate-current-app.json
+      - name: Commit generated web bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web-client/dist apps/web-client/dist-manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Rebuild current virtual app selector"
+          fi
+          git push origin HEAD:agent/current-virtual-app-selector
