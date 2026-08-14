@@ -96,6 +96,7 @@ jobs:
       - name: Smoke-test Windows executable service
         run: python tools/smoke_desktop_package.py .\dist\DroidWebDisplay.exe --timeout 60
       - name: Smoke-test Windows Authenticode signing helper
+        timeout-minutes: 2
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -104,22 +105,26 @@ jobs:
           $checksumManifest = Join-Path $env:RUNNER_TEMP "SHA256SUMS-signing-smoke.txt"
           Copy-Item .\dist\DroidWebDisplay.exe $signedCopy
 
+          Write-Host "Creating disposable CI code-signing certificate."
           $certificate = New-SelfSignedCertificate `
             -Type CodeSigningCert `
             -Subject "CN=DroidWebDisplay CI Signing Smoke" `
             -CertStoreLocation "Cert:\CurrentUser\My" `
             -HashAlgorithm SHA256 `
             -NotAfter (Get-Date).AddDays(1)
+          Write-Host "Exporting and trusting disposable CI certificate."
           Export-Certificate -Cert $certificate -FilePath $certificateFile -Force | Out-Null
-          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
-          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
+          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\Root" -Confirm:$false | Out-Null
+          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" -Confirm:$false | Out-Null
 
           try {
+            Write-Host "Invoking signing helper on disposable EXE copy."
             .\tools\sign_windows_release.ps1 `
               -File $signedCopy `
               -CertificateThumbprint $certificate.Thumbprint `
               -SkipTimestamp `
               -ChecksumManifest $checksumManifest
+            Write-Host "Invoking verification-only path."
             .\tools\sign_windows_release.ps1 -File $signedCopy -VerifyOnly
 
             $expectedHash = (Get-FileHash -LiteralPath $signedCopy -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -128,8 +133,10 @@ jobs:
             if ($manifestLines.Count -ne 1 -or $manifestLines[0] -ne $expectedLine) {
               throw "Signing smoke checksum manifest did not match the signed disposable copy."
             }
+            Write-Host "Disposable signing smoke completed successfully."
           }
           finally {
+            Write-Host "Cleaning disposable signing material."
             Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
             Remove-Item "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
             Remove-Item "Cert:\CurrentUser\TrustedPublisher\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue

@@ -42,12 +42,17 @@ function Resolve-SignTool {
 }
 
 function Invoke-SignTool {
-  param([Parameter(Mandatory = $true)][string[]]$Arguments)
+  param(
+    [Parameter(Mandatory = $true)][string]$Operation,
+    [Parameter(Mandatory = $true)][string[]]$Arguments
+  )
 
+  Write-Host "SignTool $Operation starting."
   & $script:ResolvedSignTool @Arguments
   if ($LASTEXITCODE -ne 0) {
-    throw "signtool.exe failed with exit code $LASTEXITCODE: $($Arguments -join ' ')"
+    throw "signtool.exe $Operation failed with exit code $LASTEXITCODE: $($Arguments -join ' ')"
   }
+  Write-Host "SignTool $Operation completed."
 }
 
 function Update-ChecksumManifest {
@@ -87,7 +92,9 @@ if ([IO.Path]::GetExtension($resolvedFile) -ne ".exe") {
   throw "Only Windows .exe release artifacts are accepted: $resolvedFile"
 }
 
+Write-Host "Resolving signtool.exe."
 $script:ResolvedSignTool = Resolve-SignTool
+Write-Host "Using SignTool: $script:ResolvedSignTool"
 
 if (-not $VerifyOnly) {
   if ([string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
@@ -115,15 +122,17 @@ if (-not $VerifyOnly) {
   }
 
   $signArguments += $resolvedFile
-  Invoke-SignTool -Arguments $signArguments
+  Invoke-SignTool -Operation "sign" -Arguments $signArguments
 }
 
-Invoke-SignTool -Arguments @("verify", "/pa", "/all", "/v", $resolvedFile)
+Invoke-SignTool -Operation "verify" -Arguments @("verify", "/pa", "/all", "/v", $resolvedFile)
 
+Write-Host "PowerShell Authenticode verification starting."
 $signature = Get-AuthenticodeSignature -FilePath $resolvedFile
 if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
   throw "Authenticode verification failed: $($signature.Status) - $($signature.StatusMessage)"
 }
+Write-Host "PowerShell Authenticode verification completed."
 
 if ($ChecksumManifest) {
   Update-ChecksumManifest -SignedFile $resolvedFile -Manifest $ChecksumManifest
