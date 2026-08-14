@@ -6,7 +6,6 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.js"), "utf8");
-const connectCss = await readFile(resolve(root, "static/droidwebdisplay-connect-drawer.css"), "utf8");
 const drawerCss = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.css"), "utf8");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 
@@ -14,23 +13,26 @@ test("Display is the first drawer group and owns connection controls", () => {
   assert.match(drawerSource, /const GROUPS = \['display','clipboard','files'/);
   assert.doesNotMatch(drawerSource, /data-group=\"connect\"/);
   assert.doesNotMatch(drawerSource, /dataset\.group = 'connect'/);
-  assert.match(drawerSource, /data-slot=\"display\"/);
+  const displayStart = html.indexOf('data-slot="display"');
+  const audioStart = html.indexOf('data-slot="audio"', displayStart);
+  const display = html.slice(displayStart, audioStart);
+  assert.ok(displayStart >= 0);
+  assert.match(display, /class="help-card connect-card"/);
   for (const id of ["device", "connect"]) {
-    assert.match(drawerSource, new RegExp(`getElementById\\('${id}'\\)`));
+    assert.match(display, new RegExp(`id="${id}"`));
   }
-  assert.match(drawerSource, /actions\.append\(connect\)/);
-  assert.match(drawerSource, /displaySlot\.insertBefore\(card, displaySlot\.firstElementChild\)/);
+  assert.doesNotMatch(drawerSource, /ensureDisplayConnectionUi|actions\.append\(connect\)|displaySlot\.insertBefore/);
   assert.doesNotMatch(html, /id=\"refresh\"/);
 });
 
 test("Display connection controls use one compact stateful action", () => {
-  assert.match(drawerSource, /droidwebdisplay-connect-drawer\.css/);
-  assert.match(connectCss, /data-slot=\"display\"/);
-  assert.doesNotMatch(connectCss, /data-slot=\"connect\"/);
-  assert.match(connectCss, /grid-template-columns: minmax\(0, 1fr\) !important/);
-  assert.match(connectCss, /grid-column: auto !important/);
-  assert.match(connectCss, /min-height: 2rem !important/);
-  assert.match(connectCss, /#device[\s\S]*height: 2rem/);
+  assert.doesNotMatch(drawerSource, /droidwebdisplay-connect-drawer\.css/);
+  assert.match(drawerCss, /data-slot=\"display\"/);
+  assert.doesNotMatch(drawerCss, /data-slot=\"connect\"/);
+  assert.match(drawerCss, /grid-template-columns: minmax\(0, 1fr\) !important/);
+  assert.match(drawerCss, /grid-column: auto !important/);
+  assert.match(drawerCss, /min-height: 2rem !important/);
+  assert.match(drawerCss, /#device[\s\S]*height: 2rem/);
 });
 
 test("readiness indicator stays in header and Connect rail item is absent", () => {
@@ -39,6 +41,8 @@ test("readiness indicator stays in header and Connect rail item is absent", () =
   const header = html.slice(start, end);
   assert.match(header, /id="connection-status"/);
   assert.match(header, /id="status-icon"/);
+  assert.doesNotMatch(header, /id="device"/);
+  assert.doesNotMatch(header, /id="connect"/);
   assert.doesNotMatch(drawerSource, /label\.textContent = 'Connect'/);
 });
 
@@ -51,12 +55,15 @@ test("connection status pill opens Display settings", () => {
 
 test("Network settings are integrated into Access", () => {
   assert.doesNotMatch(html, /data-group="network"/);
+  assert.doesNotMatch(html, /data-slot="network"/);
   assert.doesNotMatch(drawerSource, /'access','network'/);
-  assert.match(drawerSource, /function mergeNetworkIntoAccess\(\)/);
-  assert.match(drawerSource, /access-network/);
-  assert.match(drawerSource, /label\.textContent = 'Network access'/);
+  const accessStart = html.indexOf('data-slot="access"');
+  const diagnosticsStart = html.indexOf('data-slot="diagnostics"', accessStart);
+  const access = html.slice(accessStart, diagnosticsStart);
+  assert.match(access, /data-section-key="access-network"/);
+  assert.match(access, /id="network-card"/);
+  assert.doesNotMatch(drawerSource, /mergeNetworkIntoAccess/);
 });
-
 
 
 test("drawer pin control is compact and close can unpin in one action", () => {
