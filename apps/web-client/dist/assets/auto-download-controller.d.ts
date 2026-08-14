@@ -24,6 +24,7 @@ export declare class AutoDownloadController {
     private readonly elements;
     constructor(elements: AutoDownloadElements);
     initialize(): Promise<void>;
+    close(): void;
     private bindEvents;
     private refreshRoots;
     private save;

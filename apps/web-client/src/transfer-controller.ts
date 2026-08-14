@@ -48,6 +48,7 @@ export class TransferController {
   #lastBrowseAt = 0;
   #browseGeneration = 0;
   #refreshTransfersBusy = false;
+  #closed = false;
 
   public constructor(private readonly elements: TransferElements) {
     this.bindEvents();
@@ -83,6 +84,13 @@ export class TransferController {
     await Promise.allSettled([this.browse(roots.defaultPath), this.refreshTransfers()]);
     this.scheduleTransferRefresh();
     document.addEventListener("visibilitychange", () => this.scheduleTransferRefresh(0));
+  }
+
+  public close(): void {
+    this.#closed = true;
+    this.#browseGeneration += 1;
+    if (this.#pollTimer !== null) window.clearTimeout(this.#pollTimer);
+    this.#pollTimer = null;
   }
 
   private bindEvents(): void {
@@ -562,6 +570,7 @@ export class TransferController {
   }
 
   private scheduleTransferRefresh(delay = this.transferRefreshDelay()): void {
+    if (this.#closed) return;
     if (this.#pollTimer !== null) window.clearTimeout(this.#pollTimer);
     this.#pollTimer = window.setTimeout(() => {
       this.#pollTimer = null;

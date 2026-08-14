@@ -5,6 +5,7 @@ export class AutoDownloadController {
     #timer = null;
     #snapshot = null;
     #refreshing = false;
+    #closed = false;
     #lastNotificationTimestamp = Number(localStorage.getItem("droidwebdisplay-auto-download-notification-ts") ?? "0");
     constructor(elements) {
         this.elements = elements;
@@ -34,6 +35,12 @@ export class AutoDownloadController {
         this.scheduleRefresh();
         document.addEventListener("visibilitychange", () => this.scheduleRefresh(0));
         document.querySelector('[data-group="files"]')?.addEventListener("click", () => this.scheduleRefresh(0));
+    }
+    close() {
+        this.#closed = true;
+        if (this.#timer !== null)
+            window.clearTimeout(this.#timer);
+        this.#timer = null;
     }
     bindEvents() {
         this.elements.device.addEventListener("change", () => void this.runAction(() => this.refreshRoots()));
@@ -93,6 +100,8 @@ export class AutoDownloadController {
         return monitoring ? 5000 : 10_000;
     }
     scheduleRefresh(delay = this.refreshDelay()) {
+        if (this.#closed)
+            return;
         if (this.#timer !== null)
             window.clearTimeout(this.#timer);
         this.#timer = window.setTimeout(() => {

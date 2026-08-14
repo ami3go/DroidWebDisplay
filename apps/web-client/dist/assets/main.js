@@ -194,7 +194,7 @@ async function bootstrap() {
             summary: required("#auto-download-summary"),
             events: required("#auto-download-events"),
         });
-        window.addEventListener("beforeunload", () => { controller.stopOnUnload(); runningAppController.close(); });
+        window.addEventListener("beforeunload", () => { controller.stopOnUnload(); runningAppController.close(); transferController.close(); autoDownloadController.close(); });
         void controller.initialize()
             .then(() => Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]))
             .catch((error) => {
