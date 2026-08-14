@@ -37,6 +37,28 @@ jobs:
               raise SystemExit(f'methods block anchor count={script.count(methods_anchor)}')
           script = script.replace(methods_anchor, "methods = r'''", 1)
 
+          def indent_embedded_assignment(text: str, variable: str) -> str:
+              lines = text.splitlines()
+              prefix = f"{variable} = "
+              matches = [index for index, line in enumerate(lines) if line.startswith(prefix)]
+              if len(matches) != 1:
+                  raise SystemExit(f'{variable} assignment count={len(matches)}')
+              start_index = matches[0]
+              end_index = None
+              for index in range(start_index + 1, len(lines)):
+                  if lines[index].strip() == "'''":
+                      end_index = index
+                      break
+              if end_index is None:
+                  raise SystemExit(f'{variable} closing delimiter missing')
+              for index in range(start_index + 1, end_index):
+                  if lines[index]:
+                      lines[index] = '    ' + lines[index]
+              return '\n'.join(lines) + '\n'
+
+          for variable in ('overview', 'settings', 'methods', 'old_apply', 'new_apply'):
+              script = indent_embedded_assignment(script, variable)
+
           exact = 'gui = replace_once(gui, old_apply, new_apply, "snapshot dashboard")'
           resilient = '''gui, count = re.subn(
               r"    def _apply_snapshot\\(self, snapshot: ServerSnapshot\\) -> None:\\n.*?(?=        running = snapshot.state)",
