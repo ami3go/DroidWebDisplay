@@ -1,11 +1,11 @@
-/* DroidWebDisplay native single-drawer controller v1.6.0 */
+/* DroidWebDisplay native single-drawer controller v1.7.0 */
 (() => {
   'use strict';
   const PIN_KEY = 'droidwebdisplay.ui.drawer.pinned.v1';
   const LAST_GROUP_KEY = 'droidwebdisplay.ui.drawer.lastGroup.v1';
   const ACCORDION_KEY = 'droidwebdisplay.ui.drawer.accordions.v1';
   const DRAWER_WIDTH_KEY = 'droidwebdisplay.ui.drawer.width.v1';
-  const EXPLORER_COLUMNS_KEY = 'droidwebdisplay.ui.explorer.columns.v1';
+  const EXPLORER_COLUMNS_KEY = 'droidwebdisplay.ui.explorer.columns.v2';
   const DRAWER_MIN_WIDTH = 280;
   const DRAWER_MAX_WIDTH = 720;
   const ROOT_ID = 'gb-single-drawer-root';
@@ -240,11 +240,12 @@
     try {
       const state = JSON.parse(get(EXPLORER_COLUMNS_KEY, '{}')) || {};
       return {
+        name: Number.isFinite(Number(state.name)) ? Number(state.name) : null,
         size: Number.isFinite(Number(state.size)) ? Number(state.size) : null,
         modified: Number.isFinite(Number(state.modified)) ? Number(state.modified) : null,
       };
     } catch (_) {
-      return { size: null, modified: null };
+      return { name: null, size: null, modified: null };
     }
   }
   function bindExplorerColumnResize() {
@@ -255,41 +256,54 @@
     const modifiedHeader = frame?.querySelector('.explorer-header-button.modified-cell');
     if (!frame || !nameHeader || !sizeHeader || !modifiedHeader) return;
 
-    const apply = (size, modified, persist = false) => {
-      if (Number.isFinite(size)) frame.style.setProperty('--dwd-explorer-size-w', `${Math.round(size)}px`);
-      if (Number.isFinite(modified)) frame.style.setProperty('--dwd-explorer-modified-w', `${Math.round(modified)}px`);
-      if (persist) set(EXPLORER_COLUMNS_KEY, JSON.stringify({ size: Math.round(size), modified: Math.round(modified) }));
+    const columns = {
+      name: { header: nameHeader, property: '--dwd-explorer-name-w', min: 80, max: 720 },
+      size: { header: sizeHeader, property: '--dwd-explorer-size-w', min: 54, max: 280 },
+      modified: { header: modifiedHeader, property: '--dwd-explorer-modified-w', min: 78, max: 420 },
     };
-    const reset = () => {
-      frame.style.removeProperty('--dwd-explorer-size-w');
-      frame.style.removeProperty('--dwd-explorer-modified-w');
-      try { localStorage.removeItem(EXPLORER_COLUMNS_KEY); } catch (_) {}
+    const state = loadExplorerColumnState();
+    const save = () => set(EXPLORER_COLUMNS_KEY, JSON.stringify(state));
+    const applyColumn = (key, width, persist = false) => {
+      const column = columns[key];
+      if (!column || !Number.isFinite(width)) return;
+      const next = Math.round(Math.min(column.max, Math.max(column.min, width)));
+      state[key] = next;
+      frame.style.setProperty(column.property, `${next}px`);
+      if (persist) save();
     };
-    const stored = loadExplorerColumnState();
-    if (stored.size !== null && stored.modified !== null) apply(stored.size, stored.modified);
+    const resetColumn = key => {
+      const column = columns[key];
+      if (!column) return;
+      state[key] = null;
+      frame.style.removeProperty(column.property);
+      save();
+    };
+    for (const key of Object.keys(columns)) {
+      if (state[key] !== null) applyColumn(key, state[key]);
+    }
 
-    const addHandle = (header, boundary) => {
+    const addHandle = key => {
+      const column = columns[key];
+      const header = column.header;
       if (header.querySelector('.explorer-column-resizer')) return;
       const handle = document.createElement('span');
       handle.className = 'explorer-column-resizer';
-      handle.dataset.boundary = boundary;
+      handle.dataset.column = key;
       handle.setAttribute('role', 'separator');
       handle.setAttribute('aria-orientation', 'vertical');
-      handle.setAttribute('aria-label', `Resize ${boundary === 'name-size' ? 'Name and Size' : 'Size and Modified'} columns`);
+      handle.setAttribute('aria-label', `Resize ${key[0].toUpperCase()}${key.slice(1)} column`);
       handle.tabIndex = 0;
-      handle.title = 'Drag to resize columns · Double-click to reset';
+      handle.title = `Drag to resize ${key} · Double-click to reset`;
       header.append(handle);
 
       let pointer = null;
       let startX = 0;
-      let startName = 0;
-      let startSize = 0;
-      let startModified = 0;
+      let startWidth = 0;
       const finish = event => {
         if (pointer === null || (event?.pointerId !== undefined && event.pointerId !== pointer)) return;
         pointer = null;
         frame.classList.remove('column-resizing');
-        apply(sizeHeader.getBoundingClientRect().width, modifiedHeader.getBoundingClientRect().width, true);
+        applyColumn(key, header.getBoundingClientRect().width, true);
       };
       handle.addEventListener('click', event => event.stopPropagation());
       handle.addEventListener('pointerdown', event => {
@@ -298,53 +312,36 @@
         event.stopPropagation();
         pointer = event.pointerId;
         startX = event.clientX;
-        startName = nameHeader.getBoundingClientRect().width;
-        startSize = sizeHeader.getBoundingClientRect().width;
-        startModified = modifiedHeader.getBoundingClientRect().width;
+        startWidth = header.getBoundingClientRect().width;
         handle.setPointerCapture?.(event.pointerId);
         frame.classList.add('column-resizing');
       });
       handle.addEventListener('pointermove', event => {
         if (pointer !== event.pointerId) return;
-        const raw = event.clientX - startX;
-        if (boundary === 'name-size') {
-          const delta = Math.max(80 - startName, Math.min(startSize - 54, raw));
-          apply(startSize - delta, startModified);
-        } else {
-          const delta = Math.max(54 - startSize, Math.min(startModified - 78, raw));
-          apply(startSize + delta, startModified - delta);
-        }
+        applyColumn(key, startWidth + event.clientX - startX);
       });
       handle.addEventListener('pointerup', finish);
       handle.addEventListener('pointercancel', finish);
       handle.addEventListener('dblclick', event => {
         event.preventDefault();
         event.stopPropagation();
-        reset();
+        resetColumn(key);
       });
       handle.addEventListener('keydown', event => {
         if (event.key === 'Home') {
           event.preventDefault();
-          reset();
+          resetColumn(key);
           return;
         }
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        const direction = event.key === 'ArrowRight' ? 8 : -8;
-        const nameWidth = nameHeader.getBoundingClientRect().width;
-        const sizeWidth = sizeHeader.getBoundingClientRect().width;
-        const modifiedWidth = modifiedHeader.getBoundingClientRect().width;
-        if (boundary === 'name-size') {
-          const delta = Math.max(80 - nameWidth, Math.min(sizeWidth - 54, direction));
-          apply(sizeWidth - delta, modifiedWidth, true);
-        } else {
-          const delta = Math.max(54 - sizeWidth, Math.min(modifiedWidth - 78, direction));
-          apply(sizeWidth + delta, modifiedWidth - delta, true);
-        }
+        const delta = event.key === 'ArrowRight' ? 8 : -8;
+        applyColumn(key, header.getBoundingClientRect().width + delta, true);
       });
     };
-    addHandle(nameHeader, 'name-size');
-    addHandle(sizeHeader, 'size-modified');
+    addHandle('name');
+    addHandle('size');
+    addHandle('modified');
   }
   function boot() {
     const ui = root(); if (!ui) return;

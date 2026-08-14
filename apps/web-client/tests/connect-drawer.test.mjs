@@ -81,15 +81,16 @@ test("drawer width is user resizable and persisted", () => {
   assert.match(drawerCss, /cursor: ew-resize/);
 });
 
-test("Android File Explorer columns are user resizable", () => {
-  assert.match(drawerSource, /EXPLORER_COLUMNS_KEY = 'droidwebdisplay\.ui\.explorer\.columns\.v1'/);
-  assert.match(drawerSource, /function bindExplorerColumnResize\(\)/);
-  assert.match(drawerSource, /explorer-column-resizer/);
-  assert.match(drawerSource, /name-size/);
-  assert.match(drawerSource, /size-modified/);
-  assert.match(drawerSource, /addEventListener\('pointermove'/);
-  assert.match(drawerSource, /localStorage\.removeItem\(EXPLORER_COLUMNS_KEY\)/);
-  assert.match(drawerCss, /--dwd-explorer-size-w/);
-  assert.match(drawerCss, /--dwd-explorer-modified-w/);
-  assert.match(drawerCss, /cursor: col-resize/);
+test("File Explorer Name, Size and Modified columns resize independently", () => {
+  assert.match(drawerSource, /EXPLORER_COLUMNS_KEY = 'droidwebdisplay\.ui\.explorer\.columns\.v2'/);
+  assert.match(drawerSource, /name: \{ header: nameHeader, property: '--dwd-explorer-name-w'/);
+  assert.match(drawerSource, /size: \{ header: sizeHeader, property: '--dwd-explorer-size-w'/);
+  assert.match(drawerSource, /modified: \{ header: modifiedHeader, property: '--dwd-explorer-modified-w'/);
+  assert.match(drawerSource, /addHandle\('name'\)/);
+  assert.match(drawerSource, /addHandle\('size'\)/);
+  assert.match(drawerSource, /addHandle\('modified'\)/);
+  assert.match(drawerSource, /applyColumn\(key, startWidth \+ event\.clientX - startX\)/);
+  assert.match(drawerSource, /resetColumn\(key\)/);
+  assert.match(drawerCss, /--dwd-explorer-name-w, minmax\(80px, 1fr\)/);
+  assert.match(drawerCss, /overflow-x: auto/);
 });

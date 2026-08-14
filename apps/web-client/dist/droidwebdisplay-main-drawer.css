@@ -370,10 +370,11 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-frame {
   width: 100%;
   min-width: 0;
+  overflow-x: auto;
 }
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-header,
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-row {
-  grid-template-columns: 26px minmax(80px, 1fr) var(--dwd-explorer-size-w, 54px) var(--dwd-explorer-modified-w, 78px) 26px;
+  grid-template-columns: 26px var(--dwd-explorer-name-w, minmax(80px, 1fr)) var(--dwd-explorer-size-w, 54px) var(--dwd-explorer-modified-w, 78px) 26px;
 }
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-header {
   min-height: 1.85rem;
