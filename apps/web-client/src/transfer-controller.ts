@@ -102,7 +102,7 @@ export class TransferController {
       } else {
         for (const entry of files) this.#selectedDownloads.delete(entry.path);
       }
-      this.renderStorage(this.#currentEntries);
+      this.updateSelectionUi();
     });
     this.elements.downloadSelected.addEventListener("click", () => void this.runAction(() => this.downloadSelected()));
     this.elements.destinationProfile.addEventListener("change", () => {
@@ -376,28 +376,40 @@ export class TransferController {
       this.#selectedDownloads.add(entry.path);
     }
     this.#lastSelectedIndex = index;
-    this.renderStorage(this.#currentEntries);
+    this.updateSelectionUi();
   }
 
   private prepareContextSelection(entry: AndroidStorageEntryDto): void {
     if (!entry.isDirectory && !this.#selectedDownloads.has(entry.path)) {
       this.#selectedDownloads.clear();
       this.#selectedDownloads.add(entry.path);
-      this.renderStorage(this.#currentEntries);
+      this.updateSelectionUi();
     }
   }
 
   private setFileSelected(path: string, selected: boolean): void {
     if (selected) this.#selectedDownloads.add(path);
     else this.#selectedDownloads.delete(path);
-    this.renderStorage(this.#currentEntries);
+    this.updateSelectionUi();
   }
 
   private clearSelection(): void {
     if (!this.#selectedDownloads.size) return;
     this.#selectedDownloads.clear();
     this.#lastSelectedIndex = null;
-    this.renderStorage(this.#currentEntries);
+    this.updateSelectionUi();
+  }
+
+  private updateSelectionUi(): void {
+    for (const row of this.elements.storageBody.querySelectorAll<HTMLElement>(".explorer-row[data-path]")) {
+      const path = row.dataset.path ?? "";
+      const selected = this.#selectedDownloads.has(path);
+      row.classList.toggle("selected", selected);
+      row.setAttribute("aria-selected", String(selected));
+      const checkbox = row.querySelector<HTMLInputElement>(".storage-select");
+      if (checkbox) checkbox.checked = selected;
+    }
+    this.updateSelectionControls();
   }
 
   private updateSelectionControls(): void {
@@ -501,7 +513,8 @@ export class TransferController {
     const selected = [...this.#selectedDownloads];
     for (const path of selected) await this.download(path);
     this.#selectedDownloads.clear();
-    this.renderStorage(this.#currentEntries);
+    this.#lastSelectedIndex = null;
+    this.updateSelectionUi();
     this.setStatus(`Queued ${selected.length} download(s)`);
   }
 

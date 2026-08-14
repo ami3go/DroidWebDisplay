@@ -76,7 +76,7 @@ export class TransferController {
                 for (const entry of files)
                     this.#selectedDownloads.delete(entry.path);
             }
-            this.renderStorage(this.#currentEntries);
+            this.updateSelectionUi();
         });
         this.elements.downloadSelected.addEventListener("click", () => void this.runAction(() => this.downloadSelected()));
         this.elements.destinationProfile.addEventListener("change", () => {
@@ -367,13 +367,13 @@ export class TransferController {
             this.#selectedDownloads.add(entry.path);
         }
         this.#lastSelectedIndex = index;
-        this.renderStorage(this.#currentEntries);
+        this.updateSelectionUi();
     }
     prepareContextSelection(entry) {
         if (!entry.isDirectory && !this.#selectedDownloads.has(entry.path)) {
             this.#selectedDownloads.clear();
             this.#selectedDownloads.add(entry.path);
-            this.renderStorage(this.#currentEntries);
+            this.updateSelectionUi();
         }
     }
     setFileSelected(path, selected) {
@@ -381,14 +381,26 @@ export class TransferController {
             this.#selectedDownloads.add(path);
         else
             this.#selectedDownloads.delete(path);
-        this.renderStorage(this.#currentEntries);
+        this.updateSelectionUi();
     }
     clearSelection() {
         if (!this.#selectedDownloads.size)
             return;
         this.#selectedDownloads.clear();
         this.#lastSelectedIndex = null;
-        this.renderStorage(this.#currentEntries);
+        this.updateSelectionUi();
+    }
+    updateSelectionUi() {
+        for (const row of this.elements.storageBody.querySelectorAll(".explorer-row[data-path]")) {
+            const path = row.dataset.path ?? "";
+            const selected = this.#selectedDownloads.has(path);
+            row.classList.toggle("selected", selected);
+            row.setAttribute("aria-selected", String(selected));
+            const checkbox = row.querySelector(".storage-select");
+            if (checkbox)
+                checkbox.checked = selected;
+        }
+        this.updateSelectionControls();
     }
     updateSelectionControls() {
         const fileEntries = this.#currentEntries.filter((entry) => !entry.isDirectory);
@@ -487,7 +499,8 @@ export class TransferController {
         for (const path of selected)
             await this.download(path);
         this.#selectedDownloads.clear();
-        this.renderStorage(this.#currentEntries);
+        this.#lastSelectedIndex = null;
+        this.updateSelectionUi();
         this.setStatus(`Queued ${selected.length} download(s)`);
     }
     async refreshTransfers() {
