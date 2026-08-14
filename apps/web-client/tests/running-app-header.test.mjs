@@ -32,10 +32,12 @@ test("dropdown refresh never rebuilds options during native selection", () => {
   assert.match(source, /this\.#refreshAfterDropdown = true/);
 });
 
-test("running app selector resets after each move action", () => {
-  assert.match(source, /select\.addEventListener\("change", \(\) => void this\.handleSelectionChange\(\)\)/);
-  assert.match(source, /this\.#elements\.select\.value = ""/);
-  assert.match(source, /await this\.finishDropdownInteraction\(\)/);
+test("running app selector follows the resumed app on the virtual display", () => {
+  assert.match(source, /private currentVirtualApp\(\): RunningGuiAppDto \| null/);
+  assert.match(source, /app\.displayId === displayId && app\.resumed/);
+  assert.match(source, /const current = this\.currentVirtualApp\(\)/);
+  assert.match(source, /select\.value = current \? String\(current\.taskId\) : ""/);
+  assert.doesNotMatch(source, /action picker, not persistent state/);
 });
 
 
@@ -45,7 +47,8 @@ test("app icon explicitly refreshes the running GUI task list", () => {
   assert.match(source, /Refresh running applications/);
 });
 
-test("every application selection calls the move API", () => {
+test("every changed application selection calls the move API", () => {
+  assert.match(source, /select\.addEventListener\("change", \(\) => void this\.handleSelectionChange\(\)\)/);
   assert.doesNotMatch(source, /if \(app\.displayId === displayId\)/);
   assert.match(source, /await this\.#api\.moveRunningApp\(\{/);
 });
