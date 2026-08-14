@@ -71,3 +71,13 @@ async def test_collect_storage_metadata_marks_missing_sd_card_without_failing() 
     assert metadata["sdCardPresent"] == "false"
     assert "sdCardFreeBytes" not in metadata
     assert adb.queries == ["/sdcard"]
+
+
+async def test_collect_storage_metadata_reuses_recent_probe() -> None:
+    adb = FakeStorageAdb()
+    first = await collect_storage_metadata(adb, "PHONE")
+    second = await collect_storage_metadata(adb, "PHONE")
+
+    assert first == second
+    assert first is not second
+    assert adb.queries == ["/sdcard", "/storage/1234-ABCD"]
