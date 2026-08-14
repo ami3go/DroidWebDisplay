@@ -18,7 +18,17 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply server UI changes
-        run: python tools/apply_server_ui_dashboard.py
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/apply_server_ui_dashboard.py')
+          source = path.read_text(encoding='utf-8')
+          source = source.replace('old = dedent(', 'old = class_block(')
+          source = source.replace('new = dedent(', 'new = class_block(')
+          path.write_text(source, encoding='utf-8')
+          PY
+          python tools/apply_server_ui_dashboard.py
       - name: Remove temporary implementation helpers
         run: |
           rm tools/apply_server_ui_dashboard.py
