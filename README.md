@@ -35,6 +35,15 @@ Get-Content .\SHA256SUMS.txt
 
 Confirm that the SHA-256 shown by `Get-FileHash` matches the line for the executable in `SHA256SUMS.txt`.
 
+If the release notes state that the Windows executable is code-signed, verify the Authenticode signature before running it:
+
+```powershell
+$signature = Get-AuthenticodeSignature $exe.FullName
+$signature | Format-List Status, StatusMessage
+$signature.SignerCertificate | Format-List Subject, Thumbprint, NotAfter
+if ($signature.Status -ne 'Valid') { throw "DroidWebDisplay Authenticode signature is not valid" }
+```
+
 3. Start the executable:
 
 ```powershell
@@ -45,7 +54,7 @@ DroidWebDisplay starts the local bridge service and opens the browser interface 
 
 Local state is stored under `%LOCALAPPDATA%\DroidWebDisplay`. Browser downloads default to `%USERPROFILE%\Downloads\DroidWebDisplay`.
 
-If Windows reports an unknown publisher for an unsigned pre-release, verify the release notes and SHA-256 checksum before deciding whether to run it. Do not bypass a checksum mismatch.
+An unsigned validation build may still report an unknown publisher. Verify the release notes and SHA-256 checksum before deciding whether to run any unsigned pre-release, and never bypass a checksum mismatch. Final Windows releases should follow `docs/CODE_SIGNING.md`.
 
 ### Linux x86_64
 
@@ -172,6 +181,7 @@ uv run python tools\release_gate.py `
 - `docs/CLEANUP_REPORT.md`
 - `docs/UPSTREAM_UPDATE.md`
 - `docs/NETWORK_ACCESS.md`
+- `docs/CODE_SIGNING.md`
 - `SECURITY.md`
 
 ## Controlled scrcpy updates

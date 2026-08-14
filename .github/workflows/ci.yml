@@ -95,6 +95,46 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke-test Windows executable service
         run: python tools/smoke_desktop_package.py .\dist\DroidWebDisplay.exe --timeout 60
+      - name: Smoke-test Windows Authenticode signing helper
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $signedCopy = Join-Path $env:RUNNER_TEMP "DroidWebDisplay-signing-smoke.exe"
+          $certificateFile = Join-Path $env:RUNNER_TEMP "DroidWebDisplay-signing-smoke.cer"
+          $checksumManifest = Join-Path $env:RUNNER_TEMP "SHA256SUMS-signing-smoke.txt"
+          Copy-Item .\dist\DroidWebDisplay.exe $signedCopy
+
+          $certificate = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=DroidWebDisplay CI Signing Smoke" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddDays(1)
+          Export-Certificate -Cert $certificate -FilePath $certificateFile -Force | Out-Null
+          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
+          Import-Certificate -FilePath $certificateFile -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
+
+          try {
+            .\tools\sign_windows_release.ps1 `
+              -File $signedCopy `
+              -CertificateThumbprint $certificate.Thumbprint `
+              -SkipTimestamp `
+              -ChecksumManifest $checksumManifest
+            .\tools\sign_windows_release.ps1 -File $signedCopy -VerifyOnly
+
+            $expectedHash = (Get-FileHash -LiteralPath $signedCopy -Algorithm SHA256).Hash.ToLowerInvariant()
+            $expectedLine = "$expectedHash  DroidWebDisplay-signing-smoke.exe"
+            $manifestLines = @(Get-Content -LiteralPath $checksumManifest)
+            if ($manifestLines.Count -ne 1 -or $manifestLines[0] -ne $expectedLine) {
+              throw "Signing smoke checksum manifest did not match the signed disposable copy."
+            }
+          }
+          finally {
+            Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+            Remove-Item "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+            Remove-Item "Cert:\CurrentUser\TrustedPublisher\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+            Remove-Item $signedCopy, $certificateFile, $checksumManifest -Force -ErrorAction SilentlyContinue
+          }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-package-smoke

@@ -29,3 +29,9 @@ python tools/build_release.py --target linux --output dist/DroidWebDisplay-linux
   --python-runtime /opt/artifacts/python-runtime \
   --require-offline-ready
 ```
+
+## Windows release signing
+
+The normal package build and CI smoke remain unsigned. A final public Windows executable is signed only after the exact artifact has passed the Release Gate. Authenticode signing changes the executable bytes, so `SHA256SUMS.txt` must be generated or updated after signing.
+
+Use `tools/sign_windows_release.ps1` with a publicly trusted certificate exposed through protected hardware/cloud key storage, and follow `docs/CODE_SIGNING.md`. Production private keys must not be added to the repository or stored as exportable PFX/P12 files in GitHub Actions secrets.
