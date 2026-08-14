@@ -32,6 +32,11 @@ jobs:
           script_lines = source[start:end]
           script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script_lines) + '\n'
 
+          methods_anchor = "methods = '''"
+          if script.count(methods_anchor) != 1:
+              raise SystemExit(f'methods block anchor count={script.count(methods_anchor)}')
+          script = script.replace(methods_anchor, "methods = r'''", 1)
+
           exact = 'gui = replace_once(gui, old_apply, new_apply, "snapshot dashboard")'
           resilient = '''gui, count = re.subn(
               r"    def _apply_snapshot\\(self, snapshot: ServerSnapshot\\) -> None:\\n.*?(?=        running = snapshot.state)",
