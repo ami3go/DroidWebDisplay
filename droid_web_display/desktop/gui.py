@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from droid_web_display.desktop.controller import ServerController, ServerSnapshot, ServerState
 from droid_web_display.desktop.platform import StartupManager, open_directory
+from droid_web_display.desktop.theme import apply_desktop_theme
 
 INSTANCE_NAME = "DroidWebDisplayDesktopHost-v1"
 
@@ -51,6 +52,18 @@ def _notify_existing_instance() -> bool:
     socket.waitForBytesWritten(250)
     socket.disconnectFromServer()
     return True
+
+
+def _refresh_widget_style(widget: QWidget) -> None:
+    style = widget.style()
+    style.unpolish(widget)
+    style.polish(widget)
+    widget.update()
+
+
+def _set_button_variant(button: QPushButton, variant: str | None) -> None:
+    button.setProperty("variant", variant)
+    _refresh_widget_style(button)
 
 
 class _StatusSignals(QObject):
@@ -99,10 +112,15 @@ class ServerWindow(QMainWindow):
 
         self.setWindowTitle("DroidWebDisplay Server")
         self.setWindowIcon(icon)
-        self.resize(560, 430)
-        self.setMinimumSize(500, 390)
+        self.resize(620, 510)
+        self.setMinimumSize(540, 455)
 
-        self._status_value = QLabel("Starting")
+        self._status_value = QLabel("Starting…")
+        self._status_value.setObjectName("statusPill")
+        self._status_value.setProperty("serverState", ServerState.STARTING.value)
+        self._status_value.setAlignment(Qt.AlignCenter)
+        self._status_value.setMinimumWidth(126)
+
         self._url_value = QLabel("—")
         self._url_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._network_value = QLabel("—")
@@ -111,10 +129,39 @@ class ServerWindow(QMainWindow):
         self._uptime_value = QLabel("—")
         self._error_value = QLabel("None")
         self._error_value.setWordWrap(True)
+        self._error_value.setProperty("errorValue", True)
+        for label in (
+            self._url_value,
+            self._network_value,
+            self._device_value,
+            self._pid_value,
+            self._uptime_value,
+            self._error_value,
+        ):
+            label.setProperty("fieldValue", True)
 
-        status_box = QGroupBox("Status")
+        brand_title = QLabel("DroidWebDisplay")
+        brand_title.setObjectName("brandTitle")
+        brand_subtitle = QLabel("Desktop server manager")
+        brand_subtitle.setObjectName("brandSubtitle")
+        brand_layout = QVBoxLayout()
+        brand_layout.setContentsMargins(0, 0, 0, 0)
+        brand_layout.setSpacing(1)
+        brand_layout.addWidget(brand_title)
+        brand_layout.addWidget(brand_subtitle)
+
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(2, 0, 2, 2)
+        header_layout.setSpacing(12)
+        header_layout.addLayout(brand_layout, 1)
+        header_layout.addWidget(self._status_value, 0, Qt.AlignRight | Qt.AlignVCenter)
+
+        status_box = QGroupBox("Server details")
         status_form = QFormLayout(status_box)
-        status_form.addRow("Server", self._status_value)
+        status_form.setContentsMargins(14, 18, 14, 14)
+        status_form.setHorizontalSpacing(22)
+        status_form.setVerticalSpacing(9)
+        status_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         status_form.addRow("URL", self._url_value)
         status_form.addRow("Network mode", self._network_value)
         status_form.addRow("Android device", self._device_value)
@@ -124,15 +171,22 @@ class ServerWindow(QMainWindow):
 
         self._start_stop_button = QPushButton("Stop Server")
         self._start_stop_button.clicked.connect(self._toggle_server)
+        _set_button_variant(self._start_stop_button, "danger")
+
         open_button = QPushButton("Open DroidWebDisplay")
         open_button.clicked.connect(self.controller.open_browser)
+        _set_button_variant(open_button, "primary")
+
         restart_button = QPushButton("Restart Server")
         restart_button.clicked.connect(self._restart_server)
+
         logs_button = QPushButton("Open Logs")
         logs_button.clicked.connect(lambda: open_directory(self.controller.paths.logs_root))
 
-        controls = QGroupBox("Server")
+        controls = QGroupBox("Actions")
         controls_layout = QHBoxLayout(controls)
+        controls_layout.setContentsMargins(13, 17, 13, 13)
+        controls_layout.setSpacing(8)
         controls_layout.addWidget(open_button)
         controls_layout.addWidget(self._start_stop_button)
         controls_layout.addWidget(restart_button)
@@ -160,23 +214,33 @@ class ServerWindow(QMainWindow):
             lambda checked: self._settings.setValue("startMinimized", checked)
         )
 
+        settings_hint = QLabel(
+            "Closing the browser keeps the server running. Exit from this window or the tray menu "
+            "when you want DroidWebDisplay to stop cleanly."
+        )
+        settings_hint.setObjectName("sectionHint")
+        settings_hint.setWordWrap(True)
+
         settings_box = QGroupBox("Desktop host")
         settings_layout = QVBoxLayout(settings_box)
+        settings_layout.setContentsMargins(13, 17, 13, 13)
+        settings_layout.setSpacing(7)
         settings_layout.addWidget(self._open_browser_checkbox)
         settings_layout.addWidget(self._startup_checkbox)
         settings_layout.addWidget(self._start_minimized_checkbox)
-        settings_layout.addWidget(
-            QLabel(
-                "Closing the browser does not stop DroidWebDisplay. Use Exit from this window "
-                "or the tray menu to stop it cleanly."
-            )
-        )
+        settings_layout.addSpacing(3)
+        settings_layout.addWidget(settings_hint)
 
         exit_button = QPushButton("Exit DroidWebDisplay")
         exit_button.clicked.connect(self.request_exit)
+        _set_button_variant(exit_button, "danger")
 
         root = QWidget()
+        root.setObjectName("serverRoot")
         layout = QVBoxLayout(root)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
+        layout.addLayout(header_layout)
         layout.addWidget(status_box)
         layout.addWidget(controls)
         layout.addWidget(settings_box)
@@ -202,6 +266,11 @@ class ServerWindow(QMainWindow):
     @property
     def start_minimized_preference(self) -> bool:
         return self._start_minimized_checkbox.isChecked()
+
+    def _set_status_visual(self, state: ServerState, text: str) -> None:
+        self._status_value.setText(text)
+        self._status_value.setProperty("serverState", state.value)
+        _refresh_widget_style(self._status_value)
 
     def _create_tray(self) -> None:
         tray = QSystemTrayIcon(self.icon, self)
@@ -258,7 +327,7 @@ class ServerWindow(QMainWindow):
     def _toggle_server(self) -> None:
         state = self._cached_state
         if state in {ServerState.RUNNING, ServerState.STARTING}:
-            self._status_value.setText("Stopping…")
+            self._set_status_visual(ServerState.STOPPING, "Stopping…")
             if not self.controller.stop():
                 QMessageBox.warning(
                     self,
@@ -273,7 +342,7 @@ class ServerWindow(QMainWindow):
                 "Stop that instance separately.",
             )
         else:
-            self._status_value.setText("Starting…")
+            self._set_status_visual(ServerState.STARTING, "Starting…")
             self.controller.start()
             if self.open_browser_on_start:
                 self._browser_pending = True
@@ -288,7 +357,7 @@ class ServerWindow(QMainWindow):
                 "desktop host.",
             )
             return
-        self._status_value.setText("Restarting…")
+        self._set_status_visual(ServerState.STARTING, "Restarting…")
         if not self.controller.restart():
             QMessageBox.warning(self, "DroidWebDisplay", "The server could not be restarted cleanly.")
             return
@@ -301,11 +370,11 @@ class ServerWindow(QMainWindow):
             ServerState.STOPPED: "Stopped",
             ServerState.STARTING: "Starting…",
             ServerState.RUNNING: "Running",
-            ServerState.EXTERNAL: "Running (external instance)",
+            ServerState.EXTERNAL: "Running · external",
             ServerState.STOPPING: "Stopping…",
             ServerState.ERROR: "Error",
         }
-        self._status_value.setText(labels[snapshot.state])
+        self._set_status_visual(snapshot.state, labels[snapshot.state])
         self._url_value.setText(snapshot.url)
         self._network_value.setText(snapshot.network_mode)
         if snapshot.device:
@@ -320,6 +389,7 @@ class ServerWindow(QMainWindow):
         action_text = "Stop Server" if running else "Start Server"
         self._start_stop_button.setText(action_text)
         self._start_stop_button.setEnabled(not external and snapshot.state != ServerState.STOPPING)
+        _set_button_variant(self._start_stop_button, "danger" if running else "primary")
         if self._tray_start_stop_action is not None:
             self._tray_start_stop_action.setText(action_text)
             self._tray_start_stop_action.setEnabled(not external and snapshot.state != ServerState.STOPPING)
@@ -339,6 +409,7 @@ class ServerWindow(QMainWindow):
     def _status_failed(self, message: str) -> None:
         self._status_probe_running = False
         self._status_worker = None
+        self._set_status_visual(ServerState.ERROR, "Status unavailable")
         self._error_value.setText(message)
 
     def _refresh(self, *, force: bool = False) -> None:
@@ -382,6 +453,7 @@ def run_desktop_app(
     app.setApplicationName("DroidWebDisplay")
     app.setOrganizationName("DroidWebDisplay")
     app.setQuitOnLastWindowClosed(False)
+    apply_desktop_theme(app)
 
     if _notify_existing_instance():
         return 0
@@ -464,6 +536,7 @@ def desktop_smoke_test(icon_path: Path) -> int:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication(["DroidWebDisplay-desktop-smoke"])
     app.setApplicationName("DroidWebDisplay")
+    apply_desktop_theme(app)
     icon = QIcon(str(icon_path))
     test_server = QLocalServer()
     name = f"DroidWebDisplayDesktopSmoke-{uuid.uuid4().hex}"
@@ -471,6 +544,7 @@ def desktop_smoke_test(icon_path: Path) -> int:
     if not test_server.listen(name):
         return 2
     widget = QWidget()
+    widget.setObjectName("serverRoot")
     widget.setWindowIcon(icon)
     widget.setWindowTitle("DroidWebDisplay Server")
     widget.close()
