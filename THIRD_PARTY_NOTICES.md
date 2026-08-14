@@ -34,6 +34,15 @@ The scrcpy source is referenced as a Git submodule and the scrcpy server may be 
 
 Dependency versions are constrained in `pyproject.toml`. Release packaging should generate a resolved dependency inventory for the actual shipped environment.
 
+## Qt for Python / PySide6 Essentials
+
+- Project: Qt for Python (PySide6 Essentials)
+- Publisher: The Qt Company / Qt Project
+- Pinned version: 6.11.1
+- License: LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (or applicable commercial Qt terms)
+
+DroidWebDisplay uses the official PySide6 Qt bindings for the cross-platform desktop server manager, system-tray integration, local single-instance socket, and desktop settings UI. The packaged Windows and Linux desktop applications redistribute the Qt/PySide runtime modules selected by PyInstaller. Distributions must preserve the applicable Qt/PySide license notices and satisfy the terms of the selected license.
+
 ## TypeScript
 
 - Project: TypeScript

@@ -22,7 +22,13 @@ import uvicorn
 
 from droid_web_display.api import create_app
 from droid_web_display.config import BridgeConfig
-from droid_web_display.network_access import LAN_HTTPS, LOCAL_ONLY, FirewallManager, NetworkAccessError, NetworkConfigStore
+from droid_web_display.network_access import (
+    LAN_HTTPS,
+    LOCAL_ONLY,
+    FirewallManager,
+    NetworkAccessError,
+    NetworkConfigStore,
+)
 from droid_web_display.runtime import require_websocket_backend
 
 
@@ -32,6 +38,36 @@ WEB_UI_MARKER = "droidwebdisplay-native-single-drawer-v1"
 
 class ExistingWebServiceError(RuntimeError):
     """Raised when the configured listener belongs to an older or unrelated service."""
+
+
+class BridgeServiceRuntime:
+    """Thread-safe lifecycle handle used by the desktop host to stop Uvicorn cleanly."""
+
+    def __init__(self) -> None:
+        self._shutdown = threading.Event()
+        self._lock = threading.RLock()
+        self._server: uvicorn.Server | None = None
+
+    @property
+    def shutdown_requested(self) -> bool:
+        return self._shutdown.is_set()
+
+    def attach(self, server: uvicorn.Server) -> None:
+        with self._lock:
+            self._server = server
+            if self._shutdown.is_set():
+                server.should_exit = True
+
+    def detach(self, server: uvicorn.Server) -> None:
+        with self._lock:
+            if self._server is server:
+                self._server = None
+
+    def request_shutdown(self) -> None:
+        self._shutdown.set()
+        with self._lock:
+            if self._server is not None:
+                self._server.should_exit = True
 
 
 def _probe_host(bind_host: str) -> str:
@@ -101,7 +137,14 @@ def _bridge_config(args: argparse.Namespace, network) -> BridgeConfig:
     )
 
 
-async def _serve_once(args: argparse.Namespace, network, websocket_backend: str, *, open_browser: bool) -> bool:
+async def _serve_once(
+    args: argparse.Namespace,
+    network,
+    websocket_backend: str,
+    *,
+    open_browser: bool,
+    runtime: BridgeServiceRuntime | None = None,
+) -> bool:
     config = _bridge_config(args, network)
     config.validate()
     scheme = "https" if config.tls_enabled else "http"
@@ -117,7 +160,8 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
         return False
     if existing == "other":
         raise ExistingWebServiceError(
-            f"Port {config.bind_port} on {config.bind_host} is already in use by an older or unrelated web service. "
+            f"Port {config.bind_port} on {config.bind_host} is already in use by an older or unrelated "
+            "web service. "
             "Stop that process (or choose another port) before starting this DroidWebDisplay checkout."
         )
 
@@ -138,11 +182,21 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
         host=config.bind_host,
         port=config.bind_port,
         log_level="info",
-        ssl_certfile=str(config.tls_certificate_path) if config.tls_enabled and config.tls_certificate_path else None,
-        ssl_keyfile=str(config.tls_private_key_path) if config.tls_enabled and config.tls_private_key_path else None,
+        ssl_certfile=(
+            str(config.tls_certificate_path)
+            if config.tls_enabled and config.tls_certificate_path
+            else None
+        ),
+        ssl_keyfile=(
+            str(config.tls_private_key_path)
+            if config.tls_enabled and config.tls_private_key_path
+            else None
+        ),
     )
     server = uvicorn.Server(uvicorn_config)
     server_holder["server"] = server
+    if runtime is not None:
+        runtime.attach(server)
     print(f"DroidWebDisplay: {url}")
     print(f"Web root: {config.repo_root / 'apps' / 'web-client' / 'dist'}")
     print(f"Web UI marker: {WEB_UI_MARKER}")
@@ -168,24 +222,45 @@ async def _serve_once(args: argparse.Namespace, network, websocket_backend: str,
             browser_task.cancel()
             with suppress(asyncio.CancelledError):
                 await browser_task
-    return restart_requested
+        if runtime is not None:
+            runtime.detach(server)
+    return restart_requested and not (runtime is not None and runtime.shutdown_requested)
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the DroidWebDisplay browser service")
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--adb", help="ADB executable; defaults to bundled adb/ when present, otherwise PATH")
-    parser.add_argument("--host", help="Emergency local bind override; normally loaded from network-access.json")
+    parser.add_argument(
+        "--host",
+        help="Emergency local bind override; normally loaded from network-access.json",
+    )
     parser.add_argument("--port", type=int)
     parser.add_argument("--network-config", type=Path)
     parser.add_argument("--open-browser", action="store_true")
-    parser.add_argument("--no-browser", action="store_true", help="Do not launch the browser even if a launcher requested it")
-    parser.add_argument("--data-directory", type=Path, help="Persistent state directory (auth, network and transfer metadata)")
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not launch the browser even if a launcher requested it",
+    )
+    parser.add_argument(
+        "--data-directory",
+        type=Path,
+        help="Persistent state directory (auth, network and transfer metadata)",
+    )
     parser.add_argument("--download-directory", type=Path)
     parser.add_argument("--transfer-concurrency", type=int, default=1)
     parser.add_argument("--maximum-file-size", type=int, default=2 * 1024 * 1024 * 1024)
-    parser.add_argument("--pid-file", type=Path, help="Write the running service PID here and remove it on clean exit")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--pid-file",
+        type=Path,
+        help="Write the running service PID here and remove it on clean exit",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None, runtime: BridgeServiceRuntime | None = None) -> int:
+    args = build_parser().parse_args(argv)
     args.repo_root = args.repo_root.resolve()
     if not args.adb:
         bundled = args.repo_root / "adb" / ("adb.exe" if os.name == "nt" else "adb")
@@ -212,6 +287,8 @@ def main() -> int:
     open_browser = args.open_browser and not args.no_browser
     try:
         while True:
+            if runtime is not None and runtime.shutdown_requested:
+                return 0
             try:
                 network = store.load()
                 network.validate(require_files=network.mode == LAN_HTTPS)
@@ -220,10 +297,21 @@ def main() -> int:
                 print("Falling back to local-only access at 127.0.0.1.", file=sys.stderr)
                 network = store.reset_local_only(port=args.port or 8765)
             try:
-                restart = asyncio.run(_serve_once(args, network, websocket_backend, open_browser=open_browser))
+                restart = asyncio.run(
+                    _serve_once(
+                        args,
+                        network,
+                        websocket_backend,
+                        open_browser=open_browser,
+                        runtime=runtime,
+                    )
+                )
             except ExistingWebServiceError as exc:
                 print(f"ERROR: {exc}", file=sys.stderr)
-                print("The browser was not opened, so an older page cannot be mistaken for this checkout.", file=sys.stderr)
+                print(
+                    "The browser was not opened, so an older page cannot be mistaken for this checkout.",
+                    file=sys.stderr,
+                )
                 return 4
             except (OSError, SystemExit, ValueError) as exc:
                 if network.mode == LAN_HTTPS:
@@ -235,6 +323,8 @@ def main() -> int:
                     continue
                 print(f"ERROR: service failed to start: {exc}", file=sys.stderr)
                 return 3
+            if runtime is not None and runtime.shutdown_requested:
+                return 0
             if not restart:
                 return 0
             open_browser = False

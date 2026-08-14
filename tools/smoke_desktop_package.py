@@ -74,7 +74,9 @@ def _stop_process(process: subprocess.Popen[str], pid_file: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Launch a frozen DroidWebDisplay package and probe its web UI")
+    parser = argparse.ArgumentParser(
+        description="Launch a frozen DroidWebDisplay package and probe its web UI"
+    )
     parser.add_argument("executable", type=Path)
     parser.add_argument("--timeout", type=float, default=45.0)
     parser.add_argument("--appimage-extract-and-run", action="store_true")
@@ -103,6 +105,7 @@ def main() -> int:
 
         command = [
             str(executable),
+            "--headless",
             "--no-browser",
             "--port",
             str(port),

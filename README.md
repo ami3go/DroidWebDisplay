@@ -11,6 +11,8 @@ Browser control of an Android phone with physical and virtual displays, structur
 - Trust authority: the local PC bridge service, not the Android phone
 - Automatic-download and virtual-display HIL: PASS on Samsung SM-G980F
 
+Current `main` includes the next desktop-host update: a shared Windows/Linux Qt server manager with tray integration where supported, clean server Start/Stop/Restart/Exit, autostart controls, logs, and a headless mode. The published `v0.11.2` binaries predate this desktop-host update and retain the earlier launcher behavior.
+
 ## Install a release build
 
 For normal use, install a packaged release build. The Windows executable and Linux AppImage are self-contained; Python, Node.js, npm, and uv are not required on the target PC.
@@ -41,11 +43,13 @@ Confirm that the SHA-256 shown by `Get-FileHash` matches the line for the execut
 & $exe.FullName
 ```
 
-DroidWebDisplay starts the local bridge service and opens the browser interface automatically. Keep the DroidWebDisplay process running while using the browser UI.
+On current `main` development builds and future releases, the executable starts the DroidWebDisplay desktop host and embedded local server without a console window, then opens the browser interface. Closing the browser does not stop the server. Use **Exit DroidWebDisplay** from the server-manager window or tray menu to shut down the server cleanly.
 
-Local state is stored under `%LOCALAPPDATA%\DroidWebDisplay`. Browser downloads default to `%USERPROFILE%\Downloads\DroidWebDisplay`.
+The server manager provides Open Browser, Start/Stop, Restart, Logs, startup settings, server/network status, and Android-device status. A second launch activates the existing desktop host instead of starting another server.
 
-If Windows reports an unknown publisher for an unsigned pre-release, verify the release notes and SHA-256 checksum before deciding whether to run it. Do not bypass a checksum mismatch.
+Local state and logs are stored under `%LOCALAPPDATA%\DroidWebDisplay`. Browser downloads default to `%USERPROFILE%\Downloads\DroidWebDisplay`.
+
+If Windows reports an unknown publisher for an unsigned build, verify the release notes and SHA-256 checksum before deciding whether to run it. Do not bypass a checksum mismatch.
 
 ### Linux x86_64
 
@@ -63,13 +67,33 @@ chmod +x DroidWebDisplay-*-linux-x86_64.AppImage
 ./DroidWebDisplay-*-linux-x86_64.AppImage
 ```
 
-DroidWebDisplay starts the local bridge service and opens the browser interface automatically. If AppImage/FUSE integration is unavailable on the host, use the extraction fallback:
+On current `main` development builds and future releases, graphical Linux sessions use the same Qt desktop host as Windows. A tray/status icon is shown when the desktop environment provides compatible tray support; otherwise the server manager remains available as a normal window. Essential Start/Stop/Restart/Exit controls never depend on the tray.
+
+If AppImage/FUSE integration is unavailable on the host, use the extraction fallback:
 
 ```bash
 APPIMAGE_EXTRACT_AND_RUN=1 ./DroidWebDisplay-*-linux-x86_64.AppImage
 ```
 
-Local state is stored under `${XDG_STATE_HOME:-$HOME/.local/state}/droidwebdisplay`. Browser downloads default to `$HOME/Downloads/DroidWebDisplay`.
+If no `DISPLAY` or `WAYLAND_DISPLAY` session is available, DroidWebDisplay automatically falls back to server-only headless mode instead of attempting to initialize the GUI.
+
+Local state and logs are stored under `${XDG_STATE_HOME:-$HOME/.local/state}/droidwebdisplay`. Browser downloads default to `$HOME/Downloads/DroidWebDisplay`.
+
+## Desktop host and headless mode
+
+The browser remains the primary Android-control UI. The native desktop host only manages the PC-side server lifecycle and status.
+
+Useful commands on current `main` development builds are:
+
+```text
+DroidWebDisplay                    # desktop host + server + browser
+DroidWebDisplay --no-browser       # desktop host + server, no automatic browser
+DroidWebDisplay --start-minimized  # start minimized/to tray when available
+DroidWebDisplay --headless         # server only, no Qt desktop host
+DroidWebDisplay --headless --open-browser
+```
+
+Additional server options such as `--port 9000` are forwarded by the desktop host. See `docs/DESKTOP_HOST.md` for lifecycle, single-instance, autostart, logging, and Linux tray details.
 
 ## First run
 
@@ -123,16 +147,30 @@ Install uv using the official uv installation instructions, then from the reposi
 uv python install 3.11
 uv sync --locked --extra dev
 uv run python tools\download_server.py
-.\scripts\service.ps1
+uv run python tools\desktop_entry.py
+```
+
+For server-only development:
+
+```powershell
+uv run python tools\desktop_entry.py --headless --open-browser
 ```
 
 ### Linux / Ubuntu
+
+Install the Qt/XCB runtime libraries required by your desktop environment, then run:
 
 ```bash
 uv python install 3.11
 uv sync --locked --extra dev
 uv run python tools/download_server.py
-./scripts/service.sh
+uv run python tools/desktop_entry.py
+```
+
+For a headless Linux machine:
+
+```bash
+uv run python tools/desktop_entry.py --headless
 ```
 
 Open `http://127.0.0.1:8765/` if the browser does not open automatically.
@@ -162,6 +200,7 @@ uv run python tools\release_gate.py `
 
 ## Documentation
 
+- `docs/DESKTOP_HOST.md`
 - `docs/RUN.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY_REVIEW.md`
