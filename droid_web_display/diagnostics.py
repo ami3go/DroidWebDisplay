@@ -220,7 +220,7 @@ class DiagnosticLoggingMiddleware:
 
         try:
             await self.app(scope, receive, send_wrapper)
-        except BaseException as exc:
+        except Exception as exc:
             raised = True
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
             self.logger.exception(
@@ -308,7 +308,7 @@ class DiagnosticLoggingMiddleware:
         )
         try:
             await self.app(scope, receive_wrapper, send_wrapper)
-        except BaseException as exc:
+        except Exception as exc:
             self.logger.exception(
                 "WebSocket %s raised %s",
                 path,
