@@ -42,6 +42,7 @@ def test_controller_starts_and_stops_managed_server(tmp_path: Path, monkeypatch)
 
     def runner(argv, runtime) -> int:
         assert "--repo-root" in argv
+        assert "--log-directory" in argv
         assert "--no-browser" in argv
         assert runtime is runtime_holder[-1]
         while not runtime.shutdown_requested:
@@ -85,4 +86,5 @@ def test_server_arguments_use_persistent_desktop_paths(tmp_path: Path) -> None:
     assert arguments[arguments.index("--repo-root") + 1] == str(paths.resource_root)
     assert arguments[arguments.index("--data-directory") + 1] == str(paths.data_root)
     assert arguments[arguments.index("--download-directory") + 1] == str(paths.downloads_root)
+    assert arguments[arguments.index("--log-directory") + 1] == str(paths.logs_root)
     assert arguments[-2:] == ["--port", "9000"]
