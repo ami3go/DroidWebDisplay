@@ -57,6 +57,17 @@ jobs:
           if lock_text.count(old) != 1:
               raise SystemExit("unexpected droid-web-display uv.lock package entry")
           lock_path.write_text(lock_text.replace(old, new, 1), encoding="utf-8")
+
+          requirements_path = Path("requirements-runtime.txt")
+          requirements_text = requirements_path.read_text(encoding="utf-8")
+          old_header = "# DroidWebDisplay v0.11.2 pinned runtime environment."
+          new_header = f"# DroidWebDisplay v{version} pinned runtime environment."
+          if requirements_text.count(old_header) != 1:
+              raise SystemExit("unexpected requirements-runtime version header")
+          requirements_path.write_text(
+              requirements_text.replace(old_header, new_header, 1),
+              encoding="utf-8",
+          )
           PY
           rm .github/workflows/release-v0.11.3-prep.yml
       - name: Install Qt Linux runtime libraries
@@ -98,6 +109,9 @@ jobs:
         run: |
           npm ci --prefix packages/scrcpy-protocol
           npm ci --prefix apps/web-client
+      - name: Regenerate OpenAPI release metadata
+        run: |
+          "$UV_BIN" run python tools/generate_openapi.py
       - name: Verify release version
         run: |
           "$UV_BIN" run python -c "import droid_web_display; assert droid_web_display.__version__ == '0.11.3'"
@@ -105,7 +119,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          "$UV_BIN" run pytest -q tests/desktop/test_update_check.py tests/desktop/test_layout_regression.py
+          "$UV_BIN" run pytest -q tests/desktop/test_update_check.py tests/desktop/test_layout_regression.py tests/security/test_version_metadata.py
       - name: Run full release gate
         env:
           QT_QPA_PLATFORM: offscreen
@@ -117,6 +131,6 @@ jobs:
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION pyproject.toml uv.lock droid_web_display/__init__.py .github/workflows/release-v0.11.3-prep.yml
+          git add VERSION pyproject.toml uv.lock droid_web_display/__init__.py requirements-runtime.txt packages/bridge-api/openapi/openapi-v1.json .github/workflows/release-v0.11.3-prep.yml
           git commit -m "Prepare v0.11.3 release"
           git push origin HEAD:release/v0.11.3-prep
