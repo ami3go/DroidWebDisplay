@@ -28,3 +28,14 @@ def test_primary_open_and_exit_actions_live_outside_tabs() -> None:
     assert 'footer.setObjectName("footer")' in gui
     assert 'footer_open = QPushButton("Open DroidWebDisplay")' in gui
     assert 'footer_exit = QPushButton("Exit")' in gui
+
+def test_settings_include_only_minimal_update_checker() -> None:
+    gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
+    assert '_make_card("Updates"' in gui or '"Updates",' in gui
+    assert 'QPushButton("Check for updates")' in gui
+    assert 'QPushButton("Open release page")' in gui
+    assert 'self._update_channel.addItems(["Stable", "Pre-release"])' in gui
+    assert 'Configuration backup' not in gui
+    assert 'Tray notifications' not in gui
+    assert 'Live event timeline' not in gui
+
