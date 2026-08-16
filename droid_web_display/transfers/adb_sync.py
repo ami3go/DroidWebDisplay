@@ -76,8 +76,11 @@ class AdbSyncClient:
         finally:
             writer.close()
             try:
-                await writer.wait_closed()
-            except (ConnectionError, OSError):
+                # Bounded: a peer that has stopped reading never acknowledges
+                # the close, and an unbounded wait here would swallow the very
+                # timeout that ended the transfer.
+                await asyncio.wait_for(writer.wait_closed(), self.timeout)
+            except (ConnectionError, OSError, asyncio.TimeoutError):
                 pass
 
     async def list(self, serial: str, remote_path: str) -> list[AdbSyncEntry]:
@@ -172,11 +175,11 @@ class AdbSyncClient:
                 with local_path.open("rb") as source:
                     while chunk := source.read(self.chunk_size):
                         writer.write(b"DATA" + struct.pack("<I", len(chunk)) + chunk)
-                        await writer.drain()
+                        await self._drain(writer)
                         transferred += len(chunk)
                         await self._notify(progress, transferred, total)
                 writer.write(b"DONE" + struct.pack("<I", int(time.time())))
-                await writer.drain()
+                await self._drain(writer)
                 command = await self._read_exactly(reader, 4)
                 status = struct.unpack("<I", await self._read_exactly(reader, 4))[0]
                 if command == b"FAIL":
@@ -191,7 +194,7 @@ class AdbSyncClient:
     async def _host_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, service: str) -> None:
         payload = service.encode("utf-8")
         writer.write(f"{len(payload):04X}".encode("ascii") + payload)
-        await writer.drain()
+        await self._drain(writer)
         status = await self._read_exactly(reader, 4)
         if status == b"OKAY":
             return
@@ -209,7 +212,7 @@ class AdbSyncClient:
         if len(command) != 4:
             raise ValueError("ADB Sync command must be four bytes")
         writer.write(command + struct.pack("<I", len(payload)) + payload)
-        await writer.drain()
+        await self._drain(writer)
 
     async def _read_sync_failure(self, reader: asyncio.StreamReader) -> AdbSyncError:
         length = struct.unpack("<I", await self._read_exactly(reader, 4))[0]
@@ -226,6 +229,21 @@ class AdbSyncClient:
             ) from exc
         except asyncio.TimeoutError as exc:
             raise AdbSyncError("ADB Sync operation timed out", details={"length": length, "timeout": self.timeout}) from exc
+
+    async def _drain(self, writer: asyncio.StreamWriter) -> None:
+        """Flush with a timeout.
+
+        Without one, a device that stops reading wedges the write side forever
+        and, because a transfer holds the manager semaphore for its whole
+        duration, blocks every queued transfer behind it.
+        """
+        try:
+            await asyncio.wait_for(writer.drain(), self.timeout)
+        except asyncio.TimeoutError as exc:
+            raise AdbSyncError(
+                "ADB Sync write timed out; the device stopped accepting data",
+                details={"timeout": self.timeout},
+            ) from exc
 
     @staticmethod
     async def _notify(callback: ProgressCallback | None, transferred: int, total: int | None) -> None:
