@@ -194,6 +194,7 @@ class ServerWindow(QMainWindow):
         )
         self._refresh_count = 0
         self._status_probe_running = False
+        self._pending_force_refresh = False
         self._status_worker: _StatusProbe | None = None
         self._support_workers: set[_TaskWorker] = set()
         self._thread_pool = QThreadPool.globalInstance()
@@ -602,6 +603,7 @@ class ServerWindow(QMainWindow):
         def completed(result: object) -> None:
             self._check_updates_button.setEnabled(True)
             if not isinstance(result, ReleaseInfo):
+                self._open_release_button.setEnabled(bool(self._latest_release_url))
                 self._update_status.setText("GitHub returned an unexpected release result.")
                 return
             self._latest_release_url = result.url
@@ -622,6 +624,9 @@ class ServerWindow(QMainWindow):
 
         def failed(message: str) -> None:
             self._check_updates_button.setEnabled(True)
+            # A failed re-check does not invalidate a release URL already
+            # fetched, so keep it reachable instead of stranding the button.
+            self._open_release_button.setEnabled(bool(self._latest_release_url))
             self._update_status.setText(f"Update check failed: {message}")
 
         self._start_support_task(
@@ -838,6 +843,7 @@ class ServerWindow(QMainWindow):
         self._status_worker = None
         if isinstance(snapshot, ServerSnapshot):
             self._apply_snapshot(snapshot)
+        self._run_pending_force_refresh()
 
     def _status_failed(self, message: str) -> None:
         self._status_probe_running = False
@@ -845,9 +851,20 @@ class ServerWindow(QMainWindow):
         self._set_status_visual(ServerState.ERROR, "Status unavailable")
         self._error_value.setText(message)
         self._set_health(self._health_server, "error", "● Status unavailable")
+        self._run_pending_force_refresh()
+
+    def _run_pending_force_refresh(self) -> None:
+        if not self._pending_force_refresh:
+            return
+        self._pending_force_refresh = False
+        self._refresh(force=True)
 
     def _refresh(self, *, force: bool = False) -> None:
         if self._status_probe_running:
+            # A probe can outlast the timer interval, so dropping a forced
+            # refresh here would silently discard the user's health-check click
+            # and the refreshes that follow start/stop/restart. Queue it.
+            self._pending_force_refresh = self._pending_force_refresh or force
             return
         self._refresh_count += 1
         include_device = force or self._refresh_count % 3 == 1
