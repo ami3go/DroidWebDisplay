@@ -405,9 +405,13 @@ class NetworkPolicy:
 
     @property
     def allowed_origins(self) -> set[str]:
+        scheme = "https" if self.config.mode == LAN_HTTPS else "http"
+        # Loopback stays reachable in every mode, so its origins have to follow
+        # the scheme the server actually serves or same-origin requests from the
+        # host machine are rejected.
         values = {
-            f"http://127.0.0.1:{self.config.port}",
-            f"http://localhost:{self.config.port}",
+            f"{scheme}://127.0.0.1:{self.config.port}",
+            f"{scheme}://localhost:{self.config.port}",
         }
         if self.config.mode == LAN_HTTPS:
             values.add(f"https://{self.config.bind_address}:{self.config.port}")
