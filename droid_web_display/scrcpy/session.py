@@ -39,6 +39,13 @@ from .virtual_display import (
 Connector = Callable[[str, int], Awaitable[tuple[asyncio.StreamReader, asyncio.StreamWriter]]]
 ArtifactLoader = Callable[[], ScrcpyArtifact]
 
+TERMINAL_SESSION_STATES = {
+    SessionState.STOPPED,
+    SessionState.DISCONNECTED,
+    SessionState.FAILED,
+}
+MAX_RETAINED_TERMINATED_SESSIONS = 20
+
 
 
 class PrefixedStreamReader:
@@ -574,7 +581,28 @@ class SessionManager:
         session.stopped_at = time.time()
         async with self._lock:
             self._serial_index.pop(session.serial, None)
+            self._prune_terminated()
         return session
+
+    def _prune_terminated(self) -> None:
+        """Cap how many finished sessions stay in memory.
+
+        Terminated sessions are kept so clients can still read their final
+        state, but every one of them is re-serialised into the health,
+        diagnostics and /ws/v1/events payloads, so the backlog has to be
+        bounded rather than growing for the lifetime of the process.
+        """
+        terminated = [
+            item
+            for item in self._sessions.values()
+            if item.state in TERMINAL_SESSION_STATES
+        ]
+        excess = len(terminated) - MAX_RETAINED_TERMINATED_SESSIONS
+        if excess <= 0:
+            return
+        terminated.sort(key=lambda item: item.stopped_at or item.created_at)
+        for item in terminated[:excess]:
+            self._sessions.pop(item.session_id, None)
 
     async def _cleanup_session_resources(self, session: ScrcpySession) -> None:
         if session.options.display_mode == DisplayMode.VIRTUAL:
