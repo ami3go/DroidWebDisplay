@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Any
+from typing import Any, Sequence
 
 from droid_web_display.adb.client import AdbClient
 from droid_web_display.errors import (
@@ -28,6 +28,39 @@ from droid_web_display.transfers.paths import join_android_path, normalize_andro
 _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 
+# Directories the OS runs code from on login/boot. A file pulled off the phone
+# must never land in one of these.
+_AUTORUN_DIRECTORY_NAMES = frozenset(
+    {
+        "autostart",
+        "cron.d",
+        "cron.daily",
+        "cron.hourly",
+        "cron.monthly",
+        "cron.weekly",
+        "init.d",
+        "systemd",
+        "launchagents",
+        "launchdaemons",
+        "startup",
+        "start menu",
+        ".ssh",
+        ".gnupg",
+    }
+)
+_SYSTEM_PATH_PREFIXES = (
+    ("/", "etc"),
+    ("/", "boot"),
+    ("/", "bin"),
+    ("/", "sbin"),
+    ("/", "lib"),
+    ("/", "lib64"),
+    ("/", "usr"),
+    ("/", "proc"),
+    ("/", "sys"),
+    ("/", "var"),
+)
+
 
 class TransferManager:
     def __init__(
@@ -37,6 +70,7 @@ class TransferManager:
         *,
         data_directory: Path,
         destination_profiles: dict[str, Path],
+        allowed_destination_roots: Sequence[Path] | None = None,
         concurrency: int = 1,
         maximum_queue_length: int = 100,
         maximum_file_size: int = 2 * 1024 * 1024 * 1024,
@@ -49,6 +83,9 @@ class TransferManager:
         self.upload_spool = data_directory / "upload-spool"
         self.state_file = data_directory / "transfers.json"
         self.destination_profiles = {key: value.resolve() for key, value in destination_profiles.items()}
+        self.allowed_destination_roots = (
+            None if allowed_destination_roots is None else [Path(root).expanduser().resolve() for root in allowed_destination_roots]
+        )
         self.maximum_queue_length = maximum_queue_length
         self.maximum_file_size = maximum_file_size
         self._semaphore = asyncio.Semaphore(concurrency)
@@ -294,7 +331,13 @@ class TransferManager:
     def _schedule(self, record: TransferRecord) -> None:
         task = asyncio.create_task(self._execute(record), name=f"transfer-{record.transfer_id}")
         self._tasks[record.transfer_id] = task
-        task.add_done_callback(lambda _: self._tasks.pop(record.transfer_id, None))
+        task.add_done_callback(lambda finished: self._discard_task(record.transfer_id, finished))
+
+    def _discard_task(self, transfer_id: str, finished: asyncio.Task) -> None:
+        # A retry can register a new task under the same id before this callback
+        # runs; only drop the entry if it still points at the task that ended.
+        if self._tasks.get(transfer_id) is finished:
+            self._tasks.pop(transfer_id, None)
 
     async def _execute(self, record: TransferRecord) -> None:
         try:
@@ -351,9 +394,15 @@ class TransferManager:
         record.size = expected
         record.verification = "size-match"
         await self._complete(record)
+        # The transfer itself is done and verified past this point. Housekeeping
+        # failures must not drag the record back out of COMPLETED, or the
+        # auto-download monitor will re-queue an upload that already landed.
         media_scan = getattr(self.adb, "media_scan", None)
         if callable(media_scan):
-            await media_scan(record.serial, destination)
+            try:
+                await media_scan(record.serial, destination)
+            except Exception as exc:
+                record.add_event(time.time(), "media_scan_failed", error=str(exc))
         local.unlink(missing_ok=True)
         record.internal_local_path = None
         await self._persist()
@@ -459,7 +508,40 @@ class TransferManager:
         path = raw.resolve()
         if path.exists() and not path.is_dir():
             raise TransferValidationError("custom destination is not a folder", details={"destinationPath": str(path)})
+        self._assert_destination_allowed(path)
         return path
+
+    def _assert_destination_allowed(self, path: Path) -> None:
+        """Reject destinations that would turn a transfer into code execution.
+
+        A LAN client authenticated with the PIN is not necessarily the PC
+        owner, so a device-sourced file must not be writable into a directory
+        the OS auto-executes from. When explicit roots are configured the check
+        is a strict allowlist instead.
+        """
+        if self.allowed_destination_roots is not None:
+            if not any(path == root or root in path.parents for root in self.allowed_destination_roots):
+                raise TransferValidationError(
+                    "custom destination is outside the allowed download roots",
+                    details={
+                        "destinationPath": str(path),
+                        "allowedRoots": [str(root) for root in self.allowed_destination_roots],
+                    },
+                )
+            return
+        blocked = {part.lower() for part in path.parts} & _AUTORUN_DIRECTORY_NAMES
+        if blocked:
+            raise TransferValidationError(
+                "custom destination is a startup or system folder",
+                details={"destinationPath": str(path), "blockedComponent": sorted(blocked)[0]},
+            )
+        lowered_parts = tuple(part.lower() for part in path.parts)
+        for prefix in _SYSTEM_PATH_PREFIXES:
+            if lowered_parts[: len(prefix)] == prefix:
+                raise TransferValidationError(
+                    "custom destination is a system folder",
+                    details={"destinationPath": str(path)},
+                )
 
     async def _load_state(self) -> None:
         if not self.state_file.is_file():
