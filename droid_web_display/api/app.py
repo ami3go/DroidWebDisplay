@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 import asyncio
 import json
@@ -262,6 +262,22 @@ async def get_container(request: Request) -> ServiceContainer:
     return request.app.state.container
 
 
+async def _await_ws_disconnect(websocket: WebSocket) -> None:
+    """Resolve once the peer goes away.
+
+    A send-only websocket loop never observes ``websocket.disconnect`` because
+    that message stays queued on the receive side, so the loop has to drain it
+    explicitly to notice a closed tab.
+    """
+    try:
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                return
+    except Exception:
+        return
+
+
 def _error_response(exc: BridgeError) -> JSONResponse:
     status_map = {
         "device_not_found": 404,
@@ -392,6 +408,22 @@ def create_app(
     def clear_auth_cookie(response: Response) -> None:
         response.delete_cookie(AUTH_COOKIE_NAME, path="/", samesite="strict", secure=active_network_config.mode == LAN_HTTPS)
 
+    def client_key(request: Request) -> str:
+        return request.client.host if request.client else "loopback"
+
+    def current_session(request: Request) -> dict | None:
+        """The authenticated session, or None when authentication is disabled.
+
+        security_middleware only sets request.state.auth_session when
+        authentication_required is true, so every consumer must tolerate it
+        being absent rather than reading the attribute unconditionally.
+        """
+        return getattr(request.state, "auth_session", None)
+
+    def actor_session_id(request: Request) -> str:
+        session = current_session(request)
+        return str(session["sessionId"]) if session is not None else "auth-disabled"
+
     @app.middleware("http")
     async def security_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
         path = request.url.path
@@ -474,7 +506,8 @@ def create_app(
     async def auth_setup(body: AuthSetupRequest, request: Request, response: Response) -> dict:
         if body.pin != body.confirm_pin:
             raise AuthError("PIN confirmation does not match", code="pin_validation")
-        grant = resolved_auth.setup(
+        grant = await asyncio.to_thread(
+            resolved_auth.setup,
             body.pin,
             duration=body.duration,
             custom_seconds=body.custom_seconds,
@@ -488,12 +521,13 @@ def create_app(
 
     @app.post("/api/v1/auth/login")
     async def auth_login(body: AuthLoginRequest, request: Request, response: Response) -> dict:
-        grant = resolved_auth.login(
+        grant = await asyncio.to_thread(
+            resolved_auth.login,
             body.pin,
             duration=body.duration,
             custom_seconds=body.custom_seconds,
             user_agent=request.headers.get("user-agent", "Unknown browser"),
-            client_key=request.client.host if request.client else "loopback",
+            client_key=client_key(request),
             label=body.label,
             client_ip=request.client.host if request.client else None,
             access_mode="lan" if active_network_config.mode == LAN_HTTPS else "local",
@@ -503,28 +537,32 @@ def create_app(
 
     @app.post("/api/v1/auth/logout")
     async def auth_logout(request: Request, response: Response) -> dict:
-        session = request.state.auth_session
-        resolved_auth.logout(session["sessionId"])
+        session = current_session(request)
+        if session is not None:
+            resolved_auth.logout(session["sessionId"])
         clear_auth_cookie(response)
         return {"authenticated": False, "status": "logged-out"}
 
     @app.get("/api/v1/auth/sessions")
     async def auth_sessions(request: Request) -> dict:
-        session = request.state.auth_session
-        return {"sessions": resolved_auth.list_sessions(session["sessionId"]), "trustModel": "pc-local"}
+        return {"sessions": resolved_auth.list_sessions(actor_session_id(request)), "trustModel": "pc-local"}
 
     @app.delete("/api/v1/auth/sessions/{session_id}")
     async def auth_revoke_session(session_id: str, request: Request, response: Response) -> dict:
-        current = request.state.auth_session
-        revoked = resolved_auth.revoke(session_id, actor_session_id=current["sessionId"])
-        if session_id == current["sessionId"]:
+        actor = actor_session_id(request)
+        revoked = resolved_auth.revoke(session_id, actor_session_id=actor)
+        if session_id == actor:
             clear_auth_cookie(response)
-        return {"revoked": revoked, "sessionId": session_id, "currentSessionRevoked": session_id == current["sessionId"]}
+        return {"revoked": revoked, "sessionId": session_id, "currentSessionRevoked": session_id == actor}
 
     @app.post("/api/v1/auth/sessions/revoke-all")
     async def auth_revoke_all(body: AuthPinRequest, request: Request, response: Response) -> dict:
-        current = request.state.auth_session
-        count = resolved_auth.revoke_all(body.pin, actor_session_id=current["sessionId"])
+        count = await asyncio.to_thread(
+            resolved_auth.revoke_all,
+            body.pin,
+            actor_session_id=actor_session_id(request),
+            client_key=client_key(request),
+        )
         clear_auth_cookie(response)
         return {"revoked": count, "authenticated": False}
 
@@ -532,8 +570,13 @@ def create_app(
     async def auth_change_pin(body: AuthChangePinRequest, request: Request, response: Response) -> dict:
         if body.new_pin != body.confirm_pin:
             raise AuthError("PIN confirmation does not match", code="pin_validation")
-        current = request.state.auth_session
-        resolved_auth.change_pin(body.current_pin, body.new_pin, actor_session_id=current["sessionId"])
+        await asyncio.to_thread(
+            resolved_auth.change_pin,
+            body.current_pin,
+            body.new_pin,
+            actor_session_id=actor_session_id(request),
+            client_key=client_key(request),
+        )
         clear_auth_cookie(response)
         return {"changed": True, "authenticated": False, "sessionsRevoked": True}
 
@@ -679,7 +722,8 @@ def create_app(
                 selected = await container.manager.select_device(body.serial)
                 if (selected.sdk or 0) < 29:
                     raise HTTPException(status_code=422, detail="Virtual Display mode requires Android API 29 or newer")
-                assert requested_virtual_options is not None
+                if requested_virtual_options is None:
+                    raise ValueError("virtualDisplay configuration is required in Virtual Display mode")
                 if requested_virtual_options.start_app and not await container.adb.package_installed(
                     selected.serial, requested_virtual_options.start_app
                 ):
@@ -975,8 +1019,10 @@ def create_app(
 
     @app.post("/api/v1/network/validate")
     async def network_validate(body: NetworkConfigRequest, request: Request) -> dict:
-        if not body.current_pin or not resolved_auth.verify_pin(body.current_pin):
-            resolved_auth.audit_event("network-config-validation-rejected", actorSessionId=request.state.auth_session["sessionId"])
+        if not body.current_pin or not await asyncio.to_thread(
+            resolved_auth.verify_pin, body.current_pin, client_key=client_key(request)
+        ):
+            resolved_auth.audit_event("network-config-validation-rejected", actorSessionId=actor_session_id(request))
             raise AuthError("Invalid current PIN", code="invalid_pin")
         config_value, certificate_info = network_config_from_request(body, generate=False)
         resolved_auth.audit_event("network-config-validated", mode=config_value.mode, bindAddress=config_value.bind_address)
@@ -989,8 +1035,10 @@ def create_app(
 
     @app.post("/api/v1/network/apply")
     async def network_apply(body: NetworkConfigRequest, request: Request, background_tasks: BackgroundTasks) -> dict:
-        if not body.current_pin or not resolved_auth.verify_pin(body.current_pin):
-            resolved_auth.audit_event("network-config-apply-rejected", actorSessionId=request.state.auth_session["sessionId"])
+        if not body.current_pin or not await asyncio.to_thread(
+            resolved_auth.verify_pin, body.current_pin, client_key=client_key(request)
+        ):
+            resolved_auth.audit_event("network-config-apply-rejected", actorSessionId=actor_session_id(request))
             raise AuthError("Invalid current PIN", code="invalid_pin")
         config_value, certificate_info = network_config_from_request(body, generate=True)
         previous = resolved_network_store.load()
@@ -1005,7 +1053,7 @@ def create_app(
             bindAddress=config_value.bind_address,
             port=config_value.port,
         )
-        revoked = resolved_auth.revoke_all_for_reason("network-mode-changed", actor_session_id=request.state.auth_session["sessionId"])
+        revoked = resolved_auth.revoke_all_for_reason("network-mode-changed", actor_session_id=actor_session_id(request))
         restart_callback = getattr(app.state, "request_restart", None)
         if callable(restart_callback):
             background_tasks.add_task(restart_callback)
@@ -1021,13 +1069,13 @@ def create_app(
 
     @app.post("/api/v1/network/disable")
     async def network_disable(body: NetworkPinRequest, request: Request, background_tasks: BackgroundTasks) -> dict:
-        if not resolved_auth.verify_pin(body.current_pin):
+        if not await asyncio.to_thread(resolved_auth.verify_pin, body.current_pin, client_key=client_key(request)):
             raise AuthError("Invalid current PIN", code="invalid_pin")
         previous = resolved_network_store.load()
         if previous.firewall.manage_rule:
             resolved_firewall.apply(previous, remove=True)
         local = resolved_network_store.reset_local_only(port=previous.port)
-        revoked = resolved_auth.revoke_all_for_reason("lan-access-disabled", actor_session_id=request.state.auth_session["sessionId"])
+        revoked = resolved_auth.revoke_all_for_reason("lan-access-disabled", actor_session_id=actor_session_id(request))
         resolved_auth.audit_event("lan-access-disabled", port=local.port)
         restart_callback = getattr(app.state, "request_restart", None)
         if callable(restart_callback):
@@ -1121,8 +1169,9 @@ def create_app(
         await websocket.accept()
         container: ServiceContainer = websocket.app.state.container
         previous = ""
+        disconnected = asyncio.create_task(_await_ws_disconnect(websocket))
         try:
-            while True:
+            while not disconnected.done():
                 payload = {
                     "type": "bridge-snapshot",
                     "phase": 9,
@@ -1134,8 +1183,13 @@ def create_app(
                 if encoded != previous:
                     await websocket.send_json(payload)
                     previous = encoded
-                await asyncio.sleep(0.5)
+                await asyncio.wait({disconnected}, timeout=0.5)
         except Exception:
+            pass
+        finally:
+            disconnected.cancel()
+            with suppress(asyncio.CancelledError):
+                await disconnected
             if websocket.client_state != WebSocketState.DISCONNECTED:
                 await close_ws(websocket, 1000, "events closed")
 
