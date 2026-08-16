@@ -224,6 +224,7 @@ export class TransferController {
                     this.#sortKey = key;
                     this.#sortDirection = "ascending";
                 }
+                this.#lastSelectedIndex = null;
                 this.renderStorage(this.#currentEntries);
             });
         }
@@ -464,8 +465,18 @@ export class TransferController {
             button.setAttribute("aria-sort", active ? this.#sortDirection : "none");
             const label = button.dataset.label ?? button.textContent?.replace(/[▲▼]/g, "").trim() ?? "";
             button.dataset.label = label;
-            button.textContent = active ? `${label} ${this.#sortDirection === "ascending" ? "▲" : "▼"}` : label;
+            this.setSortHeaderLabel(button, active ? `${label} ${this.#sortDirection === "ascending" ? "▲" : "▼"}` : label);
         }
+    }
+    setSortHeaderLabel(button, text) {
+        const textNodes = [...button.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE);
+        if (textNodes.length === 0) {
+            button.prepend(document.createTextNode(text));
+            return;
+        }
+        textNodes[0].textContent = text;
+        for (const extra of textNodes.slice(1))
+            extra.remove();
     }
     showContextMenu(clientX, clientY, target) {
         this.#contextTarget = target;

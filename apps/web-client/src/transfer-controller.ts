@@ -227,6 +227,10 @@ export class TransferController {
           this.#sortKey = key;
           this.#sortDirection = "ascending";
         }
+        // The anchor indexes into the rendered order, which is about to
+        // change; keeping it would make the next shift-click select rows the
+        // user never clicked.
+        this.#lastSelectedIndex = null;
         this.renderStorage(this.#currentEntries);
       });
     }
@@ -467,8 +471,21 @@ export class TransferController {
       button.setAttribute("aria-sort", active ? this.#sortDirection : "none");
       const label = button.dataset.label ?? button.textContent?.replace(/[▲▼]/g, "").trim() ?? "";
       button.dataset.label = label;
-      button.textContent = active ? `${label} ${this.#sortDirection === "ascending" ? "▲" : "▼"}` : label;
+      this.setSortHeaderLabel(button, active ? `${label} ${this.#sortDirection === "ascending" ? "▲" : "▼"}` : label);
     }
+  }
+
+  private setSortHeaderLabel(button: HTMLButtonElement, text: string): void {
+    // Rewrite only the text nodes. Assigning textContent would drop the column
+    // resizer the drawer appends into these same buttons, permanently killing
+    // column resizing for the rest of the session.
+    const textNodes = [...button.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE);
+    if (textNodes.length === 0) {
+      button.prepend(document.createTextNode(text));
+      return;
+    }
+    textNodes[0].textContent = text;
+    for (const extra of textNodes.slice(1)) extra.remove();
   }
 
   private showContextMenu(clientX: number, clientY: number, target: AndroidStorageEntryDto | null): void {

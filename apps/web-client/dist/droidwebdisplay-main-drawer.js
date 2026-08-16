@@ -159,7 +159,10 @@
     });
     window.addEventListener('resize', () => {
       const current = Number.parseInt(get(DRAWER_WIDTH_KEY, ''), 10);
-      if (Number.isFinite(current)) applyDrawerWidth(current, true);
+      // Re-clamp to the new viewport for display only. Persisting here would
+      // overwrite a wider saved preference the moment the window is narrowed,
+      // and it could never be recovered by widening the window again.
+      if (Number.isFinite(current)) applyDrawerWidth(current, false);
     });
   }
   function loadExplorerColumnState() {
