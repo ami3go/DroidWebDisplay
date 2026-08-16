@@ -119,17 +119,28 @@ class AuthService:
             if self.configured:
                 raise AuthError("PIN is already configured", code="already_configured")
             pin = self.validate_pin(pin)
+            previous_pin = self._state.get("pin")
+            previous_sessions = list(self._state.get("sessions", []))
+            previous_audit = list(self._state.get("audit", []))
             self._state["pin"] = self._hash_pin(pin)
             self._audit("pin-configured")
-            grant = self._create_session(
-                duration=duration,
-                custom_seconds=custom_seconds,
-                user_agent=user_agent,
-                label=label,
-                client_ip=client_ip,
-                access_mode=access_mode,
-            )
-            self._persist()
+            try:
+                grant = self._create_session(
+                    duration=duration,
+                    custom_seconds=custom_seconds,
+                    user_agent=user_agent,
+                    label=label,
+                    client_ip=client_ip,
+                    access_mode=access_mode,
+                )
+                self._persist()
+            except Exception:
+                # Never leave the service "configured" in memory without a
+                # persisted PIN: first-run setup would be permanently blocked.
+                self._state["pin"] = previous_pin
+                self._state["sessions"] = previous_sessions
+                self._state["audit"] = previous_audit
+                raise
             return grant
 
     def login(
@@ -234,9 +245,9 @@ class AuthService:
             self._persist()
             return True
 
-    def revoke_all(self, pin: str, *, actor_session_id: str) -> int:
+    def revoke_all(self, pin: str, *, actor_session_id: str, client_key: str | None = None) -> int:
         with self._lock:
-            if not self._verify_pin(pin):
+            if not self._verify_pin_guarded(pin, client_key):
                 self._audit("global-revocation-rejected", actorSessionId=actor_session_id)
                 raise AuthError("Invalid PIN", code="invalid_pin")
             now = self.clock()
@@ -250,9 +261,9 @@ class AuthService:
             self._persist()
             return count
 
-    def change_pin(self, current_pin: str, new_pin: str, *, actor_session_id: str) -> None:
+    def change_pin(self, current_pin: str, new_pin: str, *, actor_session_id: str, client_key: str | None = None) -> None:
         with self._lock:
-            if not self._verify_pin(current_pin):
+            if not self._verify_pin_guarded(current_pin, client_key):
                 self._audit("pin-change-rejected", actorSessionId=actor_session_id)
                 raise AuthError("Invalid current PIN", code="invalid_pin")
             new_pin = self.validate_pin(new_pin)
@@ -269,9 +280,9 @@ class AuthService:
         with self._lock:
             return list(self._state.get("audit", []))[-max(1, min(limit, AUDIT_LIMIT)):][::-1]
 
-    def verify_pin(self, pin: str) -> bool:
+    def verify_pin(self, pin: str, *, client_key: str | None = None) -> bool:
         with self._lock:
-            return self._verify_pin(pin)
+            return self._verify_pin_guarded(pin, client_key)
 
     def revoke_all_for_reason(self, reason: str, *, actor_session_id: str | None = None) -> int:
         with self._lock:
@@ -384,6 +395,21 @@ class AuthService:
             return False
         actual = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, iterations, dklen=len(expected))
         return hmac.compare_digest(actual, expected)
+
+    def _verify_pin_guarded(self, pin: str, client_key: str | None) -> bool:
+        """Verify a PIN under the same lockout that protects login().
+
+        Every PIN check reachable from the API must be rate limited, otherwise
+        an already-authenticated client can use it as an unthrottled oracle.
+        """
+        if client_key is None:
+            return self._verify_pin(pin)
+        self._check_lockout(client_key)
+        if self._verify_pin(pin):
+            self._attempts.pop(client_key, None)
+            return True
+        self._record_failure(client_key)
+        return False
 
     @staticmethod
     def _token_digest(token: str) -> str:
