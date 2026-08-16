@@ -18,6 +18,7 @@ class DeviceState(StrEnum):
     AUTHORIZING = "authorizing"
     CONNECTING = "connecting"
     DETACHED = "detached"
+    NO_PERMISSIONS = "no permissions"
     UNKNOWN = "unknown"
 
 
