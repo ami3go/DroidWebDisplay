@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Any, Sequence
+from typing import Any
 
 from droid_web_display.adb.client import AdbClient
 from droid_web_display.errors import (
@@ -48,17 +48,27 @@ _AUTORUN_DIRECTORY_NAMES = frozenset(
         ".gnupg",
     }
 )
-_SYSTEM_PATH_PREFIXES = (
-    ("/", "etc"),
-    ("/", "boot"),
-    ("/", "bin"),
-    ("/", "sbin"),
-    ("/", "lib"),
-    ("/", "lib64"),
-    ("/", "usr"),
-    ("/", "proc"),
-    ("/", "sys"),
-    ("/", "var"),
+# Top-level directories owned by the OS, matched directly under the filesystem
+# root (POSIX "/", or a Windows drive anchor such as "c:\\").
+_SYSTEM_ROOT_NAMES = frozenset(
+    {
+        "etc",
+        "boot",
+        "bin",
+        "sbin",
+        "lib",
+        "lib64",
+        "usr",
+        "proc",
+        "sys",
+        "var",
+        "windows",
+        "winnt",
+        "program files",
+        "program files (x86)",
+        "programdata",
+        "system volume information",
+    }
 )
 
 
@@ -70,7 +80,6 @@ class TransferManager:
         *,
         data_directory: Path,
         destination_profiles: dict[str, Path],
-        allowed_destination_roots: Sequence[Path] | None = None,
         concurrency: int = 1,
         maximum_queue_length: int = 100,
         maximum_file_size: int = 2 * 1024 * 1024 * 1024,
@@ -83,9 +92,6 @@ class TransferManager:
         self.upload_spool = data_directory / "upload-spool"
         self.state_file = data_directory / "transfers.json"
         self.destination_profiles = {key: value.resolve() for key, value in destination_profiles.items()}
-        self.allowed_destination_roots = (
-            None if allowed_destination_roots is None else [Path(root).expanduser().resolve() for root in allowed_destination_roots]
-        )
         self.maximum_queue_length = maximum_queue_length
         self.maximum_file_size = maximum_file_size
         self._semaphore = asyncio.Semaphore(concurrency)
@@ -516,32 +522,22 @@ class TransferManager:
 
         A LAN client authenticated with the PIN is not necessarily the PC
         owner, so a device-sourced file must not be writable into a directory
-        the OS auto-executes from. When explicit roots are configured the check
-        is a strict allowlist instead.
+        the OS auto-executes from.
         """
-        if self.allowed_destination_roots is not None:
-            if not any(path == root or root in path.parents for root in self.allowed_destination_roots):
-                raise TransferValidationError(
-                    "custom destination is outside the allowed download roots",
-                    details={
-                        "destinationPath": str(path),
-                        "allowedRoots": [str(root) for root in self.allowed_destination_roots],
-                    },
-                )
-            return
-        blocked = {part.lower() for part in path.parts} & _AUTORUN_DIRECTORY_NAMES
+        lowered_parts = tuple(part.lower() for part in path.parts)
+        blocked = set(lowered_parts) & _AUTORUN_DIRECTORY_NAMES
         if blocked:
             raise TransferValidationError(
                 "custom destination is a startup or system folder",
-                details={"destinationPath": str(path), "blockedComponent": sorted(blocked)[0]},
+                details={"destinationPath": str(path), "blockedComponent": min(blocked)},
             )
-        lowered_parts = tuple(part.lower() for part in path.parts)
-        for prefix in _SYSTEM_PATH_PREFIXES:
-            if lowered_parts[: len(prefix)] == prefix:
-                raise TransferValidationError(
-                    "custom destination is a system folder",
-                    details={"destinationPath": str(path)},
-                )
+        # parts[0] is the filesystem anchor: "/" on POSIX, a drive root such as
+        # "C:\\" on Windows. Anything named directly beneath it is OS-owned.
+        if len(lowered_parts) >= 2 and lowered_parts[1] in _SYSTEM_ROOT_NAMES:
+            raise TransferValidationError(
+                "custom destination is a system folder",
+                details={"destinationPath": str(path), "blockedComponent": lowered_parts[1]},
+            )
 
     async def _load_state(self) -> None:
         if not self.state_file.is_file():

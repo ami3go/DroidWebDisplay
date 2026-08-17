@@ -21,9 +21,10 @@ async def _terminate(process: asyncio.subprocess.Process) -> None:
     if process.returncode is not None:
         return
     try:
+        # ProcessLookupError (already reaped) is an OSError subclass.
         process.kill()
-    except (OSError, ProcessLookupError):
-        return
+    except OSError:
+        pass
     try:
         await asyncio.shield(process.wait())
     except asyncio.CancelledError:
@@ -124,6 +125,14 @@ class AdbClient:
             raise AdbCommandError(
                 f"ADB command timed out: {' '.join(argv)}",
                 details={"argv": list(argv), "timeout": timeout or self.command_timeout},
+            ) from exc
+        except OSError as exc:
+            # A pipe failure part-way through a command still means ADB is
+            # unusable, and callers only handle the bridge error type.
+            await _terminate(process)
+            raise AdbUnavailableError(
+                f"Unable to communicate with ADB: {exc}",
+                details={"executable": executable},
             ) from exc
         except BaseException:
             # Cancellation (and any other failure while waiting) must still reap

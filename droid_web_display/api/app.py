@@ -1171,21 +1171,22 @@ def create_app(
         previous = ""
         disconnected = asyncio.create_task(_await_ws_disconnect(websocket))
         try:
-            while not disconnected.done():
-                payload = {
-                    "type": "bridge-snapshot",
-                    "phase": 9,
-                    "sessions": [item.to_dict() for item in container.manager.list_sessions()],
-                    "transfers": [item.to_dict() for item in container.transfers.list_records()],
-                    "autoDownload": container.auto_download.snapshot(),
-                }
-                encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-                if encoded != previous:
-                    await websocket.send_json(payload)
-                    previous = encoded
-                await asyncio.wait({disconnected}, timeout=0.5)
-        except Exception:
-            pass
+            with suppress(Exception):
+                while True:
+                    payload = {
+                        "type": "bridge-snapshot",
+                        "phase": 9,
+                        "sessions": [item.to_dict() for item in container.manager.list_sessions()],
+                        "transfers": [item.to_dict() for item in container.transfers.list_records()],
+                        "autoDownload": container.auto_download.snapshot(),
+                    }
+                    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                    if encoded != previous:
+                        await websocket.send_json(payload)
+                        previous = encoded
+                    done, _ = await asyncio.wait({disconnected}, timeout=0.5)
+                    if done:
+                        break
         finally:
             disconnected.cancel()
             with suppress(asyncio.CancelledError):

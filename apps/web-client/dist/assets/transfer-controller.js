@@ -469,14 +469,8 @@ export class TransferController {
         }
     }
     setSortHeaderLabel(button, text) {
-        const textNodes = [...button.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE);
-        if (textNodes.length === 0) {
-            button.prepend(document.createTextNode(text));
-            return;
-        }
-        textNodes[0].textContent = text;
-        for (const extra of textNodes.slice(1))
-            extra.remove();
+        const target = button.querySelector(".explorer-header-text") ?? button;
+        target.textContent = text;
     }
     showContextMenu(clientX, clientY, target) {
         this.#contextTarget = target;

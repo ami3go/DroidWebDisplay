@@ -476,16 +476,10 @@ export class TransferController {
   }
 
   private setSortHeaderLabel(button: HTMLButtonElement, text: string): void {
-    // Rewrite only the text nodes. Assigning textContent would drop the column
-    // resizer the drawer appends into these same buttons, permanently killing
-    // column resizing for the rest of the session.
-    const textNodes = [...button.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE);
-    if (textNodes.length === 0) {
-      button.prepend(document.createTextNode(text));
-      return;
-    }
-    textNodes[0].textContent = text;
-    for (const extra of textNodes.slice(1)) extra.remove();
+    // The label lives in its own span so the column resizer the drawer appends
+    // to these buttons is a sibling, not something this write has to preserve.
+    const target = button.querySelector<HTMLElement>(".explorer-header-text") ?? button;
+    target.textContent = text;
   }
 
   private showContextMenu(clientX: number, clientY: number, target: AndroidStorageEntryDto | null): void {

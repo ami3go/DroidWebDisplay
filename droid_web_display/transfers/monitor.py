@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from droid_web_display.adb.client import AdbClient
-from droid_web_display.errors import TransferValidationError
+from droid_web_display.errors import TransferConflictError, TransferValidationError
 from droid_web_display.transfers.manager import TransferManager
 from droid_web_display.transfers.models import DuplicatePolicy, TransferState
 from droid_web_display.transfers.paths import normalize_android_path
@@ -16,7 +16,12 @@ from droid_web_display.transfers.paths import normalize_android_path
 _PARTIAL_SUFFIXES = (".part", ".partial", ".crdownload", ".download", ".tmp", ".temp")
 # Watched-file entries that have reached a resting state and only serve as UI
 # history; the snapshot shows 200 of each, so retain a little more than that.
-_SETTLED_OBSERVED_STATUSES = frozenset({"completed", "failed", "disappeared", "deleted", "processed"})
+# "baseline" and "uploaded-from-pc" belong here too: they are resting states no
+# later scan revisits, and baselining a large folder creates one per file, so
+# leaving them out would let the tables grow without bound anyway.
+_SETTLED_OBSERVED_STATUSES = frozenset(
+    {"baseline", "completed", "failed", "disappeared", "deleted", "processed", "uploaded-from-pc"}
+)
 _MAX_SETTLED_OBSERVED = 500
 _FINAL_TRANSFER_STATES = {
     TransferState.COMPLETED,
@@ -274,6 +279,11 @@ class AutoDownloadMonitor:
         return self.snapshot()
 
     async def scan_now(self) -> dict[str, Any]:
+        # Serialising scans means a manual request can land behind a long
+        # background sweep. Fail fast rather than hanging the HTTP request for
+        # however long that sweep still needs.
+        if self._scan_lock.locked():
+            raise TransferConflictError("a scan is already running")
         await self._scan_once(force=True)
         return self.snapshot()
 

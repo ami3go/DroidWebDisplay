@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import base64
+import copy
 import hashlib
 import hmac
 import json
@@ -119,9 +120,9 @@ class AuthService:
             if self.configured:
                 raise AuthError("PIN is already configured", code="already_configured")
             pin = self.validate_pin(pin)
-            previous_pin = self._state.get("pin")
-            previous_sessions = list(self._state.get("sessions", []))
-            previous_audit = list(self._state.get("audit", []))
+            # Snapshot the whole state rather than named keys: a rollback that
+            # enumerates keys goes stale the moment one is added.
+            snapshot = copy.deepcopy(self._state)
             self._state["pin"] = self._hash_pin(pin)
             self._audit("pin-configured")
             try:
@@ -137,9 +138,7 @@ class AuthService:
             except Exception:
                 # Never leave the service "configured" in memory without a
                 # persisted PIN: first-run setup would be permanently blocked.
-                self._state["pin"] = previous_pin
-                self._state["sessions"] = previous_sessions
-                self._state["audit"] = previous_audit
+                self._state = snapshot
                 raise
             return grant
 

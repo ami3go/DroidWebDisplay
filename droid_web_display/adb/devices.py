@@ -2,35 +2,29 @@ from __future__ import annotations
 
 from droid_web_display.models import AndroidDevice, DeviceState
 
-KNOWN_STATES = {
-    state.value
-    for state in DeviceState
-    if state is not DeviceState.UNKNOWN and " " not in state.value
-}
-# adb reports some states as a phrase followed by free-text advice, e.g.
-# "no permissions (user in plugdev group; are your udev rules wrong?); see [...]".
-# These must still surface as devices so the UI can explain why they are unusable.
-MULTI_WORD_STATES = tuple(
-    sorted(
-        (state.value for state in DeviceState if " " in state.value),
-        key=lambda value: len(value.split()),
-        reverse=True,
-    )
-)
+KNOWN_STATES = {state.value for state in DeviceState if state is not DeviceState.UNKNOWN}
+# States keyed by their token tuple. adb reports some of them as a phrase
+# followed by free-text advice, e.g. "no permissions (user in plugdev group;
+# are your udev rules wrong?); see [...]" — those must still surface as devices
+# so the UI can explain why they are unusable.
+_STATE_PHRASES = {tuple(value.split()): value for value in KNOWN_STATES}
+_WIDEST_PHRASE = max(len(parts) for parts in _STATE_PHRASES)
 
 
 def _locate_state(tokens: list[str]) -> tuple[int, str, int] | None:
-    """Return (serial_end, state, fields_start) for a device line."""
+    """Return (serial_end, state, fields_start) for a device line.
+
+    Scans right to left so the rightmost state token wins, which is what
+    separates a serial containing spaces from the state that follows it. At
+    each position the widest phrase is tried first, so "no permissions" is
+    never mistaken for a bare "permissions".
+    """
     lowered = [token.lower() for token in tokens]
-    for phrase in MULTI_WORD_STATES:
-        parts = phrase.split()
-        width = len(parts)
-        for index in range(len(tokens) - width, -1, -1):
-            if lowered[index : index + width] == parts:
-                return index, phrase, index + width
     for index in range(len(tokens) - 1, -1, -1):
-        if tokens[index] in KNOWN_STATES:
-            return index, tokens[index], index + 1
+        for width in range(min(_WIDEST_PHRASE, len(tokens) - index), 0, -1):
+            state = _STATE_PHRASES.get(tuple(lowered[index : index + width]))
+            if state is not None:
+                return index, state, index + width
     return None
 
 

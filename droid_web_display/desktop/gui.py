@@ -839,32 +839,35 @@ class ServerWindow(QMainWindow):
             self._refresh_logs()
 
     def _status_ready(self, snapshot: object) -> None:
-        self._status_probe_running = False
-        self._status_worker = None
         if isinstance(snapshot, ServerSnapshot):
             self._apply_snapshot(snapshot)
-        self._run_pending_force_refresh()
+        self._status_finished()
 
     def _status_failed(self, message: str) -> None:
-        self._status_probe_running = False
-        self._status_worker = None
         self._set_status_visual(ServerState.ERROR, "Status unavailable")
         self._error_value.setText(message)
         self._set_health(self._health_server, "error", "● Status unavailable")
-        self._run_pending_force_refresh()
+        self._status_finished()
 
-    def _run_pending_force_refresh(self) -> None:
-        if not self._pending_force_refresh:
-            return
-        self._pending_force_refresh = False
-        self._refresh(force=True)
+    def _status_finished(self) -> None:
+        """Clear the in-flight probe and dispatch anything queued behind it.
+
+        Every terminal path of a status probe has to end here, or a queued
+        force refresh is stranded until the next timer tick.
+        """
+        self._status_probe_running = False
+        self._status_worker = None
+        if self._pending_force_refresh:
+            self._pending_force_refresh = False
+            self._refresh(force=True)
 
     def _refresh(self, *, force: bool = False) -> None:
         if self._status_probe_running:
             # A probe can outlast the timer interval, so dropping a forced
             # refresh here would silently discard the user's health-check click
             # and the refreshes that follow start/stop/restart. Queue it.
-            self._pending_force_refresh = self._pending_force_refresh or force
+            if force:
+                self._pending_force_refresh = True
             return
         self._refresh_count += 1
         include_device = force or self._refresh_count % 3 == 1

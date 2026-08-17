@@ -366,8 +366,7 @@ class SessionManager:
             session.error = str(exc)
             session.stop_reason = "start_failed"
             await self._cleanup_session_resources(session)
-            async with self._lock:
-                self._serial_index.pop(session.serial, None)
+            await self._retire_session(session)
             if isinstance(exc, SessionError):
                 raise
             raise SessionError(
@@ -579,10 +578,22 @@ class SessionManager:
             else SessionState.STOPPED
         )
         session.stopped_at = time.time()
-        async with self._lock:
-            self._serial_index.pop(session.serial, None)
-            self._prune_terminated()
+        await self._retire_session(session)
         return session
+
+    async def _retire_session(self, session: ScrcpySession) -> None:
+        """Release a terminated session's serial claim and bound the backlog.
+
+        Every path that leaves a session in a terminal state has to come
+        through here; pruning from stop_session alone would let the sessions
+        that die during startup accumulate for the lifetime of the process.
+        """
+        if not session.stopped_at:
+            session.stopped_at = time.time()
+        async with self._lock:
+            if self._serial_index.get(session.serial) == session.session_id:
+                self._serial_index.pop(session.serial, None)
+            self._prune_terminated()
 
     def _prune_terminated(self) -> None:
         """Cap how many finished sessions stay in memory.
@@ -664,6 +675,7 @@ class SessionManager:
         except Exception as exc:
             session.state = SessionState.FAILED
             session.error = f"{session.error}; cleanup failed: {exc}"
+            await self._retire_session(session)
 
     async def _collect_process_log(self, session: ScrcpySession) -> None:
         process = session.process

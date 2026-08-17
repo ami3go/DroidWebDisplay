@@ -272,10 +272,16 @@ class ServerController:
         current_ui = self._probe(url)
         with self._lock:
             thread_alive = bool(self._thread and self._thread.is_alive())
-            if current_ui:
+            if self._state == ServerState.STOPPING:
+                # stop() drops the lock while it joins the server thread, so a
+                # probe taken in that window still answers. Leave the shutdown
+                # to finish; it resolves itself to STOPPED or, on timeout, to
+                # ERROR rather than parking here forever.
+                pass
+            elif current_ui:
                 self._state = ServerState.RUNNING if thread_alive else ServerState.EXTERNAL
             elif thread_alive:
-                if self._state not in {ServerState.ERROR, ServerState.STOPPING}:
+                if self._state != ServerState.ERROR:
                     self._state = ServerState.STARTING
             elif self._state != ServerState.ERROR:
                 # Nothing owned is running and nothing answers the probe, so a
