@@ -12,6 +12,7 @@ const files = [
   resolve(root, "tests/layout.test.mjs"),
   resolve(root, "tests/connect-drawer.test.mjs"),
   resolve(root, "tests/header-status-indicator.test.mjs"),
+  resolve(root, "tests/header-brand-layout.test.mjs"),
 ];
 await new Promise((resolvePromise, reject) => {
   const child = spawn(process.execPath, ["--test", ...files], { stdio: "inherit" });
