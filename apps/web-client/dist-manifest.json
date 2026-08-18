@@ -175,8 +175,8 @@
     },
     {
       "path": "assets/transfer-controller.js",
-      "bytes": 35756,
-      "sha256": "aa94eb7fe8470cd9e3d4be0ed7948a43b1e92a570b0378654f147697826e90b9"
+      "bytes": 35976,
+      "sha256": "082c12bb6a42b355cf436aecc72205dd792e93881330ee784d19243832b50aac"
     },
     {
       "path": "assets/transfer-controller.js.map",
@@ -235,8 +235,8 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 13008,
-      "sha256": "23a8fb9507153ae473fa602400aa8a3fee819377aefe70a2aaeff2cee239e3d0"
+      "bytes": 13237,
+      "sha256": "322ea343553e66ed5299536f930c4582b6674c63324da8e08f5c53ba901d0a16"
     },
     {
       "path": "favicon.svg",
@@ -245,8 +245,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 30431,
-      "sha256": "16b222d59a35da4d56e9f50240d7af0c06cf8e007eb43be53feec2b1794d4c02"
+      "bytes": 30557,
+      "sha256": "8696f05554950d09b48a2a0bcff7f26cd933b3bd4762c079884110971337ee10"
     },
     {
       "path": "styles.css",
