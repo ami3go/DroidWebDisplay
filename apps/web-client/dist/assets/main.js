@@ -172,6 +172,8 @@ async function bootstrap() {
             openPcFolder: required("#open-pc-folder"),
             transferList: required("#transfer-list"),
             transferStatus: required("#transfer-status"),
+            stage: required("#stage"),
+            stageDropOverlay: required("#stage-drop-overlay"),
         });
         const autoDownloadController = new AutoDownloadController({
             device: required("#device"),

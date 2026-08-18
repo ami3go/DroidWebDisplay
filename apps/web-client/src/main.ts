@@ -176,6 +176,8 @@ async function bootstrap(): Promise<void> {
       openPcFolder: required<HTMLButtonElement>("#open-pc-folder"),
       transferList: required<HTMLElement>("#transfer-list"),
       transferStatus: required<HTMLElement>("#transfer-status"),
+      stage: required<HTMLElement>("#stage"),
+      stageDropOverlay: required<HTMLElement>("#stage-drop-overlay"),
     });
     const autoDownloadController = new AutoDownloadController({
       device: required<HTMLSelectElement>("#device"),

@@ -120,7 +120,7 @@ export declare class BridgeApi {
     uploadFile(request: {
         serial: string;
         file: File;
-        destinationPath: string;
+        destinationPath?: string | undefined;
         duplicatePolicy: DuplicatePolicy;
     }): Promise<TransferDto>;
     downloadFile(request: {

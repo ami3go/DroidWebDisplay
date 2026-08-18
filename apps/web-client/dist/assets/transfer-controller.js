@@ -18,6 +18,9 @@ export class TransferController {
     #lastBrowseAt = 0;
     #browseGeneration = 0;
     #refreshTransfersBusy = false;
+    // dragenter/dragleave fire for every child element under the pointer, so the
+    // overlay is driven by a depth counter rather than by relatedTarget guesses.
+    #stageDragDepth = 0;
     #closed = false;
     constructor(elements) {
         this.elements = elements;
@@ -111,6 +114,7 @@ export class TransferController {
             if (event.key === "Enter")
                 void this.runAction(() => this.browse());
         });
+        this.bindStageDropZone();
         this.elements.storageBody.addEventListener("dragover", (event) => {
             if (!event.dataTransfer?.types.includes("Files"))
                 return;
@@ -493,6 +497,57 @@ export class TransferController {
         this.elements.contextMenu.hidden = true;
         this.#contextTarget = null;
     }
+    /** Drop files anywhere on the mirrored screen to send them to the Android inbox.
+
+        The Explorer already accepts drops, but only inside the Files drawer, which
+        means navigating there first. The stage is where the user is already
+        looking, so it doubles as a zero-navigation upload target. */
+    bindStageDropZone() {
+        const { stage } = this.elements;
+        stage.addEventListener("dragenter", (event) => {
+            if (!hasFiles(event.dataTransfer))
+                return;
+            event.preventDefault();
+            this.#stageDragDepth += 1;
+            this.setStageDropActive(true);
+        });
+        stage.addEventListener("dragover", (event) => {
+            if (!hasFiles(event.dataTransfer))
+                return;
+            // Without preventDefault the browser navigates to the dropped file.
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+        });
+        stage.addEventListener("dragleave", (event) => {
+            if (!hasFiles(event.dataTransfer))
+                return;
+            this.#stageDragDepth = Math.max(0, this.#stageDragDepth - 1);
+            if (this.#stageDragDepth === 0)
+                this.setStageDropActive(false);
+        });
+        stage.addEventListener("drop", (event) => {
+            if (!hasFiles(event.dataTransfer))
+                return;
+            event.preventDefault();
+            this.#stageDragDepth = 0;
+            this.setStageDropActive(false);
+            const files = [...(event.dataTransfer?.files ?? [])];
+            if (!files.length)
+                return;
+            void this.runAction(() => this.uploadToInbox(files));
+        });
+    }
+    setStageDropActive(active) {
+        this.elements.stage.classList.toggle("stage-drop-active", active);
+        this.elements.stageDropOverlay.hidden = !active;
+    }
+    /** Upload to the server's configured inbox directory.
+
+        destinationPath is deliberately omitted so the server's
+        default_android_upload_directory stays the single source of truth. */
+    async uploadToInbox(files) {
+        await this.uploadFiles(undefined, files);
+    }
     clearDropTarget() {
         this.elements.storageBody.classList.remove("drop-target");
         for (const row of this.elements.storageBody.querySelectorAll(".drop-target"))
@@ -507,17 +562,21 @@ export class TransferController {
         const serial = this.requireSerial();
         if (!files.length)
             throw new Error("Choose one or more PC files to upload");
+        let queuedTo = destinationPath;
         for (const file of files) {
-            await this.#api.uploadFile({
+            const record = await this.#api.uploadFile({
                 serial,
                 file,
                 destinationPath,
                 duplicatePolicy: this.duplicatePolicy(),
             });
+            // When the server picked the destination, report what it actually chose
+            // rather than a path the client guessed.
+            queuedTo ??= androidParentPath(record.destinationPath);
         }
         this.elements.contextUploadFile.value = "";
         await this.refreshTransfers();
-        this.setStatus(`Queued ${files.length} upload(s) to ${destinationPath}`);
+        this.setStatus(`Queued ${files.length} upload(s) to ${queuedTo ?? "the Android inbox"}`);
     }
     updateDestinationUi() {
         const custom = this.elements.destinationProfile.value === "__custom__";
@@ -683,6 +742,19 @@ export function formatBytes(bytes) {
         unit = units[index];
     }
     return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
+}
+/** True when a drag actually carries files, not text or a page selection. */
+function hasFiles(data) {
+    return Boolean(data?.types.includes("Files"));
+}
+/** Plain containing directory of an Android path.
+
+    Unlike parentAndroidPath this does not clamp to a known shared root, because
+    it is used to report where the server put an upload, which may sit outside
+    the roots the Explorer offers. */
+function androidParentPath(path) {
+    const parent = path.replace(/\/+$/, "").split("/").slice(0, -1).join("/");
+    return parent || "/";
 }
 export function parentAndroidPath(path) {
     const root = androidRootForPath(path);

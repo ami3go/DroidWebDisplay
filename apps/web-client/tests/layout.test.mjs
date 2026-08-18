@@ -141,6 +141,28 @@ test("Android File Explorer updates selection without rebuilding every row", () 
   assert.match(transferSource, /row\.classList\.toggle\("selected", selected\)/);
 });
 
+test("mirrored screen is a drop target that uploads to the Android inbox", () => {
+  // The Explorer drop zone lives inside the Files drawer, so using it means
+  // navigating there first. The stage is where the user already is.
+  assert.match(html, /id="stage-drop-overlay"/);
+  assert.match(html, /Drop to send to Android/);
+  assert.match(css, /\.stage \{ position: relative; \}/);
+  assert.match(css, /\.stage-drop-overlay \{[\s\S]*pointer-events: none;/);
+
+  for (const type of ["dragenter", "dragover", "dragleave", "drop"]) {
+    assert.match(transferSource, new RegExp(`stage\\.addEventListener\\("${type}"`));
+  }
+  // Without preventDefault on dragover the browser navigates away to the file.
+  assert.match(transferSource, /addEventListener\("dragover"[\s\S]*?event\.preventDefault\(\)/);
+  // dragenter/dragleave fire per child element, so a depth counter is required
+  // or the overlay flickers and sticks.
+  assert.match(transferSource, /#stageDragDepth/);
+  assert.match(transferSource, /uploadToInbox\(files\)/);
+  // The server owns the default upload directory; the client must not restate it.
+  assert.match(transferSource, /uploadFiles\(undefined, files\)/);
+  assert.doesNotMatch(transferSource, /DroidWebDisplayInbox/);
+});
+
 test("Android File Explorer accepts PC file drag and drop", () => {
   assert.match(transferSource, /addEventListener\("dragover"/);
   assert.match(transferSource, /addEventListener\("drop"/);
