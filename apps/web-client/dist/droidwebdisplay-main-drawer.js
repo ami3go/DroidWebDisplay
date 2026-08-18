@@ -75,6 +75,142 @@
       openDisplay();
     });
   }
+  function bindStatusActivityIndicator() {
+    const statusContainer = document.getElementById('connection-status');
+    const statusIcon = document.getElementById('status-icon');
+    const statusLabel = document.getElementById('status');
+    const svg = statusIcon?.querySelector('svg');
+    if (!statusContainer || !statusIcon || !statusLabel || !svg || statusIcon.dataset.activityBound === '1') return;
+    statusIcon.dataset.activityBound = '1';
+
+    const svgNamespace = 'http://www.w3.org/2000/svg';
+    const actionDuration = 1100;
+    const actionPaths = {
+      navigation: 'M15.5 7.5 11 12l4.5 4.5M11 12h6',
+      clipboard: 'M9.25 8.5h5.5v7h-5.5zM10.5 8.5V7h3v1.5',
+      rotate: 'M16.25 9.1A5 5 0 1 0 17 14M16.25 6.75V9.1h-2.35',
+      resize: 'M9.5 8H8v1.5M14.5 8H16v1.5M16 14.5V16h-1.5M9.5 16H8v-1.5M10 14l-2 2M14 10l2-2',
+      power: 'M12 7v5M8.6 9.4a5 5 0 1 0 6.8 0',
+      fullscreen: 'M10 8H8v2M14 8h2v2M16 14v2h-2M10 16H8v-2',
+      apps: 'M8 8h3v3H8zM13 8h3v3h-3zM8 13h3v3H8zM13 13h3v3h-3z',
+      warning: 'M12 8.2v4.5M12 15.6v.2',
+    };
+    const check = svg.querySelector('.status-check');
+    const offline = svg.querySelector('.status-offline');
+    const actionGlyph = document.createElementNS(svgNamespace, 'path');
+    actionGlyph.classList.add('status-action-glyph');
+    actionGlyph.setAttribute('fill', 'none');
+    actionGlyph.setAttribute('stroke', 'currentColor');
+    actionGlyph.setAttribute('stroke-width', '1.9');
+    actionGlyph.setAttribute('stroke-linecap', 'round');
+    actionGlyph.setAttribute('stroke-linejoin', 'round');
+    actionGlyph.setAttribute('vector-effect', 'non-scaling-stroke');
+    actionGlyph.style.opacity = '0';
+    actionGlyph.style.transformOrigin = '12px 12px';
+    svg.append(actionGlyph);
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let resetTimer = null;
+    let glyphAnimation = null;
+    let iconAnimation = null;
+    let lastStatus = statusLabel.textContent?.trim() || '';
+    let lastState = statusContainer.dataset.state || 'disconnected';
+
+    const actionForStatus = title => {
+      const text = String(title || '').toLowerCase();
+      if (/error|failed|stopped|skipped|limited|not confirmed/.test(text)) return 'warning';
+      if (text.includes('clipboard') || text.includes('pasting') || text.includes('text fallback')) return 'clipboard';
+      if (text.includes('rotat')) return 'rotate';
+      if (text.includes('resiz')) return 'resize';
+      return null;
+    };
+
+    const restoreSteadyGlyph = () => {
+      if (resetTimer !== null) window.clearTimeout(resetTimer);
+      resetTimer = null;
+      glyphAnimation?.cancel();
+      iconAnimation?.cancel();
+      glyphAnimation = null;
+      iconAnimation = null;
+      actionGlyph.style.opacity = '0';
+      actionGlyph.removeAttribute('d');
+      delete statusIcon.dataset.action;
+      check?.style.removeProperty('opacity');
+      offline?.style.removeProperty('opacity');
+    };
+
+    const showAction = action => {
+      const path = actionPaths[action];
+      if (!path) return;
+      restoreSteadyGlyph();
+      actionGlyph.setAttribute('d', path);
+      statusIcon.dataset.action = action;
+      if (check) check.style.opacity = '0';
+      if (offline) offline.style.opacity = '0';
+      actionGlyph.style.opacity = '1';
+
+      if (!reducedMotion?.matches && typeof actionGlyph.animate === 'function') {
+        glyphAnimation = actionGlyph.animate([
+          { opacity: 0, transform: 'scale(.72)' },
+          { opacity: 1, transform: 'scale(1.08)', offset: 0.22 },
+          { opacity: 1, transform: 'scale(1)', offset: 0.72 },
+          { opacity: 0, transform: 'scale(.9)' },
+        ], { duration: actionDuration, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+        iconAnimation = statusIcon.animate([
+          { transform: 'scale(1)' },
+          { transform: 'scale(1.22)', offset: 0.28 },
+          { transform: 'scale(1)' },
+        ], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      }
+      resetTimer = window.setTimeout(restoreSteadyGlyph, reducedMotion?.matches ? 760 : actionDuration);
+    };
+
+    const animateConnectionState = nextState => {
+      if (!nextState || nextState === lastState) return;
+      restoreSteadyGlyph();
+      if (!reducedMotion?.matches && typeof statusIcon.animate === 'function') {
+        if (nextState === 'connected') {
+          iconAnimation = statusIcon.animate([
+            { transform: 'scale(.76)', opacity: .6 },
+            { transform: 'scale(1.18)', opacity: 1, offset: .58 },
+            { transform: 'scale(1)', opacity: 1 },
+          ], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        } else if (nextState === 'disconnected') {
+          iconAnimation = statusIcon.animate([
+            { transform: 'scale(1)', opacity: 1 },
+            { transform: 'scale(.82)', opacity: .58, offset: .5 },
+            { transform: 'scale(1)', opacity: 1 },
+          ], { duration: 320, easing: 'ease-out' });
+        }
+      }
+      lastState = nextState;
+    };
+
+    const statusObserver = new MutationObserver(() => {
+      const title = statusLabel.textContent?.trim() || '';
+      if (!title || title === lastStatus) return;
+      lastStatus = title;
+      const action = actionForStatus(title);
+      if (action) showAction(action);
+    });
+    statusObserver.observe(statusLabel, { childList: true, characterData: true, subtree: true });
+
+    const stateObserver = new MutationObserver(() => animateConnectionState(statusContainer.dataset.state || 'disconnected'));
+    stateObserver.observe(statusContainer, { attributes: true, attributeFilter: ['data-state'] });
+
+    const controlActions = {
+      back: 'navigation',
+      home: 'navigation',
+      recent: 'navigation',
+      power: 'power',
+      fullscreen: 'fullscreen',
+      'running-app-icon': 'apps',
+    };
+    for (const [id, action] of Object.entries(controlActions)) {
+      document.getElementById(id)?.addEventListener('click', () => showAction(action));
+    }
+    document.getElementById('running-app-select')?.addEventListener('change', () => showAction('apps'));
+  }
   function loadAccordionState() { try { return JSON.parse(get(ACCORDION_KEY, '{}')) || {}; } catch (_) { return {}; } }
   function bindAccordions() {
     const state = loadAccordionState();
@@ -276,6 +412,7 @@
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
     bindStatusShortcut();
+    bindStatusActivityIndicator();
     bindDrawerKeyboard();
     bindDrawerResize();
     bindExplorerColumnResize();
