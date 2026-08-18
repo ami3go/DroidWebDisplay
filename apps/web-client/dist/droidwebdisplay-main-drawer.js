@@ -46,6 +46,16 @@
     const label = root().querySelector(`[data-group="${group}"] .gb-rail-label`)?.textContent || 'Tools';
     const title = root().querySelector('.gb-drawer-title'); if (title) title.textContent = label;
     drawer()?.classList.add('gb-open'); drawer()?.setAttribute('aria-hidden', 'false');
+    if (group === 'clipboard') {
+      // controller.ts historically focused the fallback textarea one frame after
+      // opening Clipboard. That makes the global Ctrl+V route treat the paste as
+      // page editing instead of Android input. Return focus to the mirrored screen
+      // after that callback has run; users can still click the textarea explicitly.
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const screen = document.getElementById('screen');
+        if (screen instanceof HTMLCanvasElement) screen.focus();
+      }));
+    }
   }
   function closeDrawer() {
     if (pinned || !root()) return;
