@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.4 — Screen drop target, clipboard paste fix, and correctness pass
+
+- Added a drag-and-drop upload target on the mirrored screen: files dropped anywhere over the Android display are queued to the server's configured inbox directory, without navigating to the Files drawer. The Explorer drop zone is unchanged.
+- Fixed Ctrl+V pasting to Android only while the canvas held keyboard focus. The paste listener now sits on the document, so it works regardless of which control was clicked last, while the fallback textarea and other inputs still paste into themselves.
+- Removed the unreachable Ctrl+V keydown branch, and corrected the release gate and two test suites that had been pinning that dead branch in place.
+- Fixed a bounded-retention gap where baselined and PC-uploaded watched files were never trimmed, so the auto-download tables grew without limit.
+- Fixed mid-command ADB pipe failures escaping as unhandled 500s instead of a mapped ADB-unavailable error.
+- Fixed the desktop status probe flipping a shutting-down server back to "running" and re-enabling its controls.
+- Fixed the transfer destination guard being a no-op on Windows, where system folders such as `C:\Windows\System32` passed as download destinations.
+- Fixed scrcpy session retention not applying to sessions that failed during startup.
+- Bounded ADB Sync writes and the manual auto-download scan so neither can hang indefinitely.
+- Rate-limited every PIN check reachable from the API, and made first-run setup roll back cleanly on failure.
+
 ## 0.11.2 — Unified page scrolling
 
 - Removed the independent vertical scrollbar from the right-side transfer panel.
