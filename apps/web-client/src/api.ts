@@ -252,11 +252,13 @@ export class BridgeApi {
     });
   }
 
-  public async uploadFile(request: { serial: string; file: File; destinationPath: string; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
+  public async uploadFile(request: { serial: string; file: File; destinationPath?: string; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
     const form = new FormData();
     form.set("serial", request.serial);
     form.set("file", request.file, request.file.name);
-    form.set("destinationPath", request.destinationPath);
+    // Omitted on purpose for inbox drops: the server owns the default upload
+    // directory, so the client must not duplicate that path.
+    if (request.destinationPath !== undefined) form.set("destinationPath", request.destinationPath);
     form.set("duplicatePolicy", request.duplicatePolicy);
     return this.request<TransferDto>("/api/v1/transfers/upload", { method: "POST", body: form });
   }

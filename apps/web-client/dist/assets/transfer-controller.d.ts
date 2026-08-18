@@ -22,6 +22,8 @@ interface TransferElements {
     readonly openPcFolder: HTMLButtonElement;
     readonly transferList: HTMLElement;
     readonly transferStatus: HTMLElement;
+    readonly stage: HTMLElement;
+    readonly stageDropOverlay: HTMLElement;
 }
 type StorageSortKey = "name" | "size" | "modified";
 type SortDirection = "ascending" | "descending";
@@ -47,6 +49,9 @@ export declare class TransferController {
     private updateSortHeaders;
     private showContextMenu;
     private hideContextMenu;
+    private bindStageDropZone;
+    private setStageDropActive;
+    private uploadToInbox;
     private clearDropTarget;
     private chooseUploadFiles;
     private uploadFiles;

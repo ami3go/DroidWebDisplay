@@ -394,3 +394,34 @@ body[data-layout="compact"] .statistics-card { padding: 0.75rem; }
 #gb-single-drawer-root .security-card { display: grid; gap: 8px; }
 #gb-single-drawer-root .security-card[hidden], #gb-single-drawer-root .network-access-card[hidden] { display: none !important; }
 @media (max-width: 700px) { .native-workspace { padding: 0.5rem !important; } .native-workspace > .stage { min-height: calc(100vh - 72px); } }
+
+/* Drop files anywhere on the mirrored screen to upload them to the Android
+   inbox, without navigating to the Files drawer first. */
+.stage { position: relative; }
+.stage-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(9, 14, 24, 0.78);
+  border: 2px dashed #4f7fd4;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.stage-drop-overlay[hidden] { display: none; }
+.stage-drop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: center;
+  text-align: center;
+  max-width: 100%;
+}
+.stage-drop-title { font-size: 1rem; font-weight: 700; color: #eaf1fb; }
+.stage-drop-subtitle { font-size: 0.78rem; color: #aeb7c8; }
+@media (prefers-reduced-motion: no-preference) {
+  .stage-drop-overlay { transition: opacity 120ms ease; }
+}
