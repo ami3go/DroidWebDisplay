@@ -81,6 +81,7 @@ export declare class DroidWebDisplayController {
     private keydown;
     private rotate;
     private togglePower;
+    private updatePowerButton;
     private pasteClipboard;
     private pasteTypedText;
     private pasteText;
