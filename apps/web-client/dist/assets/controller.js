@@ -210,8 +210,6 @@ export class DroidWebDisplayController {
             event.preventDefault();
             void this.runUiAction(() => this.pasteTypedText());
         } });
-        document.querySelector('[data-group="clipboard"]')?.addEventListener("click", () => window.requestAnimationFrame(() => { if (!this.elements.clipboardText.disabled)
-            this.elements.clipboardText.focus(); }));
         this.elements.fullscreen.addEventListener("click", () => void this.toggleFullscreen());
         this.elements.audioMute.addEventListener("click", () => this.toggleAudioMute());
         this.elements.audioVolume.addEventListener("input", () => this.setAudioVolume());
@@ -247,10 +245,9 @@ export class DroidWebDisplayController {
         this.elements.canvas.addEventListener("keydown", (event) => void this.keydown(event));
         // Ctrl+V is routed from the native paste event rather than from keydown, so
         // ClipboardEvent.clipboardData can be read without Async Clipboard
-        // permission. The listener has to be on the document: paste fires on the
-        // focused element, and the app itself moves focus off the canvas (opening
-        // the clipboard panel focuses the fallback textarea), so a canvas-only
-        // listener makes Ctrl+V silently dead for the rest of the session.
+        // permission. The listener has to be on the document because paste fires
+        // on whichever element currently owns focus. Drawer controls can move focus
+        // away from the canvas, so a canvas-only listener would make Ctrl+V die.
         document.addEventListener("paste", (event) => {
             if (!this.#protocolSession || isEditableTarget(event.target))
                 return;
@@ -560,7 +557,7 @@ export class DroidWebDisplayController {
         catch {
             text = this.elements.clipboardText.value;
             if (!text)
-                throw new Error("Browser clipboard permission was denied. Paste text into the fallback box, then press Paste typed text.");
+                throw new Error("Browser clipboard permission was denied. Paste text into the fallback box, then press Type.");
         }
         if (!text)
             text = this.elements.clipboardText.value;
@@ -573,7 +570,12 @@ export class DroidWebDisplayController {
         const text = this.elements.clipboardText.value;
         if (!text)
             throw new Error("Enter or paste text into the fallback box first");
-        await this.pasteText(text, "typed text");
+        const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
+        if (new TextEncoder().encode(text).byteLength > maximum)
+            throw new Error(`Text exceeds the configured ${maximum / 1024} KiB limit`);
+        this.setStatus("Typing", "Injecting the text box directly into the focused Android input field…");
+        await this.sendMessages(textInjectionMessages(text));
+        this.setStatus("Text typed", "Text box content was injected directly into Android without using the clipboard.");
     }
     async pasteText(text, source) {
         const session = this.#protocolSession;
@@ -584,16 +586,21 @@ export class DroidWebDisplayController {
         if (!session)
             return;
         const sequence = this.#clipboardSequence++;
-        this.setStatus("Pasting", `Sending ${source} to the focused Android input field…`);
+        this.setStatus("Pasting", `Synchronizing ${source} and injecting it into the focused Android input field…`);
         const acknowledgement = this.waitForClipboardAcknowledgement(sequence);
         try {
-            await session.sendControl(clipboardMessage(text, sequence, true));
-            if (await acknowledgement) {
-                this.setStatus("Clipboard pasted", `${source} was acknowledged by Android.`);
-                return;
-            }
+            // SetClipboard(paste=true) only proves that Android processed the clipboard
+            // message; its ACK does not prove KEYCODE_PASTE inserted anything. Keep the
+            // clipboard synchronized with paste=false, then use scrcpy InjectText as the
+            // deterministic insertion path (the same strategy as scrcpy legacy paste).
+            await session.sendControl(clipboardMessage(text, sequence, false));
             await this.sendMessages(textInjectionMessages(text));
-            this.setStatus("Text fallback used", "Android did not acknowledge clipboard paste, so the text was injected directly.");
+            if (await acknowledgement) {
+                this.setStatus("Text pasted", `${source} was injected directly and the Android clipboard synchronization was acknowledged.`);
+            }
+            else {
+                this.setStatus("Text sent", `${source} was injected directly, but Android clipboard synchronization was not acknowledged.`);
+            }
         }
         catch (error) {
             this.resolveClipboardAcknowledgement(sequence, false);
@@ -774,10 +781,11 @@ export class DroidWebDisplayController {
         this.saveBrowserSettings();
     }
     async copyAndroidClipboard() {
-        if (!this.#lastAndroidClipboard)
-            throw new Error("No Android clipboard text has been received yet");
-        await navigator.clipboard.writeText(this.#lastAndroidClipboard);
-        this.setStatus("Clipboard copied", "Android clipboard was copied to the PC clipboard.");
+        if (!this.#protocolSession)
+            return;
+        this.#copyShortcutPending = true;
+        this.setStatus("Copying", "Requesting COPY from the focused Android selection…");
+        await this.sendMessages([androidClipboardCopyMessage()]);
     }
     async startClipboardPolling(requestPermission) {
         this.stopClipboardPolling();
@@ -786,6 +794,26 @@ export class DroidWebDisplayController {
             return;
         if (!navigator.clipboard?.readText) {
             this.setStatus("Clipboard sync limited", "This browser cannot read the PC clipboard automatically. Android → PC synchronization remains available.");
+            return;
+        }
+        const armPolling = async (initial) => {
+            this.#clipboardReadAllowed = true;
+            if (initial && initial !== this.#lastSentClipboard && initial !== this.#lastAndroidClipboard) {
+                await this.synchronizePcClipboard(initial);
+            }
+            this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);
+        };
+        if (requestPermission) {
+            try {
+                // Keep this as the first awaited browser API call from the checkbox
+                // gesture. Firefox does not expose clipboard-read through Permissions,
+                // and delaying readText() can lose the transient user activation.
+                await armPolling(await navigator.clipboard.readText());
+            }
+            catch {
+                this.#clipboardReadAllowed = false;
+                this.setStatus("Clipboard sync limited", "Browser clipboard permission was not granted. Use Paste or Type manually; Android → PC synchronization remains active.");
+            }
             return;
         }
         let permissionState = "unsupported";
@@ -799,28 +827,21 @@ export class DroidWebDisplayController {
             }
         }
         if (permissionState === "denied") {
-            this.setStatus("Clipboard sync limited", "Automatic PC → Android clipboard access is blocked by the browser. Use Paste manually; Android → PC sync remains active.");
+            this.setStatus("Clipboard sync limited", "Automatic PC → Android clipboard access is blocked by the browser. Use Paste or Type manually; Android → PC sync remains active.");
             return;
         }
-        if (permissionState !== "granted" && !requestPermission) {
-            // Never let a background timer trigger repeated permission/paste prompts. A single
-            // checkbox gesture can explicitly arm PC → Android synchronization when desired.
+        if (permissionState !== "granted") {
+            // A reconnect/background restore must never trigger a clipboard permission
+            // prompt. The checkbox gesture above is the only prompting path.
             this.setStatus("Clipboard sync ready", "Android → PC sync is active. Toggle automatic sync off/on once to grant PC → Android clipboard access.");
             return;
         }
         try {
-            // This read is either already permission-granted or is called directly from the user's
-            // checkbox gesture. It is the only place allowed to request clipboard-read permission.
-            const initial = await navigator.clipboard.readText();
-            this.#clipboardReadAllowed = true;
-            if (initial && initial !== this.#lastSentClipboard && initial !== this.#lastAndroidClipboard) {
-                await this.synchronizePcClipboard(initial);
-            }
-            this.#clipboardPollTimer = window.setInterval(() => void this.pollPcClipboard(), 1800);
+            await armPolling(await navigator.clipboard.readText());
         }
         catch {
             this.#clipboardReadAllowed = false;
-            this.setStatus("Clipboard sync limited", "Browser clipboard permission was not granted. Use Paste manually; Android → PC synchronization remains active.");
+            this.setStatus("Clipboard sync limited", "Browser clipboard permission was not granted. Use Paste or Type manually; Android → PC synchronization remains active.");
         }
     }
     stopClipboardPolling() {
@@ -864,8 +885,20 @@ export class DroidWebDisplayController {
         // Automatic synchronization updates Android's clipboard only.  It MUST NOT
         // request a paste action, because repeated paste=true messages steal focus
         // from the Android input method and make normal PC keyboard typing unusable.
-        await session.sendControl(clipboardMessage(text, sequence, false));
-        this.setStatus("Clipboard synchronized", "PC clipboard was updated on Android without pasting into the focused field.");
+        const acknowledgement = this.waitForClipboardAcknowledgement(sequence, 1_500);
+        try {
+            await session.sendControl(clipboardMessage(text, sequence, false));
+            if (await acknowledgement) {
+                this.setStatus("Clipboard synchronized", "PC clipboard was acknowledged by Android without pasting into the focused field.");
+            }
+            else {
+                this.setStatus("Clipboard sync not confirmed", "PC clipboard update was sent, but Android did not acknowledge it.");
+            }
+        }
+        catch (error) {
+            this.resolveClipboardAcknowledgement(sequence, false);
+            throw error;
+        }
     }
     scheduleReconnect() {
         this.cancelReconnect();
