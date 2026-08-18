@@ -739,7 +739,7 @@
   },
   "info": {
     "title": "DroidWebDisplay Local Service",
-    "version": "0.11.3",
+    "version": "0.11.4",
     "x-trust-model": "PC-local by default; optional authenticated private-LAN HTTPS; the Android phone is not the trust authority"
   },
   "openapi": "3.1.0",
