@@ -29,6 +29,7 @@ def test_primary_open_and_exit_actions_live_outside_tabs() -> None:
     assert 'footer_open = QPushButton("Open DroidWebDisplay")' in gui
     assert 'footer_exit = QPushButton("Exit")' in gui
 
+
 def test_settings_include_only_minimal_update_checker() -> None:
     gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
     assert '_make_card("Updates"' in gui or '"Updates",' in gui
@@ -39,3 +40,13 @@ def test_settings_include_only_minimal_update_checker() -> None:
     assert 'Tray notifications' not in gui
     assert 'Live event timeline' not in gui
 
+
+def test_settings_tab_scrolls_instead_of_compressing_cards() -> None:
+    gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
+    assert "QScrollArea" in gui
+    assert 'scroll.setObjectName("settingsScroll")' in gui
+    assert "scroll.setWidgetResizable(True)" in gui
+    assert "QLayout.SizeConstraint.SetMinimumSize" in gui
+    assert "Qt.ScrollBarPolicy.ScrollBarAlwaysOff" in gui
+    assert "scroll.setWidget(page)" in gui
+    assert "return scroll" in gui
