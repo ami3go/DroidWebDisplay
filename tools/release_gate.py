@@ -356,13 +356,15 @@ def main() -> int:
 
     checks["compactConnectionStatus"] = {
         "status": "PASS" if all(token in html_source + css_source + controller_source for token in (
-            'id="connection-status"', 'id="status-icon"', 'height: 2.12rem',
+            'id="connection-status"', 'id="status-icon"', '.connection-status { flex: 0 0 auto; height: 1.46rem;',
+            # The chip lives inside the brand lockup, under the wordmark.
+            '.topbar-brand { flex: 0 0 auto; display: flex; flex-direction: column;',
             'class="status-ring-progress"', 'class="status-check"', 'connection-ring-spin', 'border-radius: 999px',
             '.connection-status[data-state="connected"]', '.connection-status[data-state="disconnected"]',
             'statusContainer.dataset.state = state',
         )) and 'class="status-card"' not in html_source and 'statusIcon.textContent' not in controller_source else "FAIL",
-        "toolbarPlacement": True,
-        "oneUnitHeight": "2.12rem",
+        "toolbarPlacement": "brand-lockup",
+        "chipHeight": "1.46rem",
         "visualStyle": "animated-ring-status-chip",
         "states": ["connected", "disconnected", "connecting"],
         "legacySideCardPresent": 'class="status-card"' in html_source,

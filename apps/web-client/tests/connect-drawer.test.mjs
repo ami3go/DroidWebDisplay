@@ -6,7 +6,12 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const drawerSource = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.js"), "utf8");
-const drawerCss = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.css"), "utf8");
+const drawerCssEntry = await readFile(resolve(root, "static/droidwebdisplay-main-drawer.css"), "utf8");
+const drawerCssCore = await readFile(resolve(root, "static/droidwebdisplay-main-drawer-core.css"), "utf8");
+// The production stylesheet imports the stable theme core and then applies the
+// header-specific override. Static contract tests inspect the effective source
+// by concatenating both layers rather than pretending CSS @import is absent.
+const drawerCss = `${drawerCssCore}\n${drawerCssEntry}`;
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 
 test("Display is the first drawer group and owns connection controls", () => {
