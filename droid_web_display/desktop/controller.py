@@ -226,6 +226,10 @@ class ServerController:
                 self._thread = None
                 self._runtime = None
             else:
+                # Surface the failure as ERROR rather than leaving the machine
+                # parked in STOPPING, which the UI treats as "busy" and would
+                # never leave on its own.
+                self._state = ServerState.ERROR
                 self._last_error = "Timed out while stopping the embedded server"
             return stopped
 
@@ -268,13 +272,21 @@ class ServerController:
         current_ui = self._probe(url)
         with self._lock:
             thread_alive = bool(self._thread and self._thread.is_alive())
-            if self._state != ServerState.STOPPING:
-                if current_ui:
-                    self._state = ServerState.RUNNING if thread_alive else ServerState.EXTERNAL
-                elif thread_alive and self._state != ServerState.ERROR:
+            if self._state == ServerState.STOPPING:
+                # stop() drops the lock while it joins the server thread, so a
+                # probe taken in that window still answers. Leave the shutdown
+                # to finish; it resolves itself to STOPPED or, on timeout, to
+                # ERROR rather than parking here forever.
+                pass
+            elif current_ui:
+                self._state = ServerState.RUNNING if thread_alive else ServerState.EXTERNAL
+            elif thread_alive:
+                if self._state != ServerState.ERROR:
                     self._state = ServerState.STARTING
-                elif not thread_alive and self._state not in {ServerState.ERROR, ServerState.EXTERNAL}:
-                    self._state = ServerState.STOPPED
+            elif self._state != ServerState.ERROR:
+                # Nothing owned is running and nothing answers the probe, so a
+                # previously observed external server is gone too.
+                self._state = ServerState.STOPPED
             uptime = int(time.monotonic() - self._started_at) if self._started_at and thread_alive else 0
             state = self._state
             error = self._last_error

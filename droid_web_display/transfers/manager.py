@@ -28,6 +28,49 @@ from droid_web_display.transfers.paths import join_android_path, normalize_andro
 _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 
+# Directories the OS runs code from on login/boot. A file pulled off the phone
+# must never land in one of these.
+_AUTORUN_DIRECTORY_NAMES = frozenset(
+    {
+        "autostart",
+        "cron.d",
+        "cron.daily",
+        "cron.hourly",
+        "cron.monthly",
+        "cron.weekly",
+        "init.d",
+        "systemd",
+        "launchagents",
+        "launchdaemons",
+        "startup",
+        "start menu",
+        ".ssh",
+        ".gnupg",
+    }
+)
+# Top-level directories owned by the OS, matched directly under the filesystem
+# root (POSIX "/", or a Windows drive anchor such as "c:\\").
+_SYSTEM_ROOT_NAMES = frozenset(
+    {
+        "etc",
+        "boot",
+        "bin",
+        "sbin",
+        "lib",
+        "lib64",
+        "usr",
+        "proc",
+        "sys",
+        "var",
+        "windows",
+        "winnt",
+        "program files",
+        "program files (x86)",
+        "programdata",
+        "system volume information",
+    }
+)
+
 
 class TransferManager:
     def __init__(
@@ -294,7 +337,13 @@ class TransferManager:
     def _schedule(self, record: TransferRecord) -> None:
         task = asyncio.create_task(self._execute(record), name=f"transfer-{record.transfer_id}")
         self._tasks[record.transfer_id] = task
-        task.add_done_callback(lambda _: self._tasks.pop(record.transfer_id, None))
+        task.add_done_callback(lambda finished: self._discard_task(record.transfer_id, finished))
+
+    def _discard_task(self, transfer_id: str, finished: asyncio.Task) -> None:
+        # A retry can register a new task under the same id before this callback
+        # runs; only drop the entry if it still points at the task that ended.
+        if self._tasks.get(transfer_id) is finished:
+            self._tasks.pop(transfer_id, None)
 
     async def _execute(self, record: TransferRecord) -> None:
         try:
@@ -351,9 +400,15 @@ class TransferManager:
         record.size = expected
         record.verification = "size-match"
         await self._complete(record)
+        # The transfer itself is done and verified past this point. Housekeeping
+        # failures must not drag the record back out of COMPLETED, or the
+        # auto-download monitor will re-queue an upload that already landed.
         media_scan = getattr(self.adb, "media_scan", None)
         if callable(media_scan):
-            await media_scan(record.serial, destination)
+            try:
+                await media_scan(record.serial, destination)
+            except Exception as exc:
+                record.add_event(time.time(), "media_scan_failed", error=str(exc))
         local.unlink(missing_ok=True)
         record.internal_local_path = None
         await self._persist()
@@ -459,7 +514,30 @@ class TransferManager:
         path = raw.resolve()
         if path.exists() and not path.is_dir():
             raise TransferValidationError("custom destination is not a folder", details={"destinationPath": str(path)})
+        self._assert_destination_allowed(path)
         return path
+
+    def _assert_destination_allowed(self, path: Path) -> None:
+        """Reject destinations that would turn a transfer into code execution.
+
+        A LAN client authenticated with the PIN is not necessarily the PC
+        owner, so a device-sourced file must not be writable into a directory
+        the OS auto-executes from.
+        """
+        lowered_parts = tuple(part.lower() for part in path.parts)
+        blocked = set(lowered_parts) & _AUTORUN_DIRECTORY_NAMES
+        if blocked:
+            raise TransferValidationError(
+                "custom destination is a startup or system folder",
+                details={"destinationPath": str(path), "blockedComponent": min(blocked)},
+            )
+        # parts[0] is the filesystem anchor: "/" on POSIX, a drive root such as
+        # "C:\\" on Windows. Anything named directly beneath it is OS-owned.
+        if len(lowered_parts) >= 2 and lowered_parts[1] in _SYSTEM_ROOT_NAMES:
+            raise TransferValidationError(
+                "custom destination is a system folder",
+                details={"destinationPath": str(path), "blockedComponent": lowered_parts[1]},
+            )
 
     async def _load_state(self) -> None:
         if not self.state_file.is_file():

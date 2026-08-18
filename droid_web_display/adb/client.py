@@ -16,6 +16,21 @@ from .running_apps import RunningGuiApp, parse_running_gui_apps, validate_compon
 from .storage_metrics import collect_storage_metadata
 
 
+async def _terminate(process: asyncio.subprocess.Process) -> None:
+    """Kill and reap a child, shielded so cancellation cannot abandon it."""
+    if process.returncode is not None:
+        return
+    try:
+        # ProcessLookupError (already reaped) is an OSError subclass.
+        process.kill()
+    except OSError:
+        pass
+    try:
+        await asyncio.shield(process.wait())
+    except asyncio.CancelledError:
+        pass
+
+
 @dataclass(frozen=True)
 class AdbCommandResult:
     argv: tuple[str, ...]
@@ -94,22 +109,36 @@ class AdbClient:
                 stderr=asyncio.subprocess.PIPE,
                 env=self._env(),
             )
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                process.communicate(),
-                timeout=self.command_timeout if timeout is None else timeout,
-            )
-        except asyncio.TimeoutError as exc:
-            process.kill()
-            await process.wait()
-            raise AdbCommandError(
-                f"ADB command timed out: {' '.join(argv)}",
-                details={"argv": list(argv), "timeout": timeout or self.command_timeout},
-            ) from exc
         except OSError as exc:
             raise AdbUnavailableError(
                 f"Unable to start ADB: {exc}",
                 details={"executable": executable},
             ) from exc
+
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                process.communicate(),
+                timeout=self.command_timeout if timeout is None else timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            await _terminate(process)
+            raise AdbCommandError(
+                f"ADB command timed out: {' '.join(argv)}",
+                details={"argv": list(argv), "timeout": timeout or self.command_timeout},
+            ) from exc
+        except OSError as exc:
+            # A pipe failure part-way through a command still means ADB is
+            # unusable, and callers only handle the bridge error type.
+            await _terminate(process)
+            raise AdbUnavailableError(
+                f"Unable to communicate with ADB: {exc}",
+                details={"executable": executable},
+            ) from exc
+        except BaseException:
+            # Cancellation (and any other failure while waiting) must still reap
+            # the child, otherwise aborted requests leak adb processes.
+            await _terminate(process)
+            raise
 
         result = AdbCommandResult(
             argv=argv,

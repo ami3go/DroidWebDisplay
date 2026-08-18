@@ -8,12 +8,21 @@ import time
 from typing import Any
 
 from droid_web_display.adb.client import AdbClient
-from droid_web_display.errors import TransferValidationError
+from droid_web_display.errors import TransferConflictError, TransferValidationError
 from droid_web_display.transfers.manager import TransferManager
 from droid_web_display.transfers.models import DuplicatePolicy, TransferState
 from droid_web_display.transfers.paths import normalize_android_path
 
 _PARTIAL_SUFFIXES = (".part", ".partial", ".crdownload", ".download", ".tmp", ".temp")
+# Watched-file entries that have reached a resting state and only serve as UI
+# history; the snapshot shows 200 of each, so retain a little more than that.
+# "baseline" and "uploaded-from-pc" belong here too: they are resting states no
+# later scan revisits, and baselining a large folder creates one per file, so
+# leaving them out would let the tables grow without bound anyway.
+_SETTLED_OBSERVED_STATUSES = frozenset(
+    {"baseline", "completed", "failed", "disappeared", "deleted", "processed", "uploaded-from-pc"}
+)
+_MAX_SETTLED_OBSERVED = 500
 _FINAL_TRANSFER_STATES = {
     TransferState.COMPLETED,
     TransferState.CANCELLED,
@@ -218,6 +227,10 @@ class AutoDownloadMonitor:
         self._task: asyncio.Task[None] | None = None
         self._wake = asyncio.Event()
         self._lock = asyncio.Lock()
+        # _lock is released across the enqueue awaits inside a scan, so it
+        # cannot stop a manual scan from interleaving with the background one
+        # and queueing the same file twice. This serialises whole scans.
+        self._scan_lock = asyncio.Lock()
         self._started = False
 
     async def start(self) -> None:
@@ -266,6 +279,11 @@ class AutoDownloadMonitor:
         return self.snapshot()
 
     async def scan_now(self) -> dict[str, Any]:
+        # Serialising scans means a manual request can land behind a long
+        # background sweep. Fail fast rather than hanging the HTTP request for
+        # however long that sweep still needs.
+        if self._scan_lock.locked():
+            raise TransferConflictError("a scan is already running")
         await self._scan_once(force=True)
         return self.snapshot()
 
@@ -338,6 +356,10 @@ class AutoDownloadMonitor:
                 await asyncio.sleep(min(max(self.config.scan_interval_seconds, 1.0), 10.0))
 
     async def _scan_once(self, *, force: bool = False) -> None:
+        async with self._scan_lock:
+            await self._scan_once_locked(force=force)
+
+    async def _scan_once_locked(self, *, force: bool) -> None:
         config = self.config
         if not config.active and not force:
             return
@@ -834,6 +856,28 @@ class AutoDownloadMonitor:
         if len(self._processed_local) > 5000:
             newest_local = sorted(self._processed_local.items(), key=lambda item: item[1], reverse=True)[:5000]
             self._processed_local = dict(newest_local)
+        self._trim_observed()
+
+    def _trim_observed(self) -> None:
+        """Bound the watched-file tables.
+
+        Settled entries are kept only so the UI can show recent history; every
+        one of them is re-stated on each scan and written out in full on every
+        persist, so the backlog has to be capped. The processed/processedPc
+        fingerprints remain the durable record of what has been handled.
+        """
+        self._observed = self._keep_recent(self._observed)
+        self._local_observed = self._keep_recent(self._local_observed)
+
+    @staticmethod
+    def _keep_recent(table: dict[str, Any]) -> dict[str, Any]:
+        settled = [(key, item) for key, item in table.items() if item.status in _SETTLED_OBSERVED_STATUSES]
+        excess = len(settled) - _MAX_SETTLED_OBSERVED
+        if excess <= 0:
+            return table
+        settled.sort(key=lambda pair: pair[1].last_changed_at)
+        stale = {key for key, _ in settled[:excess]}
+        return {key: item for key, item in table.items() if key not in stale}
 
     @staticmethod
     def _fingerprint(path: str, size: int, modified_at: int) -> str:
