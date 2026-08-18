@@ -28,6 +28,12 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .connection-row select { min-width: 12rem; padding-block: 0.48rem; }
 .android-control-row { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
 .android-control-row button { background: #202838; }
+.android-control-row .screen-power-button { position: relative; width: 2.12rem; min-width: 2.12rem; height: 2.12rem; min-height: 2.12rem; padding: 0; display: grid; place-items: center; color: #aeb7c8; }
+.screen-power-button svg { width: 1.22rem; height: 1.22rem; overflow: visible; }
+.screen-power-phone, .screen-power-home { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.screen-power-display { stroke: none; transition: fill 140ms ease; }
+.screen-power-button[data-screen-state="on"] .screen-power-display { fill: #f3f6fb; }
+.screen-power-button[data-screen-state="off"] .screen-power-display { fill: #0a0d13; }
 .running-app-header { height: 2.12rem; min-height: 2.12rem; margin-left: auto; display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
 .running-app-header-icon { position: relative; width: 2.12rem; min-width: 2.12rem; height: 2.12rem; min-height: 2.12rem; flex: 0 0 2.12rem; display: grid; place-items: center; padding: 0; border: 1px solid #343d50; border-radius: 8px; background: #202838; color: #9fb0c2; }
 .running-app-header-icon:focus-visible { outline: 2px solid #82a6ff; outline-offset: 2px; }

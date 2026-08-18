@@ -45,6 +45,7 @@ export class DroidWebDisplayController {
         this.#renderer = new WebCodecsVideoRenderer(elements.canvas, (stats) => this.updateStatistics(stats));
         this.#audioPlayer = new WebCodecsAudioPlayer((stats) => this.updateAudioStatistics(stats));
         this.populateProfiles();
+        this.updatePowerButton();
         this.bindEvents();
     }
     async initialize() {
@@ -537,9 +538,17 @@ export class DroidWebDisplayController {
         }
     }
     async togglePower() {
-        this.#powerOn = !this.#powerOn;
-        await this.sendMessages([{ type: ControlMessageType.SetDisplayPower, on: this.#powerOn }]);
-        this.elements.power.textContent = this.#powerOn ? "Screen off" : "Screen on";
+        const nextPowerOn = !this.#powerOn;
+        await this.sendMessages([{ type: ControlMessageType.SetDisplayPower, on: nextPowerOn }]);
+        this.#powerOn = nextPowerOn;
+        this.updatePowerButton();
+    }
+    updatePowerButton() {
+        const state = this.#powerOn ? "on" : "off";
+        const action = this.#powerOn ? "Turn Android screen off" : "Turn Android screen on";
+        this.elements.power.dataset.screenState = state;
+        this.elements.power.setAttribute("aria-label", action);
+        this.elements.power.title = action;
     }
     async pasteClipboard(source = "PC clipboard") {
         if (!this.#protocolSession)
