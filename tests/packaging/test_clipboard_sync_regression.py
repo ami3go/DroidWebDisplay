@@ -8,6 +8,13 @@ def _controller_blocks() -> tuple[str, str]:
     return source, dist
 
 
+def _main_blocks() -> tuple[str, str]:
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "apps/web-client/src/main.ts").read_text(encoding="utf-8")
+    dist = (root / "apps/web-client/dist/assets/main.js").read_text(encoding="utf-8")
+    return source, dist
+
+
 def test_manual_paste_synchronizes_without_android_paste_key_and_injects_text() -> None:
     source, dist = _controller_blocks()
     src = source[source.index("\n  private async pasteText"):source.index("\n  private waitForClipboardAcknowledgement")]
@@ -32,6 +39,18 @@ def test_type_bypasses_clipboard_and_copy_requests_android_selection() -> None:
     for block in (src_copy, built_copy):
         assert "androidClipboardCopyMessage()" in block
         assert "writeText(this.#lastAndroidClipboard)" not in block
+
+
+def test_android_copy_write_through_preserves_browser_user_activation() -> None:
+    source, dist = _main_blocks()
+    for block in (source, dist):
+        assert "bindAndroidCopyWriteThrough" in block
+        assert '"#clipboard-copy-android"' in block
+        assert '"#screen"' in block
+        assert "navigator.clipboard.writeText(text)" in block
+        assert 'document.execCommand("copy")' in block
+        assert 'currentStatus === "Clipboard received"' in block
+        assert "bindAndroidCopyWriteThrough();" in block
 
 
 def test_automatic_clipboard_sync_does_not_request_paste() -> None:
