@@ -5,8 +5,8 @@
   "files": [
     {
       "path": "assets/api.d.ts",
-      "bytes": 7855,
-      "sha256": "4ec79dcbf40138b7b9b80c364a862df2ae3252daf7113d1bdb8652b48a12b025"
+      "bytes": 7867,
+      "sha256": "0de04eb0eb1f794c7dc509a73dbd6cfe73636a3301951b1e7b591d6b81f8228f"
     },
     {
       "path": "assets/api.js",

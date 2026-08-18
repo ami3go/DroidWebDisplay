@@ -252,7 +252,7 @@ export class BridgeApi {
     });
   }
 
-  public async uploadFile(request: { serial: string; file: File; destinationPath?: string; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
+  public async uploadFile(request: { serial: string; file: File; destinationPath?: string | undefined; duplicatePolicy: DuplicatePolicy }): Promise<TransferDto> {
     const form = new FormData();
     form.set("serial", request.serial);
     form.set("file", request.file, request.file.name);
