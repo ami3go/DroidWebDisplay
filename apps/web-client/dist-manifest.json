@@ -15,8 +15,8 @@
     },
     {
       "path": "assets/api.js.map",
-      "bytes": 9625,
-      "sha256": "ecb4a621a9ea74f3f99ef8a42ec5f6b517c69acee8e07218cc67c5d73a13e840"
+      "bytes": 9686,
+      "sha256": "b50d442da61de46f611663b175b2431d0578883468d746a9cad6963bdb9b74f8"
     },
     {
       "path": "assets/audio-player.d.ts",
@@ -110,8 +110,8 @@
     },
     {
       "path": "assets/input.d.ts",
-      "bytes": 1204,
-      "sha256": "a3b75762c1552ba294591b821d0c333851b14afd0297b1a0f0e3ddef12f5f4b2"
+      "bytes": 1125,
+      "sha256": "d5b15a4a97f8ee3fad6a630e962c9a32c01773f2cd2008bae2ab10478bfe52fd"
     },
     {
       "path": "assets/input.js",
@@ -121,7 +121,7 @@
     {
       "path": "assets/input.js.map",
       "bytes": 3991,
-      "sha256": "e742a1a23316541d5817125104daa75f12bb3a9b40b0b5e04db117411ab3b9fe"
+      "sha256": "1a06d556d5dcdba86e21d0f5a57cb378adccaafd486c6bd35aa5fd604216bcc9"
     },
     {
       "path": "assets/main.d.ts",
@@ -135,8 +135,8 @@
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 8360,
-      "sha256": "7b55a69966b32924b33d62ac7fd7d468fff3c81e211f82b4976db57716e391f7"
+      "bytes": 8436,
+      "sha256": "a594e86752e0a961b1e695d5a7a20155d62919cb7536d12054ef316c3ce3d6b4"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -170,18 +170,18 @@
     },
     {
       "path": "assets/transfer-controller.d.ts",
-      "bytes": 2919,
-      "sha256": "af2de615137481a9eae6d8d7a5998835a2d848bfcb003e5431fd1d921823bd7f"
+      "bytes": 3475,
+      "sha256": "cadcbde353842a0e46101286ba76d14ea58f13a878a743b2a7f6228c16fea2d6"
     },
     {
       "path": "assets/transfer-controller.js",
-      "bytes": 39191,
-      "sha256": "3d068756e035e7598800ed12a7269a8bc862f699529295d56dda2724f048bb56"
+      "bytes": 39569,
+      "sha256": "b5718eb81d08bab60ded3aa880ff29d3effd95ec61d1e5f2e800cc4a9850ea97"
     },
     {
       "path": "assets/transfer-controller.js.map",
-      "bytes": 36404,
-      "sha256": "afc1fbd63898f171f8dd4eff2eed9c145ec30d5286ff692043949e6bd54e4d2c"
+      "bytes": 38877,
+      "sha256": "b3db49586435021f5ff8b750bc7fb331df2c5065dae602176c12bb7164bd71f6"
     },
     {
       "path": "assets/types.d.ts",
@@ -235,8 +235,8 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 13237,
-      "sha256": "322ea343553e66ed5299536f930c4582b6674c63324da8e08f5c53ba901d0a16"
+      "bytes": 19396,
+      "sha256": "372af6b2287a8baea93180bc7768ddef8025d4cb12201acaeb3cc0d84d865dda"
     },
     {
       "path": "favicon.svg",
