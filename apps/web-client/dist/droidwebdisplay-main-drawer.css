@@ -45,12 +45,46 @@
   place-items: center !important;
   border-right: 1px solid var(--dwd-border) !important;
   background: linear-gradient(180deg, #101a29 0%, #09121f 100%) !important;
+  color: #758197;
   overflow: hidden !important;
 }
 
 .brand-device-status svg {
   width: 49px !important;
   height: 49px !important;
+  overflow: visible;
+}
+
+.brand-phone,
+.brand-display,
+.brand-device-link {
+  color: #758197;
+  transition: color 180ms ease, filter 180ms ease, opacity 180ms ease;
+}
+
+.brand-phone-frame,
+.brand-display-frame,
+.brand-display-stand,
+.brand-device-link,
+.brand-phone-speaker {
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.brand-phone-screen,
+.brand-display-screen {
+  fill: #0a0d13 !important;
+  stroke: currentColor !important;
+  stroke-width: 1.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.brand-phone-home {
+  fill: currentColor !important;
 }
 
 .topbar-brand > h1 {
@@ -114,12 +148,18 @@
 
 .topbar-brand[data-connection-state="connecting"] .brand-display {
   color: #8db8ff !important;
+  animation: brand-display-pulse 1.05s ease-in-out infinite;
 }
 
 .topbar-brand[data-connection-state="connected"] .brand-display,
 .topbar-brand[data-connection-state="connected"] .brand-device-link {
   color: var(--dwd-green) !important;
   filter: drop-shadow(0 0 5px rgba(52, 211, 153, .28)) !important;
+}
+
+@keyframes brand-display-pulse {
+  0%, 100% { opacity: .72; }
+  50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(130, 166, 255, .33)); }
 }
 
 .connection-row {
@@ -153,5 +193,11 @@
   }
   .topbar-brand > .connection-status {
     padding-left: .48rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-brand[data-connection-state="connecting"] .brand-display {
+    animation: none;
   }
 }
