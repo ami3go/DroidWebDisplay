@@ -289,12 +289,20 @@ def main() -> int:
         "automaticSyncPaste": False,
         "backgroundPermissionPromptLoopPrevented": True,
     }
+    # Ctrl+V is a native browser paste routed from a document "paste" listener,
+    # never a keydown shortcut: the paste event fires on the focused element and
+    # the app moves focus off the canvas, so a keydown branch (or a canvas-scoped
+    # listener) leaves Ctrl+V silently dead. Assert the real routing and assert
+    # the dead shape stays gone.
     checks["clipboardKeyboardShortcuts"] = {
         "status": "PASS" if all(token in controller_source + html_source for token in (
-            'shortcut === "paste"', 'pasteClipboard("Ctrl+V")', 'shortcut === "copy"',
+            'document.addEventListener("paste"', 'pasteText(text, "Ctrl+V")',
+            "isEditableTarget(event.target)", 'shortcut === "copy"',
             "androidClipboardCopyMessage()", "Ctrl+V pastes and Ctrl+C copies",
+        )) and not any(token in controller_source for token in (
+            'shortcut === "paste"', 'canvas.addEventListener("paste"',
         )) else "FAIL",
-        "ctrlV": "explicit-paste",
+        "ctrlV": "native-paste-event",
         "ctrlC": "remote-copy",
         "automaticSyncStillNonPasting": "clipboardMessage(text, sequence, false)" in controller_source,
     }

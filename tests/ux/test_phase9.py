@@ -94,6 +94,13 @@ def test_virtual_keyboard_suppression_and_keyboard_clipboard_shortcuts() -> None
     controller = (ROOT / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")
     assert 'id="virtual-hide-keyboard"' in html
     assert "Virtual display only. Phone screen mode keeps the normal Android keyboard behavior." in html
-    assert 'pasteClipboard("Ctrl+V")' in controller
+    # Ctrl+V rides the native paste event from a document listener; a keydown
+    # branch or a canvas-scoped listener would make it silently dead once focus
+    # leaves the canvas, which the app itself causes.
+    assert 'document.addEventListener("paste"' in controller
+    assert 'pasteText(text, "Ctrl+V")' in controller
+    assert "isEditableTarget(event.target)" in controller
+    assert 'shortcut === "paste"' not in controller
+    assert 'canvas.addEventListener("paste"' not in controller
     assert "androidClipboardCopyMessage()" in controller
     assert 'hideVirtualKeyboard.checked ? "hide"' in controller
