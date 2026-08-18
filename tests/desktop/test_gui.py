@@ -10,5 +10,5 @@ def test_qt_desktop_host_smoke(monkeypatch) -> None:
     root = Path(__file__).resolve().parents[2]
     icon = root / "apps" / "web-client" / "dist" / "favicon.svg"
     assert icon.is_file()
-    assert TAB_NAMES == ("Overview", "Health", "Logs", "Diagnostics", "Settings")
+    assert TAB_NAMES == ("Overview", "Logs", "Diagnostics", "Settings")
     assert desktop_smoke_test(icon) == 0
