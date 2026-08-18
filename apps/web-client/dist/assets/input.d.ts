@@ -10,7 +10,8 @@ export interface ScreenSize {
     readonly height: number;
 }
 export declare function mapClientPoint(clientX: number, clientY: number, rect: RectLike, screen: ScreenSize): Position;
-export type ClipboardShortcut = "copy" | "paste" | null;
+// "paste" is intentionally not a member: Ctrl/Cmd+V is never a shortcut here.
+export type ClipboardShortcut = "copy" | null;
 export declare function clipboardShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): ClipboardShortcut;
 export declare function androidClipboardCopyMessage(): ControlMessage;
 export declare function keyboardMessages(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "repeat">): ControlMessage[];

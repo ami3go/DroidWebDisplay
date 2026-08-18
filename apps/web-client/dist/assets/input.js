@@ -35,7 +35,7 @@ export function clipboardShortcut(event) {
     if (event.altKey || (!event.ctrlKey && !event.metaKey))
         return null;
     const key = event.key.toLowerCase();
-    // Ctrl/Cmd+V must stay a native browser paste so the canvas "paste"
+    // Ctrl/Cmd+V must stay a native browser paste so the document "paste"
     // handler can read ClipboardEvent.clipboardData without Async Clipboard permission.
     if (key === "v")
         return null;

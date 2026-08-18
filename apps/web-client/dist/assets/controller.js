@@ -244,7 +244,15 @@ export class DroidWebDisplayController {
             }
         });
         this.elements.canvas.addEventListener("keydown", (event) => void this.keydown(event));
-        this.elements.canvas.addEventListener("paste", (event) => {
+        // Ctrl+V is routed from the native paste event rather than from keydown, so
+        // ClipboardEvent.clipboardData can be read without Async Clipboard
+        // permission. The listener has to be on the document: paste fires on the
+        // focused element, and the app itself moves focus off the canvas (opening
+        // the clipboard panel focuses the fallback textarea), so a canvas-only
+        // listener makes Ctrl+V silently dead for the rest of the session.
+        document.addEventListener("paste", (event) => {
+            if (!this.#protocolSession || isEditableTarget(event.target))
+                return;
             const text = event.clipboardData?.getData("text/plain") ?? "";
             if (!text)
                 return;
@@ -493,12 +501,9 @@ export class DroidWebDisplayController {
         });
     }
     async keydown(event) {
+        // Ctrl+V is deliberately absent here: it stays a native browser paste and
+        // is handled by the document "paste" listener bound in bindEvents().
         const shortcut = clipboardShortcut(event);
-        if (shortcut === "paste") {
-            event.preventDefault();
-            await this.pasteClipboard("Ctrl+V");
-            return;
-        }
         if (shortcut === "copy") {
             event.preventDefault();
             this.#copyShortcutPending = true;
@@ -985,6 +990,14 @@ function deviceLabel(device) {
 }
 function errorMessage(error) {
     return error instanceof Error ? error.message : String(error);
+}
+/** True when a paste belongs to the page's own text entry rather than to Android. */
+function isEditableTarget(target) {
+    if (!(target instanceof HTMLElement))
+        return false;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+        return true;
+    return target.isContentEditable;
 }
 function clamp(value, minimum, maximum) {
     return Math.max(minimum, Math.min(maximum, value));

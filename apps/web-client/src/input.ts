@@ -49,12 +49,13 @@ const KEYCODES: Readonly<Record<string, number>> = {
 };
 
 
-export type ClipboardShortcut = "copy" | "paste" | null;
+// "paste" is intentionally not a member: Ctrl/Cmd+V is never a shortcut here.
+export type ClipboardShortcut = "copy" | null;
 
 export function clipboardShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): ClipboardShortcut {
   if (event.altKey || (!event.ctrlKey && !event.metaKey)) return null;
   const key = event.key.toLowerCase();
-  // Ctrl/Cmd+V must stay a native browser paste so the canvas "paste"
+  // Ctrl/Cmd+V must stay a native browser paste so the document "paste"
   // handler can read ClipboardEvent.clipboardData without Async Clipboard permission.
   if (key === "v") return null;
   if (key === "c") return "copy";
