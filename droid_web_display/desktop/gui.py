@@ -51,7 +51,7 @@ from droid_web_display.desktop.support import (
 from droid_web_display.desktop.theme import apply_desktop_theme
 
 INSTANCE_NAME = "DroidWebDisplayDesktopHost-v1"
-TAB_NAMES = ("Overview", "Health", "Logs", "Diagnostics", "Settings")
+TAB_NAMES = ("Overview", "Logs", "Diagnostics", "Settings")
 
 
 def _format_uptime(seconds: int) -> str:
@@ -123,7 +123,7 @@ def _health_label(text: str = "Checking…", state: str = "idle") -> QLabel:
     label.setObjectName("healthStatus")
     label.setProperty("healthState", state)
     label.setAlignment(Qt.AlignCenter)
-    label.setMinimumWidth(150)
+    label.setMinimumWidth(112)
     return label
 
 
@@ -239,7 +239,6 @@ class ServerWindow(QMainWindow):
         self._tabs.setObjectName("mainTabs")
         self._tabs.setDocumentMode(True)
         self._tabs.addTab(self._build_overview_tab(), "Overview")
-        self._tabs.addTab(self._build_health_tab(), "Health")
         self._tabs.addTab(self._build_logs_tab(), "Logs")
         self._tabs.addTab(self._build_diagnostics_tab(), "Diagnostics")
         self._tabs.addTab(self._build_settings_tab(), "Settings")
@@ -295,7 +294,11 @@ class ServerWindow(QMainWindow):
         layout.setContentsMargins(2, 10, 2, 2)
         layout.setSpacing(12)
 
-        summary, summary_layout = _make_card("Server")
+        overview_row = QHBoxLayout()
+        overview_row.setContentsMargins(0, 0, 0, 0)
+        overview_row.setSpacing(12)
+
+        summary, summary_layout = _make_card("Summary")
         self._url_value = _field_value(selectable=True)
         self._network_value = _field_value()
         self._device_value = _field_value()
@@ -306,7 +309,7 @@ class ServerWindow(QMainWindow):
 
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
-        form.setHorizontalSpacing(28)
+        form.setHorizontalSpacing(18)
         form.setVerticalSpacing(9)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         for name, value in (
@@ -318,6 +321,35 @@ class ServerWindow(QMainWindow):
         ):
             form.addRow(_field_label(name), value)
         summary_layout.addLayout(form)
+
+        health, health_layout = _make_card(
+            "Health status",
+            "Live host, browser service, ADB, Android device and logging checks.",
+        )
+        health_form = QFormLayout()
+        health_form.setContentsMargins(0, 0, 0, 0)
+        health_form.setHorizontalSpacing(12)
+        health_form.setVerticalSpacing(9)
+        health_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+
+        self._health_server = _health_label()
+        self._health_browser = _health_label()
+        self._health_adb = _health_label()
+        self._health_device = _health_label()
+        self._health_logging = _health_label()
+
+        for name, value in (
+            ("Server", self._health_server),
+            ("Browser UI", self._health_browser),
+            ("ADB", self._health_adb),
+            ("Android device", self._health_device),
+            ("Diagnostics log", self._health_logging),
+        ):
+            health_form.addRow(_field_label(name), value)
+        health_layout.addLayout(health_form)
+
+        overview_row.addWidget(summary, 1)
+        overview_row.addWidget(health, 1)
 
         controls, controls_layout = _make_card(
             "Server controls",
@@ -338,48 +370,8 @@ class ServerWindow(QMainWindow):
         row.addWidget(logs_button)
         controls_layout.addLayout(row)
 
-        layout.addWidget(summary)
+        layout.addLayout(overview_row)
         layout.addWidget(controls)
-        layout.addStretch(1)
-        return page
-
-    def _build_health_tab(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(2, 10, 2, 2)
-        layout.setSpacing(12)
-
-        card, card_layout = _make_card(
-            "System health",
-            "Fast checks for the host, browser service, ADB connection, Android device and diagnostics.",
-        )
-        health_form = QFormLayout()
-        health_form.setContentsMargins(0, 0, 0, 0)
-        health_form.setHorizontalSpacing(28)
-        health_form.setVerticalSpacing(10)
-        health_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-
-        self._health_server = _health_label()
-        self._health_browser = _health_label()
-        self._health_adb = _health_label()
-        self._health_device = _health_label()
-        self._health_logging = _health_label()
-
-        for name, value in (
-            ("Server", self._health_server),
-            ("Browser UI", self._health_browser),
-            ("ADB", self._health_adb),
-            ("Android device", self._health_device),
-            ("Diagnostics log", self._health_logging),
-        ):
-            health_form.addRow(_field_label(name), value)
-        card_layout.addLayout(health_form)
-
-        refresh_button = QPushButton("Run health check")
-        refresh_button.clicked.connect(lambda: self._refresh(force=True))
-        card_layout.addWidget(refresh_button, alignment=Qt.AlignLeft)
-
-        layout.addWidget(card)
         layout.addStretch(1)
         return page
 
@@ -846,7 +838,7 @@ class ServerWindow(QMainWindow):
             self._browser_pending = False
             self.controller.open_browser()
 
-        if self._tabs.currentIndex() == 2:
+        if self._tabs.tabText(self._tabs.currentIndex()) == "Logs":
             self._refresh_logs()
 
     def _status_ready(self, snapshot: object) -> None:
@@ -875,8 +867,8 @@ class ServerWindow(QMainWindow):
     def _refresh(self, *, force: bool = False) -> None:
         if self._status_probe_running:
             # A probe can outlast the timer interval, so dropping a forced
-            # refresh here would silently discard the user's health-check click
-            # and the refreshes that follow start/stop/restart. Queue it.
+            # refresh here would silently discard refreshes that follow
+            # start/stop/restart. Queue the forced refresh instead.
             if force:
                 self._pending_force_refresh = True
             return

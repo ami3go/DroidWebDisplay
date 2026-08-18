@@ -15,12 +15,25 @@ def test_card_headers_are_inside_cards() -> None:
 
 def test_manager_uses_fixed_application_tabs_and_compact_default_size() -> None:
     gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
-    assert 'TAB_NAMES = ("Overview", "Health", "Logs", "Diagnostics", "Settings")' in gui
+    assert 'TAB_NAMES = ("Overview", "Logs", "Diagnostics", "Settings")' in gui
     assert "QTabWidget" in gui
     assert 'setObjectName("mainTabs")' in gui
     assert 'self.resize(760, 600)' in gui
     assert 'self.setMinimumSize(640, 520)' in gui
     assert 'windowGeometryTabsV1' in gui
+
+
+def test_overview_merges_summary_and_live_health_side_by_side() -> None:
+    gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
+    assert 'self._tabs.addTab(self._build_health_tab(), "Health")' not in gui
+    assert "def _build_health_tab" not in gui
+    assert '_make_card("Summary")' in gui
+    assert '"Health status",' in gui
+    assert "overview_row = QHBoxLayout()" in gui
+    assert "overview_row.addWidget(summary, 1)" in gui
+    assert "overview_row.addWidget(health, 1)" in gui
+    assert 'QPushButton("Run health check")' not in gui
+    assert 'self._tabs.tabText(self._tabs.currentIndex()) == "Logs"' in gui
 
 
 def test_primary_open_and_exit_actions_live_outside_tabs() -> None:
