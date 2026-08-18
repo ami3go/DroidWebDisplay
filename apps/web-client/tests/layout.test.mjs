@@ -286,9 +286,21 @@ test("automatic clipboard polling never prompts from the background", () => {
 test("virtual keyboard suppression is virtual-display-only and Ctrl+V is explicit", () => {
   assert.match(html, /id="virtual-hide-keyboard"/);
   assert.match(html, /Virtual display only\. Phone screen mode keeps the normal Android keyboard behavior\./);
-  assert.match(controllerSource, /shortcut === "paste"[\s\S]*pasteClipboard\("Ctrl\+V"\)/);
   assert.match(controllerSource, /shortcut === "copy"[\s\S]*androidClipboardCopyMessage\(\)/);
   assert.match(controllerSource, /hideVirtualKeyboard\.checked \? "hide"/);
+});
+
+test("Ctrl+V routes through a document paste listener, not a keydown shortcut", () => {
+  // The paste event fires on the focused element, and the app moves focus off
+  // the canvas (opening the clipboard panel focuses the fallback textarea), so
+  // a canvas-scoped listener would make Ctrl+V silently dead. Binding on the
+  // document is the behaviour under test.
+  assert.match(controllerSource, /document\.addEventListener\("paste"[\s\S]*?pasteText\(text, "Ctrl\+V"\)/);
+  assert.doesNotMatch(controllerSource, /canvas\.addEventListener\("paste"/);
+  // Typing into the page's own text fields must still paste normally.
+  assert.match(controllerSource, /isEditableTarget\(event\.target\)/);
+  // clipboardShortcut must never claim Ctrl+V, or both paths would fire.
+  assert.doesNotMatch(controllerSource, /shortcut === "paste"/);
 });
 
 test("Android File Explorer prioritizes destination then storage navigation", () => {

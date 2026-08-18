@@ -309,7 +309,14 @@ export class DroidWebDisplayController {
       if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
     });
     this.elements.canvas.addEventListener("keydown", (event) => void this.keydown(event));
-    this.elements.canvas.addEventListener("paste", (event) => {
+    // Ctrl+V is routed from the native paste event rather than from keydown, so
+    // ClipboardEvent.clipboardData can be read without Async Clipboard
+    // permission. The listener has to be on the document: paste fires on the
+    // focused element, and the app itself moves focus off the canvas (opening
+    // the clipboard panel focuses the fallback textarea), so a canvas-only
+    // listener makes Ctrl+V silently dead for the rest of the session.
+    document.addEventListener("paste", (event) => {
+      if (!this.#protocolSession || isEditableTarget(event.target)) return;
       const text = event.clipboardData?.getData("text/plain") ?? "";
       if (!text) return;
       event.preventDefault();
@@ -557,12 +564,9 @@ export class DroidWebDisplayController {
   }
 
   private async keydown(event: KeyboardEvent): Promise<void> {
+    // Ctrl+V is deliberately absent here: it stays a native browser paste and
+    // is handled by the document "paste" listener bound in bindEvents().
     const shortcut = clipboardShortcut(event);
-    if (shortcut === "paste") {
-      event.preventDefault();
-      await this.pasteClipboard("Ctrl+V");
-      return;
-    }
     if (shortcut === "copy") {
       event.preventDefault();
       this.#copyShortcutPending = true;
@@ -1044,6 +1048,13 @@ function deviceLabel(device: AndroidDevice): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** True when a paste belongs to the page's own text entry rather than to Android. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return true;
+  return target.isContentEditable;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
