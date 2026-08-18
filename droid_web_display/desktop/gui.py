@@ -20,12 +20,14 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QStyle,
     QSystemTrayIcon,
     QTabWidget,
@@ -495,8 +497,16 @@ class ServerWindow(QMainWindow):
         return page
 
     def _build_settings_tab(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setObjectName("settingsScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         page = QWidget()
+        page.setObjectName("settingsPage")
         layout = QVBoxLayout(page)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setContentsMargins(2, 10, 2, 2)
         layout.setSpacing(12)
 
@@ -592,7 +602,8 @@ class ServerWindow(QMainWindow):
         layout.addWidget(logging_card)
         layout.addWidget(update_card)
         layout.addStretch(1)
-        return page
+        scroll.setWidget(page)
+        return scroll
 
     def _check_for_updates(self) -> None:
         channel = self._update_channel.currentText()
