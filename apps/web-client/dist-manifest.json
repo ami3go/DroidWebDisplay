@@ -245,13 +245,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 33344,
-      "sha256": "9be27735c3154feb39a18490f1bb53061cc00c6da4fdd4a1aaf821abd14ef078"
+      "bytes": 33335,
+      "sha256": "f138aeee999e7765ae1c415d80ad89f6acab48548911f16234f7dc739ad6e897"
     },
     {
       "path": "styles.css",
-      "bytes": 31268,
-      "sha256": "973ab4b68f1c7abfeb56a66435b652fb877a1f6deb9088733f8d3ef653648156"
+      "bytes": 31432,
+      "sha256": "0bc546956b467f8d5d072409732a5e86154dd67f7a5d441e229a6967cabfd701"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",

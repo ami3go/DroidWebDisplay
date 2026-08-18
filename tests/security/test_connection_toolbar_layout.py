@@ -20,6 +20,11 @@ def test_connection_status_is_compact_toolbar_control() -> None:
     assert 'id="status-icon"' in header
     assert 'class="status-card"' not in html
     assert '.connection-status {' in css
-    assert 'height: 2.12rem' in css
+    # The status chip moved under the wordmark, so it is sized as an eyebrow
+    # rather than as a full toolbar control.
+    assert 'height: 1.46rem' in css
+    brand = header[header.index('class="topbar-brand"'):header.index('class="connection-row"')]
+    assert 'id="connection-status"' in brand
+    assert '.topbar-brand { flex: 0 0 auto; display: flex; flex-direction: column;' in css
     assert '.connection-status[data-state="connected"]' in css
     assert '.connection-status[data-state="disconnected"]' in css

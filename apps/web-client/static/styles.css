@@ -18,9 +18,10 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 
 .shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar { display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; padding: 0.52rem 0.85rem; border-bottom: 1px solid #242a37; background: rgba(10, 13, 19, 0.9); backdrop-filter: blur(18px); }
-.topbar-brand { flex: 0 0 auto; display: flex; align-items: baseline; gap: 0.65rem; white-space: nowrap; }
-.topbar h1 { margin: 0; font-size: 1.28rem; letter-spacing: -0.02em; }
-.topbar .eyebrow { margin: 0; font-size: 0.58rem; }
+/* Two-line brand lockup: wordmark above a compact connection chip, so the
+   toolbar row is left to the Android controls and the running-app picker. */
+.topbar-brand { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 0.14rem; white-space: nowrap; }
+.topbar h1 { margin: 0; font-size: 1.12rem; line-height: 1.1; letter-spacing: -0.02em; }
 .connection-row { min-width: 0; flex: 1 1 auto; display: flex; align-items: center; gap: 0.36rem; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: thin; }
 .connection-row button { white-space: nowrap; flex: 0 0 auto; }
 .connection-row button { min-height: 2.12rem; padding: 0.45rem 0.65rem; border-radius: 8px; }
@@ -58,9 +59,9 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .sidepanel { min-width: 0; display: flex; flex-direction: column; gap: 1rem; }
 .help-card { min-width: 0; background: rgba(20, 25, 35, 0.92); border: 1px solid #2c3445; border-radius: 14px; padding: 1rem; }
 .help-card p { margin: 0.3rem 0 0; color: #aeb7c8; line-height: 1.45; font-size: 0.9rem; }
-.connection-status { flex: 0 0 auto; height: 2.12rem; min-height: 2.12rem; max-width: 13rem; display: inline-flex; align-items: center; gap: 0.46rem; padding: 0 0.78rem 0 0.55rem; border: 1px solid #39445a; border-radius: 999px; background: linear-gradient(180deg, #1b2230 0%, #121822 100%); color: #dce4f3; box-shadow: inset 0 1px 0 #ffffff0d, 0 4px 14px #0004; white-space: nowrap; overflow: hidden; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
-.connection-status strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.78rem; letter-spacing: 0.01em; }
-.connection-status-icon { flex: 0 0 auto; width: 1.2rem; height: 1.2rem; display: grid; place-items: center; color: #8895aa; }
+.connection-status { flex: 0 0 auto; height: 1.46rem; min-height: 1.46rem; max-width: 15rem; display: inline-flex; align-items: center; gap: 0.32rem; padding: 0 0.5rem 0 0.34rem; border: 1px solid #39445a; border-radius: 999px; background: linear-gradient(180deg, #1b2230 0%, #121822 100%); color: #dce4f3; box-shadow: inset 0 1px 0 #ffffff0d, 0 4px 14px #0004; white-space: nowrap; overflow: hidden; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.connection-status strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.01em; }
+.connection-status-icon { flex: 0 0 auto; width: 0.92rem; height: 0.92rem; display: grid; place-items: center; color: #8895aa; }
 .connection-status-icon svg { width: 100%; height: 100%; overflow: visible; }
 .status-ring-track, .status-ring-progress, .status-check, .status-offline { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .status-ring-track { stroke: currentColor; opacity: 0.22; }

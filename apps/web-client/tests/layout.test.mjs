@@ -216,7 +216,7 @@ test("File sync controls are present", () => {
   assert.match(html, /Files created by one sync direction are fingerprinted/);
 });
 
-test("connection status is a one-unit toolbar pill with state icons", () => {
+test("connection status is a state chip inside the brand lockup", () => {
   const headerStart = html.indexOf('<header class="topbar">');
   const headerEnd = html.indexOf('</header>', headerStart);
   const header = html.slice(headerStart, headerEnd);
@@ -225,7 +225,12 @@ test("connection status is a one-unit toolbar pill with state icons", () => {
   assert.match(header, /class="status-ring-progress"/);
   assert.match(header, /class="status-check"/);
   assert.equal(html.includes('class="status-card"'), false);
-  assert.match(css, /\.connection-status \{[^}]*height: 2\.12rem;[^}]*display: inline-flex;/s);
+  // The chip sits under the wordmark, not beside it in the control row.
+  const brand = header.slice(header.indexOf('class="topbar-brand"'), header.indexOf('class="connection-row"'));
+  assert.match(brand, /<h1>DroidWebDisplay<\/h1>[\s\S]*id="connection-status"/);
+  assert.equal(header.slice(header.indexOf('class="connection-row"')).includes('id="connection-status"'), false);
+  assert.match(css, /\.topbar-brand \{[^}]*flex-direction: column;/s);
+  assert.match(css, /\.connection-status \{[^}]*height: 1\.46rem;[^}]*display: inline-flex;/s);
   assert.match(css, /\.connection-status\[data-state="connected"\]/);
   assert.match(css, /\.connection-status\[data-state="disconnected"\]/);
   assert.match(css, /\.connection-status\[data-state="connecting"\]/);
