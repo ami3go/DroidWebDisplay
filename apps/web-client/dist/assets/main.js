@@ -11,6 +11,76 @@ function required(selector) {
         throw new Error(`Missing UI element: ${selector}`);
     return value;
 }
+function bindAndroidCopyWriteThrough() {
+    const button = required("#clipboard-copy-android");
+    const canvas = required("#screen");
+    const clipboardText = required("#clipboard-text");
+    const status = required("#status");
+    const details = required("#details");
+    let generation = 0;
+    const finishCopy = async () => {
+        const request = ++generation;
+        const initialText = clipboardText.value;
+        const initialStatus = status.textContent?.trim() ?? "";
+        const deadline = performance.now() + 1200;
+        let responseObserved = false;
+        while (performance.now() < deadline) {
+            if (request !== generation)
+                return;
+            const currentStatus = status.textContent?.trim() ?? "";
+            const textChanged = clipboardText.value !== initialText;
+            const statusChanged = currentStatus !== initialStatus;
+            if ((textChanged || statusChanged) && currentStatus === "Clipboard copied")
+                return;
+            if (textChanged || (statusChanged && currentStatus === "Clipboard received")) {
+                responseObserved = true;
+                break;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, 20));
+        }
+        if (request !== generation)
+            return;
+        const text = clipboardText.value;
+        if (!text) {
+            status.textContent = "Copy not confirmed";
+            details.textContent = "Android did not return clipboard text.";
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(text);
+            if (request !== generation)
+                return;
+            status.textContent = "Clipboard copied";
+            details.textContent = responseObserved
+                ? "Android selection was copied to the PC clipboard."
+                : "No new Android clipboard event arrived; copied the last Android clipboard value.";
+            return;
+        }
+        catch {
+            const selectionStart = clipboardText.selectionStart;
+            const selectionEnd = clipboardText.selectionEnd;
+            clipboardText.focus();
+            clipboardText.select();
+            const copied = document.execCommand("copy");
+            clipboardText.setSelectionRange(selectionStart, selectionEnd);
+            canvas.focus();
+            if (copied) {
+                status.textContent = "Clipboard copied";
+                details.textContent = "Android selection was copied to the PC clipboard using the browser fallback.";
+            }
+            else {
+                status.textContent = "Clipboard received";
+                details.textContent = "Android clipboard reached the browser, but the browser blocked writing to the PC clipboard.";
+            }
+        }
+    };
+    button.addEventListener("click", () => void finishCopy());
+    canvas.addEventListener("keydown", (event) => {
+        if (event.altKey || (!event.ctrlKey && !event.metaKey) || event.key.toLowerCase() !== "c")
+            return;
+        void finishCopy();
+    });
+}
 async function bootstrap() {
     const auth = new AuthController({
         gate: required("#auth-gate"),
@@ -140,6 +210,7 @@ async function bootstrap() {
             displaySummary: required("#display-summary"),
             capability: required("#virtual-capability"),
         });
+        bindAndroidCopyWriteThrough();
         const runningAppController = new RunningAppController({
             device: required("#device"),
             select: required("#running-app-select"),
