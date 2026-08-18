@@ -75,6 +75,173 @@
       openDisplay();
     });
   }
+  function installBrandHeaderRedesign() {
+    const brand = document.querySelector('.topbar-brand');
+    const title = brand?.querySelector('h1');
+    if (!brand || !title) return;
+
+    if (!document.getElementById('brand-header-redesign-style')) {
+      const style = document.createElement('style');
+      style.id = 'brand-header-redesign-style';
+      style.textContent = `
+        .topbar {
+          min-height: 2.92rem;
+          padding: 0 .85rem 0 0;
+        }
+        .topbar-brand {
+          position: relative;
+          height: 2.92rem;
+          min-height: 2.92rem;
+          min-width: 12.5rem;
+          padding-left: 3.34rem;
+          gap: 0;
+          justify-content: flex-start;
+        }
+        .brand-device-status {
+          position: absolute;
+          inset: 0 auto 0 0;
+          width: 2.92rem;
+          height: 2.92rem;
+          display: grid;
+          place-items: center;
+          border-right: 1px solid #242a37;
+          background: linear-gradient(180deg, #151c29 0%, #0d121b 100%);
+          color: #758197;
+          overflow: hidden;
+        }
+        .brand-device-status svg {
+          width: 2.62rem;
+          height: 2.62rem;
+          overflow: visible;
+        }
+        .brand-phone, .brand-display, .brand-device-link {
+          color: #758197;
+          transition: color 180ms ease, filter 180ms ease, opacity 180ms ease;
+        }
+        .brand-phone-frame, .brand-display-frame, .brand-display-stand,
+        .brand-device-link, .brand-phone-speaker {
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 2.15;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          vector-effect: non-scaling-stroke;
+        }
+        .brand-phone-screen, .brand-display-screen {
+          fill: #0a0d13;
+          stroke: currentColor;
+          stroke-width: 1.45;
+          vector-effect: non-scaling-stroke;
+        }
+        .brand-phone-home { fill: currentColor; }
+        .topbar-brand[data-phone-found="true"] .brand-phone {
+          color: #69d9a2;
+          filter: drop-shadow(0 0 5px #36c98242);
+        }
+        .topbar-brand[data-connection-state="connecting"] .brand-display {
+          color: #82a6ff;
+          animation: brand-display-pulse 1.05s ease-in-out infinite;
+        }
+        .topbar-brand[data-connection-state="connected"] .brand-display,
+        .topbar-brand[data-connection-state="connected"] .brand-device-link {
+          color: #69d9a2;
+          filter: drop-shadow(0 0 5px #36c98242);
+        }
+        .topbar-brand > h1 {
+          flex: 0 0 1.46rem;
+          height: 1.46rem;
+          margin: 0;
+          display: flex;
+          align-items: flex-end;
+          padding-bottom: .08rem;
+          color: #f3f6fb;
+          font-size: 1.04rem;
+          line-height: 1;
+          letter-spacing: -.02em;
+          transition: color 180ms ease, text-shadow 180ms ease;
+        }
+        .topbar-brand[data-connection-state="connected"] > h1 {
+          color: #69d9a2;
+          text-shadow: 0 0 12px #36c98222;
+        }
+        .topbar-brand > .connection-status {
+          height: 1.46rem;
+          min-height: 1.46rem;
+          max-width: 15rem;
+          gap: .28rem;
+          padding: 0;
+          border-color: transparent;
+          background: transparent;
+          box-shadow: none;
+        }
+        .topbar-brand > .connection-status strong {
+          font-size: .66rem;
+          font-weight: 650;
+        }
+        .topbar-brand > .connection-status .connection-status-icon {
+          width: .84rem;
+          height: .84rem;
+        }
+        .topbar-brand > .connection-status[data-state="connected"],
+        .topbar-brand > .connection-status[data-state="disconnected"],
+        .topbar-brand > .connection-status[data-state="connecting"] {
+          border-color: transparent;
+          background: transparent;
+          box-shadow: none;
+        }
+        @keyframes brand-display-pulse {
+          0%, 100% { opacity: .72; }
+          50% { opacity: 1; filter: drop-shadow(0 0 6px #82a6ff55); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .topbar-brand[data-connection-state="connecting"] .brand-display { animation: none; }
+        }
+      `;
+      document.head.append(style);
+    }
+
+    if (!brand.querySelector('.brand-device-status')) {
+      const mark = document.createElement('span');
+      mark.className = 'brand-device-status';
+      mark.setAttribute('aria-hidden', 'true');
+      mark.innerHTML = `
+        <svg viewBox="0 0 64 64" focusable="false">
+          <g class="brand-display">
+            <rect class="brand-display-frame" x="28.5" y="11.5" width="31" height="27" rx="3.5"></rect>
+            <path class="brand-display-stand" d="M44 38.5v8M35.5 49.5h17"></path>
+            <path class="brand-display-screen" d="M33.5 17h21v16.5h-21z"></path>
+          </g>
+          <path class="brand-device-link" d="M25.5 31.5h5"></path>
+          <g class="brand-phone">
+            <rect class="brand-phone-frame" x="5" y="8.5" width="22" height="47" rx="5"></rect>
+            <rect class="brand-phone-screen" x="8.5" y="15" width="15" height="31" rx="1.8"></rect>
+            <path class="brand-phone-speaker" d="M11.5 12h9"></path>
+            <circle class="brand-phone-home" cx="16" cy="51" r="1.4"></circle>
+          </g>
+        </svg>`;
+      brand.insertBefore(mark, title);
+    }
+  }
+
+  function bindBrandHeaderStatus() {
+    const brand = document.querySelector('.topbar-brand');
+    const device = document.getElementById('device');
+    const status = document.getElementById('connection-status');
+    if (!brand || !(device instanceof HTMLSelectElement) || !status || brand.dataset.statusBound === '1') return;
+    brand.dataset.statusBound = '1';
+
+    const sync = () => {
+      const phoneFound = [...device.options].some(option => Boolean(option.value) && !option.disabled);
+      brand.dataset.phoneFound = phoneFound ? 'true' : 'false';
+      brand.dataset.connectionState = status.dataset.state || 'disconnected';
+    };
+    const deviceObserver = new MutationObserver(sync);
+    deviceObserver.observe(device, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'value'] });
+    device.addEventListener('change', sync);
+    const statusObserver = new MutationObserver(sync);
+    statusObserver.observe(status, { attributes: true, attributeFilter: ['data-state'] });
+    sync();
+  }
   function bindStatusActivityIndicator() {
     const statusContainer = document.getElementById('connection-status');
     const statusIcon = document.getElementById('status-icon');
@@ -411,7 +578,9 @@
   function boot() {
     const ui = root(); if (!ui) return;
     document.documentElement.classList.add('gb-single-drawer-enabled');
+    installBrandHeaderRedesign();
     bindStatusShortcut();
+    bindBrandHeaderStatus();
     bindStatusActivityIndicator();
     bindDrawerKeyboard();
     bindDrawerResize();
