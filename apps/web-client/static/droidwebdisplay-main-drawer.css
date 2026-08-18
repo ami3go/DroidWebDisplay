@@ -50,8 +50,8 @@
 }
 
 .brand-device-status svg {
-  width: 49px !important;
-  height: 49px !important;
+  width: 43px !important;
+  height: 43px !important;
   overflow: visible;
 }
 
@@ -59,7 +59,27 @@
 .brand-display,
 .brand-device-link {
   color: #758197;
-  transition: color 180ms ease, filter 180ms ease, opacity 180ms ease;
+  transition: color 180ms ease, filter 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.brand-phone,
+.brand-display {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.brand-phone {
+  transform: translate(-1.8px, 1.2px) scale(.80);
+}
+
+.brand-display {
+  transform: translate(1.8px, .4px) scale(.91);
+}
+
+.brand-device-link {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleX(1.45);
 }
 
 .brand-phone-frame,
@@ -102,9 +122,9 @@
   line-height: 1 !important;
 }
 
-.topbar-brand[data-connection-state="connected"] > h1 {
-  color: var(--dwd-green) !important;
-  text-shadow: 0 0 12px rgba(52, 211, 153, .18) !important;
+.topbar .topbar-brand[data-connection-state="connected"] > h1 {
+  color: #f2f7fc !important;
+  text-shadow: none !important;
 }
 
 .topbar-brand > .connection-status,
@@ -184,8 +204,8 @@
     width: 50px !important;
   }
   .brand-device-status svg {
-    width: 45px !important;
-    height: 45px !important;
+    width: 40px !important;
+    height: 40px !important;
   }
   .topbar-brand > h1 {
     font-size: .98rem !important;
