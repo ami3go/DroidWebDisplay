@@ -47,6 +47,21 @@ TERMINAL_SESSION_STATES = {
 MAX_RETAINED_TERMINATED_SESSIONS = 20
 
 
+def _optional_audio_relay_end(session: "ScrcpySession", reason: str) -> bool:
+    """Return True when an audio-only relay failure must not stop the session.
+
+    Audio is optional when video or control is still enabled. Authentication
+    revocation is never optional, and an audio-only scrcpy session still needs
+    the relay lifetime to own the server lifetime.
+    """
+
+    return (
+        reason.startswith("browser_audio_")
+        and reason != "browser_audio_authentication_revoked"
+        and session.options.audio
+        and (session.options.video or session.options.control)
+    )
+
 
 class PrefixedStreamReader:
     """StreamReader facade that returns validated transport bytes before raw data."""
@@ -562,6 +577,8 @@ class SessionManager:
         session = self._sessions.get(session_id)
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
+        if _optional_audio_relay_end(session, reason):
+            return session
         if session.state in {
             SessionState.STOPPING,
             SessionState.STOPPED,
