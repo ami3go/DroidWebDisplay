@@ -30,6 +30,8 @@ function bindAndroidCopyWriteThrough() {
             const currentStatus = status.textContent?.trim() ?? "";
             const textChanged = clipboardText.value !== initialText;
             const statusChanged = currentStatus !== initialStatus;
+            if (statusChanged && currentStatus === "Copy not confirmed")
+                return;
             if ((textChanged || statusChanged) && currentStatus === "Clipboard copied")
                 return;
             if (textChanged || (statusChanged && currentStatus === "Clipboard received")) {
@@ -40,6 +42,11 @@ function bindAndroidCopyWriteThrough() {
         }
         if (request !== generation)
             return;
+        if (!responseObserved) {
+            status.textContent = "Copy not confirmed";
+            details.textContent = "Android did not return a new clipboard value. The previous PC clipboard was left unchanged.";
+            return;
+        }
         const text = clipboardText.value;
         if (!text) {
             status.textContent = "Copy not confirmed";
@@ -51,9 +58,7 @@ function bindAndroidCopyWriteThrough() {
             if (request !== generation)
                 return;
             status.textContent = "Clipboard copied";
-            details.textContent = responseObserved
-                ? "Android selection was copied to the PC clipboard."
-                : "No new Android clipboard event arrived; copied the last Android clipboard value.";
+            details.textContent = "Android selection was copied to the PC clipboard.";
             return;
         }
         catch {
