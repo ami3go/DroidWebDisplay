@@ -1,0 +1,76 @@
+name: Repair v0.11.6 release contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v0.11.6-release-contracts.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Update stale clipboard release contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one match in {path}, found {count}: {old!r}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "tests/regression/virtual_display/test_virtual_display_models.py",
+              '        "tunnel_forward=true",\n        "new_display=1600x900/240",\n        "keep_active=true",\n    )\n    assert len(args) == 9',
+              '        "tunnel_forward=true",\n        "clipboard_autosync=false",\n        "new_display=1600x900/240",\n        "keep_active=true",\n    )\n    assert len(args) == 10',
+          )
+          replace_once(
+              "tests/ux/test_phase9.py",
+              '    assert \'permissionState !== "granted" && !requestPermission\' in controller',
+              '    assert "if (requestPermission)" in controller\n    assert \'permissionState !== "granted"\' in controller',
+          )
+          replace_once(
+              "apps/web-client/tests/layout.test.mjs",
+              '  assert.match(controllerSource, /permissionState !== "granted" && !requestPermission/);',
+              '  assert.match(controllerSource, /if \\(requestPermission\\)/);\n  assert.match(controllerSource, /permissionState !== "granted"/);',
+          )
+          replace_once(
+              "tools/release_gate.py",
+              '        \'permissionState !== "granted" && !requestPermission\', "#clipboardReadAllowed",',
+              '        "if (requestPermission)", \'permissionState !== "granted"\', "#clipboardReadAllowed",',
+          )
+          PY
+          git diff --check
+          git diff -- \
+            tests/regression/virtual_display/test_virtual_display_models.py \
+            tests/ux/test_phase9.py \
+            apps/web-client/tests/layout.test.mjs \
+            tools/release_gate.py
+
+      - name: Commit repaired contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tests/regression/virtual_display/test_virtual_display_models.py \
+            tests/ux/test_phase9.py \
+            apps/web-client/tests/layout.test.mjs \
+            tools/release_gate.py
+          git commit -m "test: align release contracts with clipboard behavior"
+          git push origin HEAD:main
