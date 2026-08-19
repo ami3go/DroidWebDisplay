@@ -87,9 +87,11 @@ def test_clipboard_session_state_is_reset_before_use_and_on_cleanup() -> None:
         cleanup = block[cleanup_start:cleanup_end]
         assert "resetClipboardSessionState()" in cleanup
 
-        reset_start = block.index("resetClipboardSessionState()")
-        reset_end = block.index("startClipboardPolling", reset_start)
-        reset = block[reset_start:reset_end]
+    src_reset_start = source.index("\n  private resetClipboardSessionState(): void {")
+    src_reset_end = source.index("\n  private async startClipboardPolling", src_reset_start)
+    built_reset_start = dist.index("\n    resetClipboardSessionState() {")
+    built_reset_end = dist.index("\n    async startClipboardPolling", built_reset_start)
+    for reset in (source[src_reset_start:src_reset_end], dist[built_reset_start:built_reset_end]):
         assert '#lastAndroidClipboard = ""' in reset
         assert '#lastSentClipboard = ""' in reset
         assert 'clipboardText.value = ""' in reset
