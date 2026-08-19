@@ -4,6 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+class DestinationProfiles(dict[str, Path]):
+    """Destination roots plus the host-path policy for the active access mode."""
+
+    def __init__(self, values: dict[str, Path], *, allow_custom_paths: bool) -> None:
+        super().__init__(values)
+        self.allow_custom_paths = allow_custom_paths
+
+
 @dataclass(frozen=True)
 class BridgeConfig:
     repo_root: Path
@@ -73,5 +81,8 @@ class BridgeConfig:
     def resolved_network_config_file(self) -> Path:
         return (self.network_config_file or (self.resolved_transfer_data_directory / "network-access.json")).resolve()
 
-    def destination_profiles(self) -> dict[str, Path]:
-        return {"default-downloads": self.resolved_default_download_directory}
+    def destination_profiles(self) -> DestinationProfiles:
+        return DestinationProfiles(
+            {"default-downloads": self.resolved_default_download_directory},
+            allow_custom_paths=self.network_mode == "local-only",
+        )

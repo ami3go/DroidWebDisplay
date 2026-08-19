@@ -92,6 +92,7 @@ class TransferManager:
         self.data_directory = data_directory
         self.upload_spool = data_directory / "upload-spool"
         self.state_file = data_directory / "transfers.json"
+        self.allow_custom_destination_paths = bool(getattr(destination_profiles, "allow_custom_paths", True))
         self.destination_profiles = {key: value.resolve() for key, value in destination_profiles.items()}
         self.maximum_queue_length = maximum_queue_length
         self.maximum_file_size = maximum_file_size
@@ -586,7 +587,8 @@ class TransferManager:
         path = raw.resolve()
         if path.exists() and not path.is_dir():
             raise TransferValidationError("custom destination is not a folder", details={"destinationPath": str(path)})
-        self._assert_within_destination_profile(path)
+        if not self.allow_custom_destination_paths:
+            self._assert_within_destination_profile(path)
         self._assert_destination_allowed(path)
         return path
 
@@ -605,9 +607,8 @@ class TransferManager:
     def _assert_destination_allowed(self, path: Path) -> None:
         """Reject destinations that would turn a transfer into code execution.
 
-        Destination profiles are the primary trust boundary. These component
-        checks remain as defense in depth if a future profile is configured too
-        broadly.
+        Custom absolute folders are a PC-local convenience. LAN mode confines
+        them to approved profiles before these defense-in-depth checks run.
         """
         lowered_parts = tuple(part.lower() for part in path.parts)
         blocked = set(lowered_parts) & _AUTORUN_DIRECTORY_NAMES
