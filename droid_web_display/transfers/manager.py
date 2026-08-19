@@ -29,16 +29,46 @@ _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _DISK_FREE_RESERVE = 16 * 1024 * 1024
 
+# Directories the OS runs code from on login/boot. A file pulled off the phone
+# must never land in one of these.
 _AUTORUN_DIRECTORY_NAMES = frozenset(
     {
-        "autostart", "cron.d", "cron.daily", "cron.hourly", "cron.monthly", "cron.weekly",
-        "init.d", "systemd", "launchagents", "launchdaemons", "startup", "start menu", ".ssh", ".gnupg",
+        "autostart",
+        "cron.d",
+        "cron.daily",
+        "cron.hourly",
+        "cron.monthly",
+        "cron.weekly",
+        "init.d",
+        "systemd",
+        "launchagents",
+        "launchdaemons",
+        "startup",
+        "start menu",
+        ".ssh",
+        ".gnupg",
     }
 )
+# Top-level directories owned by the OS, matched directly under the filesystem
+# root (POSIX "/", or a Windows drive anchor such as "c:\\").
 _SYSTEM_ROOT_NAMES = frozenset(
     {
-        "etc", "boot", "bin", "sbin", "lib", "lib64", "usr", "proc", "sys", "var",
-        "windows", "winnt", "program files", "program files (x86)", "programdata", "system volume information",
+        "etc",
+        "boot",
+        "bin",
+        "sbin",
+        "lib",
+        "lib64",
+        "usr",
+        "proc",
+        "sys",
+        "var",
+        "windows",
+        "winnt",
+        "program files",
+        "program files (x86)",
+        "programdata",
+        "system volume information",
     }
 )
 
@@ -120,6 +150,7 @@ class TransferManager:
         return [{"id": key, "path": str(path)} for key, path in sorted(self.destination_profiles.items())]
 
     def destination_path(self, profile_id: str) -> Path:
+        """Return a validated destination profile path without opening it."""
         return self._profile(profile_id)
 
     def open_destination_profile(self, profile_id: str) -> Path:
@@ -178,7 +209,10 @@ class TransferManager:
 
     def _check_spool_capacity(self, *, existing_bytes: int, incoming_bytes: int) -> None:
         if existing_bytes + incoming_bytes > self.maximum_spool_size:
-            raise TransferValidationError("upload spool capacity exceeded", details={"maximumSpoolSize": self.maximum_spool_size})
+            raise TransferValidationError(
+                "upload spool capacity exceeded",
+                details={"maximumSpoolSize": self.maximum_spool_size},
+            )
         free = shutil.disk_usage(self.upload_spool).free
         if free < incoming_bytes + _DISK_FREE_RESERVE:
             raise TransferValidationError(
@@ -199,7 +233,10 @@ class TransferManager:
                         break
                     total += len(chunk)
                     if total > self.maximum_file_size:
-                        raise TransferValidationError("file exceeds configured maximum size", details={"maximumFileSize": self.maximum_file_size})
+                        raise TransferValidationError(
+                            "file exceeds configured maximum size",
+                            details={"maximumFileSize": self.maximum_file_size},
+                        )
                     self._check_spool_capacity(existing_bytes=baseline, incoming_bytes=total)
                     output.write(chunk)
         except Exception:
@@ -209,6 +246,13 @@ class TransferManager:
         return spool_path, total, safe_name
 
     async def spool_local_file(self, source_path: Path) -> tuple[Path, int, str]:
+        """Copy a watched local file into the managed upload spool.
+
+        Upload workers delete their spool files after verified transfer, so a
+        two-way folder monitor must never pass the user's original file to the
+        worker. The source is checked before and after copying to avoid
+        uploading a file that is still being written.
+        """
         source = source_path.resolve()
         if not source.is_file():
             raise TransferValidationError("local sync source is not a regular file", details={"path": str(source)})
@@ -225,7 +269,10 @@ class TransferManager:
             await asyncio.to_thread(shutil.copyfile, source, spool_path)
             after = source.stat()
             if before.st_size != after.st_size or before.st_mtime_ns != after.st_mtime_ns:
-                raise TransferConflictError("local sync source changed while preparing upload", details={"path": str(source)})
+                raise TransferConflictError(
+                    "local sync source changed while preparing upload",
+                    details={"path": str(source)},
+                )
             if spool_path.stat().st_size != after.st_size:
                 raise TransferError(
                     "local sync spool verification failed",
@@ -247,16 +294,23 @@ class TransferManager:
         destination_directory: str,
         duplicate_policy: DuplicatePolicy = DuplicatePolicy.RENAME,
     ) -> TransferRecord:
-        if spool_path in self._spool_reservations:
+        reserved = spool_path in self._spool_reservations
+        if reserved:
             self._release_spool_reservation(spool_path)
         try:
             self._check_queue_capacity()
             destination = join_android_path(destination_directory, original_filename)
             record = TransferRecord(
-                transfer_id=secrets.token_urlsafe(18), direction=TransferDirection.UPLOAD, serial=serial,
-                source_path=original_filename, destination_path=destination,
-                filename=sanitize_filename(original_filename), size=size, created_at=time.time(),
-                duplicate_policy=duplicate_policy, internal_local_path=str(spool_path),
+                transfer_id=secrets.token_urlsafe(18),
+                direction=TransferDirection.UPLOAD,
+                serial=serial,
+                source_path=original_filename,
+                destination_path=destination,
+                filename=sanitize_filename(original_filename),
+                size=size,
+                created_at=time.time(),
+                duplicate_policy=duplicate_policy,
+                internal_local_path=str(spool_path),
             )
             record.add_event(record.created_at, "queued")
             await self._register_and_run(record)
@@ -279,14 +333,19 @@ class TransferManager:
         profile_path = self._custom_destination(destination_path) if destination_path else self._profile(destination_profile)
         destination_label = "custom" if destination_path else destination_profile
         filename = sanitize_filename(PurePosixPath(normalized).name)
-        # Keep the unmodified requested path on the record. Duplicate selection
-        # happens while holding a per-destination lock in the worker, so two
-        # concurrent transfers cannot both choose the same final filename.
+        # Duplicate resolution belongs in the worker under the destination lock.
         destination = profile_path / filename
         record = TransferRecord(
-            transfer_id=secrets.token_urlsafe(18), direction=TransferDirection.DOWNLOAD, serial=serial,
-            source_path=normalized, destination_path=str(destination), filename=filename, created_at=time.time(),
-            duplicate_policy=duplicate_policy, destination_profile=destination_label, internal_local_path=str(destination),
+            transfer_id=secrets.token_urlsafe(18),
+            direction=TransferDirection.DOWNLOAD,
+            serial=serial,
+            source_path=normalized,
+            destination_path=str(destination),
+            filename=filename,
+            created_at=time.time(),
+            duplicate_policy=duplicate_policy,
+            destination_profile=destination_label,
+            internal_local_path=str(destination),
         )
         record.add_event(record.created_at, "queued")
         await self._register_and_run(record)
@@ -336,12 +395,13 @@ class TransferManager:
         task.add_done_callback(lambda finished: self._discard_task(record.transfer_id, finished))
 
     def _discard_task(self, transfer_id: str, finished: asyncio.Task) -> None:
+        # A retry can register a new task under the same id before this callback
+        # runs; only drop the entry if it still points at the task that ended.
         if self._tasks.get(transfer_id) is finished:
             self._tasks.pop(transfer_id, None)
 
     def _local_destination_lock(self, path: Path) -> asyncio.Lock:
-        key = str(path.resolve())
-        return self._local_destination_locks.setdefault(key, asyncio.Lock())
+        return self._local_destination_locks.setdefault(str(path.resolve()), asyncio.Lock())
 
     def _remote_destination_lock(self, serial: str, path: str) -> asyncio.Lock:
         return self._remote_destination_locks.setdefault((serial, path), asyncio.Lock())
@@ -374,7 +434,11 @@ class TransferManager:
         local = Path(record.internal_local_path)
         requested_destination = record.destination_path
         async with self._remote_destination_lock(record.serial, requested_destination):
-            destination = await self._resolve_remote_duplicate(record.serial, requested_destination, record.duplicate_policy)
+            destination = await self._resolve_remote_duplicate(
+                record.serial,
+                requested_destination,
+                record.duplicate_policy,
+            )
             record.destination_path = destination
             parent = str(PurePosixPath(destination).parent)
             await self.adb.mkdir(record.serial, parent)
@@ -404,6 +468,9 @@ class TransferManager:
             record.verification = "size-match"
             await self._complete(record)
 
+        # The transfer itself is done and verified past this point. Housekeeping
+        # failures must not drag the record back out of COMPLETED, or the
+        # auto-download monitor will re-queue an upload that already landed.
         media_scan = getattr(self.adb, "media_scan", None)
         if callable(media_scan):
             try:
@@ -425,11 +492,18 @@ class TransferManager:
             partial = final_path.with_name(final_path.name + f".{record.transfer_id}.part")
             remote = await self.sync.stat(record.serial, record.source_path)
             if not remote.exists or remote.is_directory:
-                raise TransferValidationError("download source is not a regular file", details={"sourcePath": record.source_path})
+                raise TransferValidationError(
+                    "download source is not a regular file",
+                    details={"sourcePath": record.source_path},
+                )
             if remote.size > self.maximum_file_size:
                 raise TransferValidationError(
                     "download exceeds configured maximum size",
-                    details={"sourcePath": record.source_path, "size": remote.size, "maximumFileSize": self.maximum_file_size},
+                    details={
+                        "sourcePath": record.source_path,
+                        "size": remote.size,
+                        "maximumFileSize": self.maximum_file_size,
+                    },
                 )
             record.size = remote.size
             record.state = TransferState.TRANSFERRING
@@ -546,10 +620,18 @@ class TransferManager:
             return
         raise TransferValidationError(
             "custom destination must be inside an approved destination profile",
-            details={"destinationPath": str(path), "approvedRoots": [str(root) for root in approved]},
+            details={
+                "destinationPath": str(path),
+                "approvedRoots": [str(root) for root in approved],
+            },
         )
 
     def _assert_destination_allowed(self, path: Path) -> None:
+        """Reject destinations that would turn a transfer into code execution.
+
+        Custom absolute folders are a PC-local convenience. LAN mode confines
+        them to approved profiles before these defense-in-depth checks run.
+        """
         lowered_parts = tuple(part.lower() for part in path.parts)
         blocked = set(lowered_parts) & _AUTORUN_DIRECTORY_NAMES
         if blocked:
@@ -557,6 +639,8 @@ class TransferManager:
                 "custom destination is a startup or system folder",
                 details={"destinationPath": str(path), "blockedComponent": min(blocked)},
             )
+        # parts[0] is the filesystem anchor: "/" on POSIX, a drive root such as
+        # "C:\\" on Windows. Anything named directly beneath it is OS-owned.
         if len(lowered_parts) >= 2 and lowered_parts[1] in _SYSTEM_ROOT_NAMES:
             raise TransferValidationError(
                 "custom destination is a system folder",
@@ -574,13 +658,25 @@ class TransferManager:
         for item in payload.get("transfers", []):
             try:
                 record = TransferRecord(
-                    transfer_id=item["transferId"], direction=TransferDirection(item["direction"]), serial=item["serial"],
-                    source_path=item["sourcePath"], destination_path=item["destinationPath"], filename=item["filename"],
-                    state=TransferState(item["state"]), size=item.get("size"), bytes_transferred=item.get("bytesTransferred", 0),
-                    speed_bytes_per_second=0.0, created_at=item.get("createdAt", now), started_at=item.get("startedAt"),
-                    ended_at=item.get("endedAt"), retry_count=item.get("retryCount", 0), error=item.get("error"),
-                    verification=item.get("verification"), duplicate_policy=DuplicatePolicy(item.get("duplicatePolicy", "rename")),
-                    destination_profile=item.get("destinationProfile"), internal_local_path=item.get("internalLocalPath"),
+                    transfer_id=item["transferId"],
+                    direction=TransferDirection(item["direction"]),
+                    serial=item["serial"],
+                    source_path=item["sourcePath"],
+                    destination_path=item["destinationPath"],
+                    filename=item["filename"],
+                    state=TransferState(item["state"]),
+                    size=item.get("size"),
+                    bytes_transferred=item.get("bytesTransferred", 0),
+                    speed_bytes_per_second=0.0,
+                    created_at=item.get("createdAt", now),
+                    started_at=item.get("startedAt"),
+                    ended_at=item.get("endedAt"),
+                    retry_count=item.get("retryCount", 0),
+                    error=item.get("error"),
+                    verification=item.get("verification"),
+                    duplicate_policy=DuplicatePolicy(item.get("duplicatePolicy", "rename")),
+                    destination_profile=item.get("destinationProfile"),
+                    internal_local_path=item.get("internalLocalPath"),
                     history=item.get("history", []),
                 )
             except (KeyError, ValueError, TypeError):
@@ -594,7 +690,10 @@ class TransferManager:
 
     async def _persist(self) -> None:
         self.data_directory.mkdir(parents=True, exist_ok=True)
-        payload = {"schemaVersion": 1, "transfers": [record.to_dict(include_internal=True) for record in self.list_records()]}
+        payload = {
+            "schemaVersion": 1,
+            "transfers": [record.to_dict(include_internal=True) for record in self.list_records()],
+        }
         async with self._persist_lock:
             temporary = self.state_file.with_suffix(".json.tmp")
             temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
