@@ -121,6 +121,8 @@ class AuthService:
             if self.configured:
                 raise AuthError("PIN is already configured", code="already_configured")
             pin = self.validate_pin(pin)
+            # Snapshot the whole state rather than named keys: a rollback that
+            # enumerates keys goes stale the moment one is added.
             snapshot = copy.deepcopy(self._state)
             self._state["pin"] = self._hash_pin(pin)
             self._audit("pin-configured")
@@ -135,6 +137,8 @@ class AuthService:
                 )
                 self._persist()
             except Exception:
+                # Never leave the service "configured" in memory without a
+                # persisted PIN: first-run setup would be permanently blocked.
                 self._state = snapshot
                 raise
             return grant
