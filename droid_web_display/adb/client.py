@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
@@ -29,6 +30,15 @@ async def _terminate(process: asyncio.subprocess.Process) -> None:
         await asyncio.shield(process.wait())
     except asyncio.CancelledError:
         pass
+
+
+def _subprocess_creation_kwargs(platform_name: str | None = None) -> dict[str, int]:
+    """Return platform-specific flags for invisible background child processes."""
+    if (platform_name or os.name) != "nt":
+        return {}
+    # CREATE_NO_WINDOW is 0x08000000. Keep the literal fallback so tests and
+    # alternate Python runtimes can still validate the Windows launch contract.
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
 
 
 @dataclass(frozen=True)
@@ -108,6 +118,7 @@ class AdbClient:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=self._env(),
+                **_subprocess_creation_kwargs(),
             )
         except OSError as exc:
             raise AdbUnavailableError(
@@ -425,6 +436,7 @@ class AdbClient:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=self._env(),
+                **_subprocess_creation_kwargs(),
             )
         except OSError as exc:
             raise AdbUnavailableError(
