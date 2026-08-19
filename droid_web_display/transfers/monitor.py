@@ -229,7 +229,8 @@ class AutoDownloadMonitor:
         self._lock = asyncio.Lock()
         # _lock is released across the enqueue awaits inside a scan, so it
         # cannot stop a manual scan from interleaving with the background one
-        # and queueing the same file twice. This serialises whole scans.
+        # and queueing the same file twice. This serialises whole scans and any
+        # state/config mutation that must not happen in the middle of a scan.
         self._scan_lock = asyncio.Lock()
         self._started = False
 
@@ -253,28 +254,29 @@ class AutoDownloadMonitor:
     async def configure(self, config: AutoDownloadConfig) -> dict[str, Any]:
         validated = config.validate()
         self.transfers.destination_path(validated.destination_profile)
-        async with self._lock:
-            remote_changed = (
-                validated.serial != self.config.serial
-                or validated.source_path != self.config.source_path
-                or validated.include_existing != self.config.include_existing
-            )
-            local_changed = (
-                validated.serial != self.config.serial
-                or validated.source_path != self.config.source_path
-                or validated.destination_profile != self.config.destination_profile
-                or validated.include_existing_pc != self.config.include_existing_pc
-            )
-            self.config = validated
-            if remote_changed:
-                self.runtime.baseline_initialized = False
-                self._observed.clear()
-            if local_changed:
-                self.runtime.pc_baseline_initialized = False
-                self._local_observed.clear()
-            self.runtime.state = "watching" if validated.active else "disabled"
-            self.runtime.last_error = None
-            await self._persist_unlocked()
+        async with self._scan_lock:
+            async with self._lock:
+                remote_changed = (
+                    validated.serial != self.config.serial
+                    or validated.source_path != self.config.source_path
+                    or validated.include_existing != self.config.include_existing
+                )
+                local_changed = (
+                    validated.serial != self.config.serial
+                    or validated.source_path != self.config.source_path
+                    or validated.destination_profile != self.config.destination_profile
+                    or validated.include_existing_pc != self.config.include_existing_pc
+                )
+                self.config = validated
+                if remote_changed:
+                    self.runtime.baseline_initialized = False
+                    self._observed.clear()
+                if local_changed:
+                    self.runtime.pc_baseline_initialized = False
+                    self._local_observed.clear()
+                self.runtime.state = "watching" if validated.active else "disabled"
+                self.runtime.last_error = None
+                await self._persist_unlocked()
         self._wake.set()
         return self.snapshot()
 
@@ -288,22 +290,23 @@ class AutoDownloadMonitor:
         return self.snapshot()
 
     async def clear_history(self) -> dict[str, Any]:
-        async with self._lock:
-            self._observed.clear()
-            self._local_observed.clear()
-            self._processed.clear()
-            self._processed_local.clear()
-            self.runtime.baseline_initialized = False
-            self.runtime.pc_baseline_initialized = False
-            self.runtime.notifications.clear()
-            self.runtime.files_seen = 0
-            self.runtime.pc_files_seen = 0
-            self.runtime.downloads_queued = 0
-            self.runtime.downloads_completed = 0
-            self.runtime.uploads_queued = 0
-            self.runtime.uploads_completed = 0
-            self.runtime.deletions_completed = 0
-            await self._persist_unlocked()
+        async with self._scan_lock:
+            async with self._lock:
+                self._observed.clear()
+                self._local_observed.clear()
+                self._processed.clear()
+                self._processed_local.clear()
+                self.runtime.baseline_initialized = False
+                self.runtime.pc_baseline_initialized = False
+                self.runtime.notifications.clear()
+                self.runtime.files_seen = 0
+                self.runtime.pc_files_seen = 0
+                self.runtime.downloads_queued = 0
+                self.runtime.downloads_completed = 0
+                self.runtime.uploads_queued = 0
+                self.runtime.uploads_completed = 0
+                self.runtime.deletions_completed = 0
+                await self._persist_unlocked()
         self._wake.set()
         return self.snapshot()
 
