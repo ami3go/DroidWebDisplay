@@ -1,0 +1,81 @@
+name: Publish v0.11.6 from verified CI
+
+on:
+  workflow_run:
+    workflows: ["DroidWebDisplay Release Gate"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'agent/v0.11.6-release-verify'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.11.6
+      RELEASE_VERSION: 0.11.6
+      RELEASE_TARGET: fcf6f6fd9ed5f7c4112dacc640a4cb4f123275d7
+      VERIFY_RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Verify release target and CI source
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TARGET" --jq .sha)
+          test "$target" = "$RELEASE_TARGET"
+          encoded=$(gh api "repos/$GITHUB_REPOSITORY/contents/VERSION?ref=$RELEASE_TARGET" --jq .content)
+          test "$(printf '%s' "$encoded" | base64 -d | tr -d '\r\n')" = "$RELEASE_VERSION"
+          run_sha=$(gh run view "$VERIFY_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
+          test -n "$run_sha"
+
+      - name: Stop if release already exists
+        id: existing
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download verified Windows and Linux artifacts
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/windows artifacts/linux assets
+          gh run download "$VERIFY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name windows-package-smoke --dir artifacts/windows
+          gh run download "$VERIFY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name linux-appimage-smoke --dir artifacts/linux
+          windows=$(find artifacts/windows -type f -name 'DroidWebDisplay.exe' -print -quit)
+          linux=$(find artifacts/linux -type f -name '*.AppImage' -print -quit)
+          test -n "$windows" && test -n "$linux"
+          cp "$windows" "assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.exe"
+          cp "$linux" "assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
+          chmod +x "assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
+          (cd assets && sha256sum DroidWebDisplay-* > SHA256SUMS.txt)
+
+      - name: Publish release
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/releases/${RELEASE_TAG}.md?ref=$RELEASE_TARGET" --jq .content \
+            | base64 -d > /tmp/release-notes.md
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$RELEASE_TARGET" \
+            --title "DroidWebDisplay $RELEASE_TAG" --notes-file /tmp/release-notes.md \
+            "assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.exe" \
+            "assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage" \
+            assets/SHA256SUMS.txt
+
+      - name: Verify final release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease,assets,targetCommitish \
+            --jq '(.tagName == "v0.11.6") and (.isDraft == false) and (.isPrerelease == false) and ([.assets[].name] | sort) == (["DroidWebDisplay-v0.11.6-linux-x86_64.AppImage","DroidWebDisplay-v0.11.6-windows-x86_64.exe","SHA256SUMS.txt"] | sort)' \
+            | grep -qx true
