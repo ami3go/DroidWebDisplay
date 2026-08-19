@@ -1,0 +1,44 @@
+name: Repair final v0.11.6 web test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v0.11.6-final-web-test.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Replace stale focus assertion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("apps/web-client/tests/layout.test.mjs")
+          text = path.read_text(encoding="utf-8")
+          old = '''test("Clipboard drawer supports focused Ctrl+Enter Type", () => {\n  assert.match(controllerSource, /clipboardText\\.focus\\(\\)/);\n  assert.match(controllerSource, /updateClipboardUi/);\n  assert.match(html, /id="clipboard-card"/);\n});'''
+          new = '''test("Clipboard drawer supports focused Ctrl+Enter Type", () => {\n  assert.match(controllerSource, /clipboardText\\.addEventListener\\("keydown"/);\n  assert.match(controllerSource, /event\\.key === "Enter"[\\s\\S]*pasteTypedText\\(\\)/);\n  assert.match(controllerSource, /updateClipboardUi/);\n  assert.match(html, /id="clipboard-card"/);\n});'''
+          if text.count(old) != 1:
+              raise SystemExit("Expected stale clipboard focus assertion exactly once")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          git diff --check
+          git diff -- apps/web-client/tests/layout.test.mjs
+      - name: Commit corrected web contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web-client/tests/layout.test.mjs
+          git commit -m "test: align Ctrl+Enter clipboard contract"
+          git push origin HEAD:main
