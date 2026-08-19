@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
-      TARGET_SHA: 00f357d389b7d0fe72e11bffe61dd5788272fc75
+      TARGET_SHA: 55c67c93003bd0dfd1c0e1414a9e5a7d0d9b613e
       RELEASE_VERSION: 0.11.6
       RELEASE_TAG: v0.11.6
       BUILD_BRANCH: release/v0.11.6-build
