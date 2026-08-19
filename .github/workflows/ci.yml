@@ -50,6 +50,14 @@ jobs:
           test "$(.tools/uv/uv --version | awk '{print $1 " " $2}')" = "uv 0.12.4"
       - name: Sync locked Python environment
         run: .tools/uv/uv sync --locked --extra dev
+      - name: Lint Python
+        run: .tools/uv/uv run ruff check droid_web_display tools tests
+      - name: Run high-risk behavioral regressions
+        run: |
+          .tools/uv/uv run pytest -q \
+            tests/security \
+            tests/regression/transfers \
+            tests/regression/test_clipboard_copy_server_mode.py
       - working-directory: packages/scrcpy-protocol
         run: npm ci
       - working-directory: apps/web-client
@@ -208,7 +216,7 @@ jobs:
             --runtime-file "$PWD/runtime-x86_64" \
             "$APPDIR" \
             "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
-          chmod +x release/DroidWebDisplay-ci-linux-x86_64.AppImage
+          chmod +x "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
       - name: Smoke-test AppImage desktop host
         run: QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --desktop-smoke
       - name: Smoke-test AppImage CLI
