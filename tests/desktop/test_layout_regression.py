@@ -36,11 +36,28 @@ def test_overview_merges_summary_and_live_health_side_by_side() -> None:
     assert 'self._tabs.tabText(self._tabs.currentIndex()) == "Logs"' in gui
 
 
-def test_primary_open_and_exit_actions_live_outside_tabs() -> None:
+def test_primary_open_and_exit_actions_live_in_header_as_icons() -> None:
     gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
-    assert 'footer.setObjectName("footer")' in gui
-    assert 'footer_open = QPushButton("Open DroidWebDisplay")' in gui
-    assert 'footer_exit = QPushButton("Exit")' in gui
+    assert 'brand_icon.setObjectName("brandIcon")' in gui
+    assert 'brand_title = QLabel("DroidWebDisplay")' in gui
+    assert "QStyle.StandardPixmap.SP_DesktopIcon" in gui
+    assert "QStyle.StandardPixmap.SP_TitleBarCloseButton" in gui
+    assert "header_layout.addWidget(self._status_value" in gui
+    assert "header_layout.addWidget(self._header_open_button" in gui
+    assert "header_layout.addWidget(self._header_exit_button" in gui
+    assert 'footer_open = QPushButton("Open DroidWebDisplay")' not in gui
+    assert 'footer_exit = QPushButton("Exit")' not in gui
+
+
+def test_summary_is_compact_and_local_url_is_clickable() -> None:
+    gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
+    assert "summary_layout.setAlignment(Qt.AlignTop)" in gui
+    assert "summary_layout.addStretch(1)" in gui
+    assert '("Local URL", self._url_value)' in gui
+    assert 'self._url_value.setObjectName("summaryUrl")' in gui
+    assert "Qt.TextBrowserInteraction" in gui
+    assert "self._url_value.linkActivated.connect(self._open_summary_url)" in gui
+    assert "QDesktopServices.openUrl(QUrl(href))" in gui
 
 
 def test_settings_include_only_minimal_update_checker() -> None:

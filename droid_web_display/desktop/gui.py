@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 import os
 from pathlib import Path
 import platform
@@ -9,7 +10,7 @@ import tempfile
 import uuid
 from typing import Callable
 
-from PySide6.QtCore import QObject, QRunnable, QSettings, QThreadPool, QTimer, Qt, QUrl, Signal
+from PySide6.QtCore import QObject, QRunnable, QSettings, QSize, QThreadPool, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
@@ -85,6 +86,25 @@ def _refresh_widget_style(widget: QWidget) -> None:
 def _set_button_variant(button: QPushButton, variant: str | None) -> None:
     button.setProperty("variant", variant)
     _refresh_widget_style(button)
+
+
+def _make_header_icon_button(
+    icon: QIcon,
+    tooltip: str,
+    accessible_name: str,
+    *,
+    danger: bool = False,
+) -> QPushButton:
+    button = QPushButton()
+    button.setObjectName("headerIconButton")
+    button.setIcon(icon)
+    button.setIconSize(QSize(20, 20))
+    button.setFixedSize(38, 38)
+    button.setToolTip(tooltip)
+    button.setAccessibleName(accessible_name)
+    if danger:
+        button.setProperty("headerDanger", True)
+    return button
 
 
 def _make_card(title: str, subtitle: str | None = None) -> tuple[QFrame, QVBoxLayout]:
@@ -219,21 +239,41 @@ class ServerWindow(QMainWindow):
         self._status_value.setAlignment(Qt.AlignCenter)
         self._status_value.setMinimumWidth(126)
 
+        brand_icon = QLabel()
+        brand_icon.setObjectName("brandIcon")
+        brand_icon.setPixmap(icon.pixmap(QSize(34, 34)))
+        brand_icon.setFixedSize(40, 40)
+        brand_icon.setAlignment(Qt.AlignCenter)
+        brand_icon.setToolTip("DroidWebDisplay")
+
         brand_title = QLabel("DroidWebDisplay")
         brand_title.setObjectName("brandTitle")
-        brand_subtitle = QLabel("Desktop server manager")
-        brand_subtitle.setObjectName("brandSubtitle")
-        brand_layout = QVBoxLayout()
-        brand_layout.setContentsMargins(0, 0, 0, 0)
-        brand_layout.setSpacing(1)
-        brand_layout.addWidget(brand_title)
-        brand_layout.addWidget(brand_subtitle)
+
+        self._header_open_button = _make_header_icon_button(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_DesktopIcon),
+            "Open DroidWebDisplay",
+            "Open DroidWebDisplay",
+        )
+        self._header_open_button.setEnabled(False)
+        self._header_open_button.clicked.connect(self.controller.open_browser)
+
+        self._header_exit_button = _make_header_icon_button(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarCloseButton),
+            "Exit DroidWebDisplay",
+            "Exit DroidWebDisplay",
+            danger=True,
+        )
+        self._header_exit_button.clicked.connect(self.request_exit)
 
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(2, 0, 2, 0)
-        header_layout.setSpacing(12)
-        header_layout.addLayout(brand_layout, 1)
-        header_layout.addWidget(self._status_value, 0, Qt.AlignRight | Qt.AlignVCenter)
+        header_layout.setSpacing(10)
+        header_layout.addWidget(brand_icon, 0, Qt.AlignVCenter)
+        header_layout.addWidget(brand_title, 0, Qt.AlignVCenter)
+        header_layout.addStretch(1)
+        header_layout.addWidget(self._status_value, 0, Qt.AlignVCenter)
+        header_layout.addWidget(self._header_open_button, 0, Qt.AlignVCenter)
+        header_layout.addWidget(self._header_exit_button, 0, Qt.AlignVCenter)
 
         self._tabs = QTabWidget()
         self._tabs.setObjectName("mainTabs")
@@ -250,22 +290,12 @@ class ServerWindow(QMainWindow):
         self._footer_device.setObjectName("footerDevice")
         self._footer_device.setProperty("deviceState", "idle")
 
-        footer_open = QPushButton("Open DroidWebDisplay")
-        footer_open.clicked.connect(self.controller.open_browser)
-        _set_button_variant(footer_open, "primary")
-
-        footer_exit = QPushButton("Exit")
-        footer_exit.clicked.connect(self.request_exit)
-        _set_button_variant(footer_exit, "danger")
-
         footer = QFrame()
         footer.setObjectName("footer")
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(0, 9, 0, 0)
         footer_layout.setSpacing(8)
         footer_layout.addWidget(self._footer_device, 1)
-        footer_layout.addWidget(footer_open)
-        footer_layout.addWidget(footer_exit)
 
         root = QWidget()
         root.setObjectName("serverRoot")
@@ -299,7 +329,16 @@ class ServerWindow(QMainWindow):
         overview_row.setSpacing(12)
 
         summary, summary_layout = _make_card("Summary")
-        self._url_value = _field_value(selectable=True)
+        summary_layout.setAlignment(Qt.AlignTop)
+        summary_layout.setSpacing(8)
+
+        self._url_value = _field_value()
+        self._url_value.setObjectName("summaryUrl")
+        self._url_value.setTextFormat(Qt.RichText)
+        self._url_value.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self._url_value.setOpenExternalLinks(False)
+        self._url_value.setToolTip("Open DroidWebDisplay in the default browser")
+        self._url_value.linkActivated.connect(self._open_summary_url)
         self._network_value = _field_value()
         self._device_value = _field_value()
         self._uptime_value = _field_value()
@@ -310,10 +349,12 @@ class ServerWindow(QMainWindow):
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
         form.setHorizontalSpacing(18)
-        form.setVerticalSpacing(9)
+        form.setVerticalSpacing(7)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setFormAlignment(Qt.AlignTop)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         for name, value in (
-            ("URL", self._url_value),
+            ("Local URL", self._url_value),
             ("Network", self._network_value),
             ("Android", self._device_value),
             ("Uptime", self._uptime_value),
@@ -321,6 +362,7 @@ class ServerWindow(QMainWindow):
         ):
             form.addRow(_field_label(name), value)
         summary_layout.addLayout(form)
+        summary_layout.addStretch(1)
 
         health, health_layout = _make_card(
             "Health status",
@@ -642,6 +684,10 @@ class ServerWindow(QMainWindow):
         if self._latest_release_url:
             QDesktopServices.openUrl(QUrl(self._latest_release_url))
 
+    def _open_summary_url(self, href: str) -> None:
+        if href:
+            QDesktopServices.openUrl(QUrl(href))
+
     @property
     def open_browser_on_start(self) -> bool:
         return self._open_browser_checkbox.isChecked()
@@ -769,7 +815,10 @@ class ServerWindow(QMainWindow):
             ServerState.ERROR: "Error",
         }
         self._set_status_visual(snapshot.state, labels[snapshot.state])
-        self._url_value.setText(snapshot.url)
+        safe_url = escape(snapshot.url, quote=True)
+        self._url_value.setText(
+            f'<a href="{safe_url}" style="color:#82a6ff; text-decoration:none;">{safe_url}</a>'
+        )
         self._network_value.setText(snapshot.network_mode)
         self._diag_url.setText(snapshot.url)
         if snapshot.device:
@@ -789,6 +838,7 @@ class ServerWindow(QMainWindow):
             self._tray_start_stop_action.setEnabled(not external and snapshot.state != ServerState.STOPPING)
 
         server_ok = snapshot.state in {ServerState.RUNNING, ServerState.EXTERNAL}
+        self._header_open_button.setEnabled(server_ok)
         if server_ok:
             self._set_health(self._health_server, "ok", "● Healthy")
             self._set_health(self._health_browser, "ok", "● Reachable")

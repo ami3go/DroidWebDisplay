@@ -59,9 +59,18 @@ QLabel#brandTitle {{
     font-weight: 700;
 }}
 
-QLabel#brandSubtitle, QLabel#sectionHint {{
+QLabel#sectionHint {{
     color: {c['text_muted']};
     font-size: 9pt;
+}}
+
+QLabel#brandIcon {{
+    background: transparent;
+}}
+
+QLabel#summaryUrl {{
+    color: {c['focus']};
+    font-weight: 600;
 }}
 
 QLabel[fieldLabel="true"] {{
@@ -212,6 +221,26 @@ QPushButton {{
 QPushButton:hover {{
     background-color: {c['surface_button_hover']};
     border-color: #45516a;
+}}
+
+QPushButton#headerIconButton {{
+    min-width: 36px;
+    min-height: 36px;
+    max-width: 36px;
+    max-height: 36px;
+    padding: 0;
+    border-radius: 10px;
+    background-color: {c['surface_alt']};
+}}
+
+QPushButton#headerIconButton:hover {{
+    background-color: {c['surface_button_hover']};
+    border-color: {c['focus']};
+}}
+
+QPushButton#headerIconButton[headerDanger="true"]:hover {{
+    background-color: {c['danger_surface']};
+    border-color: {c['danger_border']};
 }}
 
 QPushButton:pressed {{
