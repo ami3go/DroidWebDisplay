@@ -5,6 +5,7 @@ import { TransferController } from "./transfer-controller.js";
 import { RunningAppController } from "./running-app-controller.js";
 import { AuthController } from "./auth-controller.js";
 import { NetworkAccessController } from "./network-controller.js";
+import { screenCopyShortcut, writeCanvasPngToClipboard } from "./screen-copy.js";
 
 function required<T extends Element>(selector: string): T {
   const value = document.querySelector<T>(selector);
@@ -20,11 +21,24 @@ function bindAndroidCopyWriteThrough(): void {
   const details = required<HTMLElement>("#details");
   let generation = 0;
 
-  const finishCopy = async (): Promise<void> => {
+  const copyDisplayImage = async (request: number, reason: string): Promise<void> => {
+    try {
+      await writeCanvasPngToClipboard(canvas);
+      if (request !== generation) return;
+      status.textContent = "Image copied";
+      details.textContent = reason;
+    } catch (error) {
+      if (request !== generation) return;
+      status.textContent = "Image copy unavailable";
+      details.textContent = error instanceof Error ? error.message : String(error);
+    }
+  };
+
+  const finishCopy = async (fallbackToImage = false): Promise<void> => {
     const request = ++generation;
     const initialText = clipboardText.value;
     const initialStatus = status.textContent?.trim() ?? "";
-    const deadline = performance.now() + 1200;
+    const deadline = performance.now() + (fallbackToImage ? 700 : 1200);
     let responseObserved = false;
 
     while (performance.now() < deadline) {
@@ -32,7 +46,7 @@ function bindAndroidCopyWriteThrough(): void {
       const currentStatus = status.textContent?.trim() ?? "";
       const textChanged = clipboardText.value !== initialText;
       const statusChanged = currentStatus !== initialStatus;
-      if ((textChanged || statusChanged) && currentStatus === "Clipboard copied") return;
+      if (currentStatus === "Clipboard copied" && (textChanged || (!fallbackToImage && statusChanged))) return;
       if (textChanged || (statusChanged && currentStatus === "Clipboard received")) {
         responseObserved = true;
         break;
@@ -42,6 +56,10 @@ function bindAndroidCopyWriteThrough(): void {
 
     if (request !== generation) return;
     const text = clipboardText.value;
+    if (fallbackToImage && (!responseObserved || text === initialText || !text)) {
+      await copyDisplayImage(request, "Ctrl+C found no new Android text selection, so the displayed Android frame was copied to the PC clipboard as PNG.");
+      return;
+    }
     if (!text) {
       status.textContent = "Copy not confirmed";
       details.textContent = "Android did not return clipboard text.";
@@ -76,8 +94,15 @@ function bindAndroidCopyWriteThrough(): void {
 
   button.addEventListener("click", () => void finishCopy());
   canvas.addEventListener("keydown", (event) => {
-    if (event.altKey || (!event.ctrlKey && !event.metaKey) || event.key.toLowerCase() !== "c") return;
-    void finishCopy();
+    if (screenCopyShortcut(event) !== "image") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const request = ++generation;
+    void copyDisplayImage(request, "Ctrl+Shift+C copied the displayed Android frame to the PC clipboard as PNG.");
+  }, { capture: true });
+  canvas.addEventListener("keydown", (event) => {
+    if (screenCopyShortcut(event) !== "smart") return;
+    void finishCopy(true);
   });
 }
 
