@@ -55,13 +55,10 @@ def build_server_arguments(version: str, scid: int, options: SessionOptions) -> 
 
     args.append("tunnel_forward=true")
 
-    if options.control:
-        # scrcpy suppresses the direct GetClipboard response while its native
-        # clipboard listener is enabled. DroidWebDisplay needs a deterministic
-        # Clipboard device message for the Copy button/Ctrl+C path, including
-        # when Android's primary-clip listener does not emit a change event.
-        args.append("clipboard_autosync=false")
-    else:
+    # Keep scrcpy's default clipboard autosync enabled for control sessions so
+    # Android primary-clipboard changes are forwarded to the browser. Manual
+    # Copy/Ctrl+C remains protected by the browser-side write-through fallback.
+    if not options.control:
         args.append("control=false")
     if not options.cleanup:
         args.append("cleanup=false")
