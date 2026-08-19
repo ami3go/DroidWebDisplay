@@ -304,7 +304,8 @@ test("automatic clipboard sync never triggers Android paste", () => {
 
 test("automatic clipboard polling never prompts from the background", () => {
   assert.match(controllerSource, /startClipboardPolling\(requestPermission: boolean\)/);
-  assert.match(controllerSource, /permissionState !== "granted" && !requestPermission/);
+  assert.match(controllerSource, /if \(requestPermission\)/);
+  assert.match(controllerSource, /permissionState !== "granted"/);
   assert.match(controllerSource, /#clipboardReadAllowed/);
   assert.match(controllerSource, /Stop polling after the first runtime permission failure/);
 });

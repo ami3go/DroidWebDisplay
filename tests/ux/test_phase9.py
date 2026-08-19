@@ -84,7 +84,8 @@ def test_automatic_clipboard_sync_does_not_prompt_loop_or_auto_paste() -> None:
     html = (root / "apps/web-client/static/index.html").read_text(encoding="utf-8")
     assert "clipboardMessage(text, sequence, false)" in controller
     assert 'pasteText(text, "automatic PC clipboard")' not in controller
-    assert 'permissionState !== "granted" && !requestPermission' in controller
+    assert "if (requestPermission)" in controller
+    assert 'permissionState !== "granted"' in controller
     assert "#clipboardReadAllowed" in controller
     assert "Automatic sync mirrors clipboard content only" in html
 

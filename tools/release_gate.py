@@ -278,7 +278,7 @@ def main() -> int:
     clipboard_tokens = (
         "clipboardAutoSync", "copyAndroidClipboard", "pollPcClipboard", 'id="clipboard-copy-android"',
         "synchronizePcClipboard", "clipboardMessage(text, sequence, false)",
-        'permissionState !== "granted" && !requestPermission', "#clipboardReadAllowed",
+        "if (requestPermission)", 'permissionState !== "granted"', "#clipboardReadAllowed",
     )
     checks["clipboardCompletion"] = {
         "status": "PASS" if all(token in controller_source + html_source for token in clipboard_tokens)
