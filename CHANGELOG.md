@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.5 — Clipboard reliability and compact header refinements
+
+- Fixed PC → Android text transfer end to end: **Type** now uses direct scrcpy text injection, while **Paste** and **Ctrl+V** synchronize the Android clipboard without depending on Android's `KEYCODE_PASTE` behavior and then inject the text deterministically.
+- Fixed Android → PC **Copy** and **Ctrl+C** by disabling scrcpy's native clipboard autosync for controlled sessions so `GetClipboard(COPY)` returns clipboard data deterministically instead of depending on Android's primary-clipboard change listener.
+- Fixed browser clipboard handling so drawer focus and permission flows no longer break Ctrl+V or normal keyboard input, and added a browser-side copy fallback for restricted clipboard-write contexts.
+- Refined the header into compact icon-only Android controls and a DroidWebDisplay brand/status lockup with clearer phone/display connection-state presentation.
+- Merged Health information into Overview and corrected Settings/tab sizing and scrolling regressions.
+- Added regression coverage for clipboard semantics in both directions, header/status layout, power controls, and release/static asset consistency.
+
 ## 0.11.4 — Screen drop target, clipboard paste fix, and correctness pass
 
 - Added a drag-and-drop upload target on the mirrored screen: files dropped anywhere over the Android display are queued to the server's configured inbox directory, without navigating to the Files drawer. The Explorer drop zone is unchanged.
