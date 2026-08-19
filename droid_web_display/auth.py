@@ -26,6 +26,7 @@ BROWSER_SESSION_MAX_SECONDS = 24 * 60 * 60
 CUSTOM_MIN_SECONDS = 5 * 60
 CUSTOM_MAX_SECONDS = 10 * 365 * 24 * 60 * 60
 AUDIT_LIMIT = 500
+REVOKED_SESSION_LIMIT = 100
 
 TRUST_DURATIONS: dict[str, int | None] = {
     "browser-session": BROWSER_SESSION_MAX_SECONDS,
@@ -120,8 +121,6 @@ class AuthService:
             if self.configured:
                 raise AuthError("PIN is already configured", code="already_configured")
             pin = self.validate_pin(pin)
-            # Snapshot the whole state rather than named keys: a rollback that
-            # enumerates keys goes stale the moment one is added.
             snapshot = copy.deepcopy(self._state)
             self._state["pin"] = self._hash_pin(pin)
             self._audit("pin-configured")
@@ -136,8 +135,6 @@ class AuthService:
                 )
                 self._persist()
             except Exception:
-                # Never leave the service "configured" in memory without a
-                # persisted PIN: first-run setup would be permanently blocked.
                 self._state = snapshot
                 raise
             return grant
@@ -417,6 +414,24 @@ class AuthService:
     def _find_session(self, session_id: str) -> dict[str, Any] | None:
         return next((item for item in self._state.get("sessions", []) if item.get("sessionId") == session_id), None)
 
+    def _prune_revoked_sessions(self) -> bool:
+        sessions = list(self._state.get("sessions", []))
+        revoked = [item for item in sessions if item.get("revokedAt") is not None]
+        if len(revoked) <= REVOKED_SESSION_LIMIT:
+            return False
+        newest = sorted(
+            revoked,
+            key=lambda item: float(item.get("revokedAt") or item.get("createdAt") or 0),
+            reverse=True,
+        )[:REVOKED_SESSION_LIMIT]
+        keep = {id(item) for item in newest}
+        self._state["sessions"] = [
+            item
+            for item in sessions
+            if item.get("revokedAt") is None or id(item) in keep
+        ]
+        return True
+
     def _cleanup_expired(self, *, persist: bool) -> bool:
         now = self.clock()
         changed = False
@@ -429,6 +444,7 @@ class AuthService:
                 item["revocationReason"] = "expired"
                 self._audit("session-expired", sessionId=item.get("sessionId"))
                 changed = True
+        changed = self._prune_revoked_sessions() or changed
         if changed and persist:
             self._persist()
         return changed
@@ -504,6 +520,7 @@ class AuthService:
         return {"schemaVersion": 1, "pin": None, "sessions": [], "audit": []}
 
     def _persist(self) -> None:
+        self._prune_revoked_sessions()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         payload = json.dumps(self._state, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
