@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   actions: write
+  issues: write
 
 concurrency:
   group: droidwebdisplay-v0.11.6-recovery
@@ -68,7 +69,7 @@ jobs:
           set -euo pipefail
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BUILD_BRANCH"
 
-      - name: Find and verify release gate
+      - name: Find release gate
         if: steps.existing.outputs.exists != 'true'
         id: gate
         shell: bash
@@ -92,7 +93,36 @@ jobs:
           done
           test -n "$run_id"
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Verify release gate
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run watch '${{ steps.gate.outputs.run_id }}' --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Report release gate failure
+        if: failure() && steps.gate.outputs.run_id != ''
+        shell: bash
+        run: |
+          set +e
+          run_id='${{ steps.gate.outputs.run_id }}'
+          {
+            echo "The automated v0.11.6 recovery release gate failed."
+            echo
+            echo "Target commit: $TARGET_SHA"
+            echo "CI run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$run_id"
+            echo
+            echo '```text'
+            gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --log-failed 2>&1 | tail -c 50000
+            echo '```'
+          } > release-recovery-failure.md
+          existing_issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search '"v0.11.6 recovery failure" in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$existing_issue" ]; then
+            gh issue comment "$existing_issue" --repo "$GITHUB_REPOSITORY" --body-file release-recovery-failure.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "v0.11.6 recovery failure" --body-file release-recovery-failure.md
+          fi
 
       - name: Download verified packages
         if: steps.existing.outputs.exists != 'true'
