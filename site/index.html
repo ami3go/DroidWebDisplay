@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0d13">
+  <meta name="description" content="DroidWebDisplay brings Android physical and virtual displays to a browser with control, file transfer, app relocation, and local-first access.">
+  <title>DroidWebDisplay — Android display in your browser</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="DroidWebDisplay home">
+      <img src="./favicon.svg" alt="" width="38" height="38">
+      <span>DroidWebDisplay</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="#features">Features</a>
+      <a href="#start">Get started</a>
+      <a href="#docs">Docs</a>
+      <a class="nav-github" href="https://github.com/ami3go/DroidWebDisplay">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">ANDROID · BROWSER · LOCAL-FIRST</p>
+        <h1>Your Android display,<br><span>in the browser.</span></h1>
+        <p class="lede">Control Android physical or virtual displays from a modern browser, move apps between displays, and transfer files without turning the phone into a cloud service.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/ami3go/DroidWebDisplay/releases/latest">Download latest release</a>
+          <a class="button secondary" href="https://github.com/ami3go/DroidWebDisplay">View source</a>
+        </div>
+        <div class="hero-notes" aria-label="Project highlights">
+          <span>Windows &amp; Linux hosts</span>
+          <span>USB / ADB</span>
+          <span>Browser control</span>
+        </div>
+      </div>
+
+      <div class="product-card" aria-label="DroidWebDisplay concept">
+        <div class="card-toolbar">
+          <div class="brand-mini"><img src="./favicon.svg" alt="" width="25" height="25"><strong>DroidWebDisplay</strong></div>
+          <span class="status"><i></i> Connected</span>
+        </div>
+        <div class="card-body">
+          <aside class="rail" aria-hidden="true">
+            <span>⌂</span><span>↔</span><span>▣</span><span>⚙</span>
+          </aside>
+          <div class="screen-shell">
+            <div class="phone-screen">
+              <div class="screen-glow"></div>
+              <div class="screen-title">Android</div>
+              <div class="app-grid">
+                <b></b><b></b><b></b><b></b><b></b><b></b>
+              </div>
+              <div class="dock"><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer"><span>Physical display</span><span>1920 × 1080</span><span>30 FPS</span></div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="features">
+      <div class="section-heading">
+        <p class="eyebrow">WHAT IT DOES</p>
+        <h2>One bridge, several workflows.</h2>
+        <p>DroidWebDisplay keeps the Android device as the compute endpoint while the PC provides the larger screen, keyboard, mouse, and file workflow.</p>
+      </div>
+      <div class="feature-grid">
+        <article><span class="icon">▣</span><h3>Physical &amp; virtual displays</h3><p>Mirror the physical Android screen or create a separate virtual display with its own workspace.</p></article>
+        <article><span class="icon">⌁</span><h3>Browser control</h3><p>Use pointer and keyboard input from the browser through the local DroidWebDisplay bridge.</p></article>
+        <article><span class="icon">↔</span><h3>File transfer</h3><p>Move files between the PC and Android storage, with transfer and folder-sync workflows.</p></article>
+        <article><span class="icon">▦</span><h3>App relocation</h3><p>Inspect running apps and move supported activities onto the selected Android display.</p></article>
+        <article><span class="icon">◉</span><h3>Desktop host</h3><p>Run the service through the desktop host on Windows or Linux, then open the local web interface.</p></article>
+        <article><span class="icon">⌾</span><h3>Controlled LAN access</h3><p>Local access is the default; optional trusted-network access is documented separately with authentication and HTTPS guidance.</p></article>
+      </div>
+    </section>
+
+    <section class="section wrap" id="start">
+      <div class="section-heading compact">
+        <p class="eyebrow">GET STARTED</p>
+        <h2>From phone to browser in three steps.</h2>
+      </div>
+      <ol class="steps">
+        <li><span>01</span><div><h3>Install DroidWebDisplay</h3><p>Download the latest packaged release for your host platform, or install from source for development.</p></div></li>
+        <li><span>02</span><div><h3>Connect Android</h3><p>Enable Android developer options and USB debugging, then authorize the host when prompted.</p></div></li>
+        <li><span>03</span><div><h3>Launch the web UI</h3><p>Start the host service and open the local DroidWebDisplay interface in a supported browser.</p></div></li>
+      </ol>
+      <div class="actions centered">
+        <a class="button primary" href="https://github.com/ami3go/DroidWebDisplay/releases/latest">Get the latest release</a>
+        <a class="button secondary" href="https://github.com/ami3go/DroidWebDisplay/blob/main/docs/RUN.md">Read the run guide</a>
+      </div>
+    </section>
+
+    <section class="section wrap docs-section" id="docs">
+      <div class="section-heading compact">
+        <p class="eyebrow">DOCUMENTATION</p>
+        <h2>Technical reference.</h2>
+      </div>
+      <div class="docs-grid">
+        <a href="https://github.com/ami3go/DroidWebDisplay/blob/main/docs/RUN.md"><strong>Run guide</strong><span>Install, launch and validate the service →</span></a>
+        <a href="https://github.com/ami3go/DroidWebDisplay/blob/main/docs/DESKTOP_HOST.md"><strong>Desktop host</strong><span>Windows and Linux host behavior →</span></a>
+        <a href="https://github.com/ami3go/DroidWebDisplay/blob/main/docs/VIRTUAL_DISPLAY.md"><strong>Virtual display</strong><span>Secondary Android display workflow →</span></a>
+        <a href="https://github.com/ami3go/DroidWebDisplay/blob/main/docs/NETWORK_ACCESS.md"><strong>Network access</strong><span>Trusted LAN and access configuration →</span></a>
+        <a href="https://github.com/ami3go/DroidWebDisplay/blob/main/docs/ARCHITECTURE.md"><strong>Architecture</strong><span>Bridge, protocol and component overview →</span></a>
+        <a href="https://github.com/ami3go/DroidWebDisplay/blob/main/SECURITY.md"><strong>Security</strong><span>Security model and reporting guidance →</span></a>
+      </div>
+    </section>
+
+    <section class="cta wrap">
+      <div><p class="eyebrow">OPEN SOURCE</p><h2>Built around a local Android-to-browser bridge.</h2></div>
+      <a class="button primary" href="https://github.com/ami3go/DroidWebDisplay">Explore on GitHub</a>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <div class="brand footer-brand"><img src="./favicon.svg" alt="" width="28" height="28"><span>DroidWebDisplay</span></div>
+      <p>Open-source Android web display and control bridge.</p>
+      <div><a href="https://github.com/ami3go/DroidWebDisplay/releases">Releases</a><a href="https://github.com/ami3go/DroidWebDisplay/issues">Issues</a><a href="https://github.com/ami3go/DroidWebDisplay/blob/main/LICENSE">License</a></div>
+    </div>
+  </footer>
+</body>
+</html>
