@@ -820,8 +820,9 @@ def create_app(
         )
         return {
             "status": "moved" if after else "launch-sent-unverified",
-            "moved": True,
+            "moved": after is not None,
             "verified": after is not None,
+            "launchRequested": True,
             "sessionId": session_id,
             "displayId": session.display_id,
             "app": (after or selected).to_dict(),
