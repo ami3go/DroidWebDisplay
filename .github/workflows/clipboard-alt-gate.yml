@@ -3,6 +3,8 @@ name: Clipboard Alternate Validation
 on:
   push:
     branches: [agent/harden-clipboard-state]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
