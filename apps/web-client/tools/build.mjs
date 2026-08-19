@@ -12,6 +12,11 @@ const dist = resolve(root, "dist");
 const manifestPath = resolve(root, "dist-manifest.json");
 const stage = resolve(root, `.dist-stage-${process.pid}`);
 const backup = resolve(root, `.dist-backup-${process.pid}`);
+const productVersion = (await readFile(resolve(repo, "VERSION"), "utf8")).trim();
+
+if (!/^\d+\.\d+\.\d+$/.test(productVersion)) {
+  throw new Error(`Invalid DroidWebDisplay VERSION: ${JSON.stringify(productVersion)}`);
+}
 
 async function exists(path) {
   try {
@@ -61,6 +66,16 @@ async function listFiles(directory) {
   return result.sort();
 }
 
+async function stampStaticVersion(directory) {
+  const indexPath = resolve(directory, "index.html");
+  const html = await readFile(indexPath, "utf8");
+  const stamped = html.replace(
+    /\?v=\d+\.\d+\.\d+(-native\d+)?/g,
+    (_match, suffix = "") => `?v=${productVersion}${suffix}`,
+  );
+  await writeFile(indexPath, stamped, "utf8");
+}
+
 async function createManifest(directory) {
   const files = [];
   for (const path of await listFiles(directory)) {
@@ -73,7 +88,7 @@ async function createManifest(directory) {
   }
   return {
     schemaVersion: 1,
-    packageVersion: "0.11.2",
+    packageVersion: productVersion,
     generatedBy: "apps/web-client/tools/build.mjs",
     files,
   };
@@ -103,12 +118,13 @@ await mkdir(stage, { recursive: true });
 try {
   await runCompiler(compiler);
   await cp(resolve(root, "static"), stage, { recursive: true });
+  await stampStaticVersion(stage);
   await mkdir(resolve(stage, "vendor/scrcpy-protocol"), { recursive: true });
   await cp(resolve(protocolRoot, "dist"), resolve(stage, "vendor/scrcpy-protocol"), { recursive: true });
   const manifest = await createManifest(stage);
   await installStage();
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
-  console.log(`Built web client with ${manifest.files.length} files using ${compiler}`);
+  console.log(`Built DroidWebDisplay ${productVersion} web client with ${manifest.files.length} files using ${compiler}`);
 } catch (error) {
   await rm(stage, { recursive: true, force: true });
   throw error;

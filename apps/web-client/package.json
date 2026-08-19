@@ -1,6 +1,6 @@
 {
   "name": "@droid-web-display/web-client",
-  "version": "0.10.1",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "description": "Browser client for physical and virtual Android display sessions",
