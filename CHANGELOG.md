@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.6 — Windows console flash fix
+
+- Fixed the Windows packaged application repeatedly opening and immediately closing console windows while the server was running.
+- Applied `CREATE_NO_WINDOW` consistently to background ADB commands and the scrcpy server child process, matching the existing hidden-process behavior used by the desktop host.
+- Centralized the Windows subprocess creation flags so future ADB call sites inherit the same GUI-safe launch behavior.
+- Added regression coverage verifying both ordinary ADB commands and scrcpy server startup pass the hidden-window creation flags.
+
 ## 0.11.5 — Clipboard reliability and compact header refinements
 
 - Fixed PC → Android text transfer end to end: **Type** now uses direct scrcpy text injection, while **Paste** and **Ctrl+V** synchronize the Android clipboard without depending on Android's `KEYCODE_PASTE` behavior and then inject the text deterministically.
