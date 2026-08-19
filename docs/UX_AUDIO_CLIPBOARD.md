@@ -6,10 +6,15 @@ Audio is disabled by default and explicitly marked **Experimental**. Enable **An
 
 ## Clipboard
 
+Clipboard behavior is a protected compatibility surface. Before changing clipboard, keyboard shortcuts, browser focus/permission handling, scrcpy control messages, or scrcpy session arguments, read `docs/contracts/CLIPBOARD.md`.
+
 - **Paste PC clipboard** reads the browser clipboard and sends it to the focused Android field.
 - **Paste typed text** uses the text box when browser clipboard permission is unavailable.
 - **Copy Android clipboard** writes the most recently received Android clipboard text to the PC clipboard.
-- Automatic synchronization is optional and constrained by the configured maximum size.
+- Automatic Android -> PC synchronization relies on scrcpy native clipboard change notifications.
+- Automatic PC -> Android synchronization is optional and browser-permission constrained.
+- Manual Copy/Ctrl+C and automatic Android -> PC synchronization are independent requirements; fixing one must not disable the other.
+- Automatic synchronization is constrained by the configured maximum size.
 
 Clipboard text is not written to diagnostics.
 
