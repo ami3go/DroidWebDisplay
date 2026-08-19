@@ -290,7 +290,8 @@ test("optional LAN access is explicit, authenticated and recoverable", () => {
 
 
 test("Clipboard drawer supports focused Ctrl+Enter Type", () => {
-  assert.match(controllerSource, /clipboardText\.focus\(\)/);
+  assert.match(controllerSource, /clipboardText\.addEventListener\("keydown"/);
+  assert.match(controllerSource, /event\.key === "Enter"[\s\S]*pasteTypedText\(\)/);
   assert.match(controllerSource, /updateClipboardUi/);
   assert.match(html, /id="clipboard-card"/);
 });
