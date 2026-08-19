@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 import re
+import shlex
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
@@ -29,6 +30,25 @@ async def _terminate(process: asyncio.subprocess.Process) -> None:
         await asyncio.shield(process.wait())
     except asyncio.CancelledError:
         pass
+
+
+def _remote_shell_command(args: Sequence[str]) -> str:
+    """Build one safely quoted Android shell command.
+
+    ``adb shell`` joins host-side argv into a command interpreted by Android's
+    shell. Passing an untrusted path as a separate local argv element therefore
+    does not make it a literal remote argument. Quote every remote argument and
+    reject control characters before the command crosses that shell boundary.
+    """
+
+    if not args:
+        raise ValueError("Android shell command cannot be empty")
+    values: list[str] = []
+    for value in args:
+        if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+            raise ValueError("Android shell arguments must not contain control characters")
+        values.append(shlex.quote(value))
+    return " ".join(values)
 
 
 @dataclass(frozen=True)
@@ -209,16 +229,22 @@ class AdbClient:
     async def get_properties(self, serial: str, names: Sequence[str]) -> dict[str, str]:
         values: dict[str, str] = {}
         for name in names:
-            result = await self.run("-s", serial, "shell", "getprop", name, check=False)
+            result = await self.shell(serial, "getprop", name, check=False)
             if result.returncode == 0:
                 value = result.stdout.strip()
                 if value:
                     values[name] = value
         return values
 
-
-    async def shell(self, serial: str, *args: str, check: bool = True, timeout: float | None = None) -> AdbCommandResult:
-        return await self.run("-s", serial, "shell", *args, check=check, timeout=timeout)
+    async def shell(
+        self,
+        serial: str,
+        *args: str,
+        check: bool = True,
+        timeout: float | None = None,
+    ) -> AdbCommandResult:
+        command = _remote_shell_command(args)
+        return await self.run("-s", serial, "shell", command, check=check, timeout=timeout)
 
     async def external_storage_roots(self, serial: str) -> list[dict[str, str]]:
         result = await self.shell(serial, "ls", "-1", "/storage", check=False, timeout=20.0)
@@ -270,7 +296,6 @@ class AdbClient:
                 label = package.rsplit(".", 1)[-1].replace("_", " ").title()
             apps.append({"label": label, "packageName": package})
         return apps
-
 
     async def free_memory_bytes(self, serial: str) -> int | None:
         result = await self.shell(serial, "cat", "/proc/meminfo", check=False, timeout=10.0)
@@ -369,18 +394,23 @@ class AdbClient:
         await self.run("-s", serial, "push", str(local), remote, timeout=120.0)
 
     async def mkdir(self, serial: str, remote_directory: str) -> None:
-        await self.run("-s", serial, "shell", "mkdir", "-p", remote_directory, timeout=30.0)
+        await self.shell(serial, "mkdir", "-p", remote_directory, timeout=30.0)
 
     async def media_scan(self, serial: str, remote_path: str) -> None:
-        await self.run(
-            "-s", serial, "shell", "am", "broadcast",
-            "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
-            "-d", f"file://{remote_path}", check=False, timeout=30.0,
+        await self.shell(
+            serial,
+            "am",
+            "broadcast",
+            "-a",
+            "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+            "-d",
+            f"file://{remote_path}",
+            check=False,
+            timeout=30.0,
         )
 
     async def remove_file(self, serial: str, remote_path: str) -> None:
-        # Arguments are passed directly to adb; no shell command string is built.
-        result = await self.run("-s", serial, "shell", "rm", "-f", remote_path, check=False, timeout=30.0)
+        result = await self.shell(serial, "rm", "-f", remote_path, check=False, timeout=30.0)
         if result.returncode != 0:
             raise AdbCommandError(
                 "unable to delete Android file",
@@ -408,17 +438,16 @@ class AdbClient:
 
     async def spawn_server(self, serial: str, server_args: Sequence[str]) -> SpawnedAdbProcess:
         executable = self.resolved_executable()
-        argv = (
-            executable,
-            "-s",
-            serial,
-            "shell",
-            "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
-            "app_process",
-            "/",
-            "com.genymobile.scrcpy.Server",
-            *server_args,
+        remote_command = _remote_shell_command(
+            (
+                "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
+                "app_process",
+                "/",
+                "com.genymobile.scrcpy.Server",
+                *server_args,
+            )
         )
+        argv = (executable, "-s", serial, "shell", remote_command)
         try:
             return await asyncio.create_subprocess_exec(
                 *argv,
