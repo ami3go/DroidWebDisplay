@@ -514,15 +514,28 @@ class TransferManager:
         path = raw.resolve()
         if path.exists() and not path.is_dir():
             raise TransferValidationError("custom destination is not a folder", details={"destinationPath": str(path)})
+        self._assert_within_destination_profile(path)
         self._assert_destination_allowed(path)
         return path
+
+    def _assert_within_destination_profile(self, path: Path) -> None:
+        approved = tuple(self.destination_profiles.values())
+        if any(path == root or root in path.parents for root in approved):
+            return
+        raise TransferValidationError(
+            "custom destination must be inside an approved destination profile",
+            details={
+                "destinationPath": str(path),
+                "approvedRoots": [str(root) for root in approved],
+            },
+        )
 
     def _assert_destination_allowed(self, path: Path) -> None:
         """Reject destinations that would turn a transfer into code execution.
 
-        A LAN client authenticated with the PIN is not necessarily the PC
-        owner, so a device-sourced file must not be writable into a directory
-        the OS auto-executes from.
+        Destination profiles are the primary trust boundary. These component
+        checks remain as defense in depth if a future profile is configured too
+        broadly.
         """
         lowered_parts = tuple(part.lower() for part in path.parts)
         blocked = set(lowered_parts) & _AUTORUN_DIRECTORY_NAMES
