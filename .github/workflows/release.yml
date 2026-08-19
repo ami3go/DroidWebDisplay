@@ -1,0 +1,199 @@
+name: DroidWebDisplay Publish Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/releases/v*.md'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: droidwebdisplay-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      sha: ${{ steps.prepare.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+
+      - id: prepare
+        name: Prepare versioned release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          request=$(git diff --name-only HEAD^ HEAD -- '.github/releases/v*.md' | head -n 1)
+          test -n "$request"
+          file=$(basename "$request")
+          version=${file#v}
+          version=${version%.md}
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          export RELEASE_VERSION="$version"
+          export RELEASE_REQUEST="$request"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          version = os.environ["RELEASE_VERSION"]
+          request = Path(os.environ["RELEASE_REQUEST"])
+          current = Path("VERSION").read_text(encoding="utf-8").strip()
+          if current == version:
+              raise SystemExit(f"VERSION already equals {version}")
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"Expected version marker not found in {path}: {old!r}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          Path("VERSION").write_text(version + "\n", encoding="utf-8")
+          replace_once(
+              "droid_web_display/__init__.py",
+              f'__version__ = "{current}"',
+              f'__version__ = "{version}"',
+          )
+          replace_once(
+              "pyproject.toml",
+              f'version = "{current}"',
+              f'version = "{version}"',
+          )
+          replace_once(
+              "requirements-runtime.txt",
+              f"# DroidWebDisplay v{current} pinned runtime environment.",
+              f"# DroidWebDisplay v{version} pinned runtime environment.",
+          )
+          replace_once(
+              "packages/bridge-api/openapi/openapi-v1.json",
+              f'"version": "{current}"',
+              f'"version": "{version}"',
+          )
+          replace_once(
+              "uv.lock",
+              f'name = "droid-web-display"\nversion = "{current}"',
+              f'name = "droid-web-display"\nversion = "{version}"',
+          )
+
+          notes = request.read_text(encoding="utf-8").strip()
+          if not notes.startswith(f"## {version} "):
+              raise SystemExit(f"Release notes must start with '## {version} '")
+          changelog_path = Path("CHANGELOG.md")
+          changelog = changelog_path.read_text(encoding="utf-8")
+          if f"## {version} " in changelog:
+              raise SystemExit(f"CHANGELOG already contains {version}")
+          prefix = "# Changelog\n"
+          if not changelog.startswith(prefix):
+              raise SystemExit("Unexpected CHANGELOG header")
+          existing = changelog[len(prefix):].lstrip("\n")
+          changelog_path.write_text(
+              f"# Changelog\n\n{notes}\n\n{existing}",
+              encoding="utf-8",
+          )
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            CHANGELOG.md \
+            VERSION \
+            droid_web_display/__init__.py \
+            pyproject.toml \
+            requirements-runtime.txt \
+            packages/bridge-api/openapi/openapi-v1.json \
+            uv.lock
+          git commit -m "Prepare v${version} release"
+          git push origin HEAD:main
+
+          sha=$(git rev-parse HEAD)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+
+      - name: Dispatch release gate for exact release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$current" != "$RELEASE_SHA" ]; then
+            echo "main moved from release commit $RELEASE_SHA to $current" >&2
+            exit 1
+          fi
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+      - name: Wait for release gate and download packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=""
+          for attempt in $(seq 1 90); do
+            run_id=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow ci.yml \
+              --commit "$RELEASE_SHA" \
+              --event workflow_dispatch \
+              --limit 10 \
+              --json databaseId \
+              --jq '.[0].databaseId // empty')
+            if [ -n "$run_id" ]; then
+              break
+            fi
+            sleep 10
+          done
+          if [ -z "$run_id" ]; then
+            echo "No dispatched release-gate workflow run found for $RELEASE_SHA" >&2
+            exit 1
+          fi
+
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+          mkdir -p artifacts/windows artifacts/linux release-assets
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name windows-package-smoke --dir artifacts/windows
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name linux-appimage-smoke --dir artifacts/linux
+
+          windows=$(find artifacts/windows -type f -name 'DroidWebDisplay.exe' -print -quit)
+          linux=$(find artifacts/linux -type f -name '*.AppImage' -print -quit)
+          test -n "$windows"
+          test -n "$linux"
+
+          cp "$windows" "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.exe"
+          cp "$linux" "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
+          chmod +x "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
+          (cd release-assets && sha256sum DroidWebDisplay-* > SHA256SUMS.txt)
+
+      - name: Publish GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${RELEASE_VERSION}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists" >&2
+            exit 1
+          fi
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --title "DroidWebDisplay $tag" \
+            --notes-file ".github/releases/${tag}.md" \
+            release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.exe \
+            release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage \
+            release-assets/SHA256SUMS.txt
