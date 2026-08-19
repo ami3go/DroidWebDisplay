@@ -216,7 +216,7 @@ jobs:
             --runtime-file "$PWD/runtime-x86_64" \
             "$APPDIR" \
             "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
-          chmod +x "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
+          chmod +x release/DroidWebDisplay-ci-linux-x86_64.AppImage
       - name: Smoke-test AppImage desktop host
         run: QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --desktop-smoke
       - name: Smoke-test AppImage CLI
