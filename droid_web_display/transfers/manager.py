@@ -27,6 +27,7 @@ from droid_web_display.transfers.paths import join_android_path, normalize_andro
 
 _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
+_DISK_FREE_RESERVE = 16 * 1024 * 1024
 
 # Directories the OS runs code from on login/boot. A file pulled off the phone
 # must never land in one of these.
@@ -94,9 +95,11 @@ class TransferManager:
         self.destination_profiles = {key: value.resolve() for key, value in destination_profiles.items()}
         self.maximum_queue_length = maximum_queue_length
         self.maximum_file_size = maximum_file_size
+        self.maximum_spool_size = maximum_file_size * min(maximum_queue_length, 4)
         self._semaphore = asyncio.Semaphore(concurrency)
         self._records: dict[str, TransferRecord] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._spool_reservations: set[Path] = set()
         self._persist_lock = asyncio.Lock()
         self._started = False
 
@@ -108,6 +111,7 @@ class TransferManager:
         for path in self.destination_profiles.values():
             path.mkdir(parents=True, exist_ok=True)
         await self._load_state()
+        self._sweep_orphan_spool_files()
         self._started = True
 
     async def close(self) -> None:
@@ -125,6 +129,7 @@ class TransferManager:
                 record.add_event(now, "interrupted", reason="service_shutdown")
         await self._persist()
         self._tasks.clear()
+        self._spool_reservations.clear()
         self._started = False
 
     def list_records(self) -> list[TransferRecord]:
@@ -178,9 +183,42 @@ class TransferManager:
             for entry in sorted(entries, key=lambda item: (not item.is_directory, item.name.casefold()))
         ]
 
+    def _reserve_spool(self, safe_name: str) -> Path:
+        self._check_queue_capacity()
+        spool_path = self.upload_spool / f"{secrets.token_urlsafe(12)}-{safe_name}.part"
+        self._spool_reservations.add(spool_path)
+        return spool_path
+
+    def _release_spool_reservation(self, spool_path: Path) -> None:
+        self._spool_reservations.discard(spool_path)
+
+    def _spool_usage(self) -> int:
+        total = 0
+        for path in self.upload_spool.glob("*.part"):
+            try:
+                if path.is_file():
+                    total += path.stat().st_size
+            except OSError:
+                continue
+        return total
+
+    def _check_spool_capacity(self, *, existing_bytes: int, incoming_bytes: int) -> None:
+        if existing_bytes + incoming_bytes > self.maximum_spool_size:
+            raise TransferValidationError(
+                "upload spool capacity exceeded",
+                details={"maximumSpoolSize": self.maximum_spool_size},
+            )
+        free = shutil.disk_usage(self.upload_spool).free
+        if free < incoming_bytes + _DISK_FREE_RESERVE:
+            raise TransferValidationError(
+                "insufficient free disk space for upload spool",
+                details={"freeBytes": free, "reserveBytes": _DISK_FREE_RESERVE},
+            )
+
     async def spool_upload(self, filename: str, chunks: Any) -> tuple[Path, int, str]:
         safe_name = sanitize_filename(filename)
-        spool_path = self.upload_spool / f"{secrets.token_urlsafe(12)}-{safe_name}.part"
+        spool_path = self._reserve_spool(safe_name)
+        baseline = self._spool_usage()
         total = 0
         try:
             with spool_path.open("wb") as output:
@@ -194,8 +232,10 @@ class TransferManager:
                             "file exceeds configured maximum size",
                             details={"maximumFileSize": self.maximum_file_size},
                         )
+                    self._check_spool_capacity(existing_bytes=baseline, incoming_bytes=total)
                     output.write(chunk)
         except Exception:
+            self._release_spool_reservation(spool_path)
             spool_path.unlink(missing_ok=True)
             raise
         return spool_path, total, safe_name
@@ -218,8 +258,9 @@ class TransferManager:
                 details={"path": str(source), "maximumFileSize": self.maximum_file_size},
             )
         safe_name = sanitize_filename(source.name)
-        spool_path = self.upload_spool / f"{secrets.token_urlsafe(12)}-{safe_name}.part"
+        spool_path = self._reserve_spool(safe_name)
         try:
+            self._check_spool_capacity(existing_bytes=self._spool_usage(), incoming_bytes=before.st_size)
             await asyncio.to_thread(shutil.copyfile, source, spool_path)
             after = source.stat()
             if before.st_size != after.st_size or before.st_mtime_ns != after.st_mtime_ns:
@@ -234,6 +275,7 @@ class TransferManager:
                 )
             return spool_path, after.st_size, safe_name
         except Exception:
+            self._release_spool_reservation(spool_path)
             spool_path.unlink(missing_ok=True)
             raise
 
@@ -247,23 +289,30 @@ class TransferManager:
         destination_directory: str,
         duplicate_policy: DuplicatePolicy = DuplicatePolicy.RENAME,
     ) -> TransferRecord:
-        self._check_queue_capacity()
-        destination = join_android_path(destination_directory, original_filename)
-        record = TransferRecord(
-            transfer_id=secrets.token_urlsafe(18),
-            direction=TransferDirection.UPLOAD,
-            serial=serial,
-            source_path=original_filename,
-            destination_path=destination,
-            filename=sanitize_filename(original_filename),
-            size=size,
-            created_at=time.time(),
-            duplicate_policy=duplicate_policy,
-            internal_local_path=str(spool_path),
-        )
-        record.add_event(record.created_at, "queued")
-        await self._register_and_run(record)
-        return record
+        reserved = spool_path in self._spool_reservations
+        if reserved:
+            self._release_spool_reservation(spool_path)
+        try:
+            self._check_queue_capacity()
+            destination = join_android_path(destination_directory, original_filename)
+            record = TransferRecord(
+                transfer_id=secrets.token_urlsafe(18),
+                direction=TransferDirection.UPLOAD,
+                serial=serial,
+                source_path=original_filename,
+                destination_path=destination,
+                filename=sanitize_filename(original_filename),
+                size=size,
+                created_at=time.time(),
+                duplicate_policy=duplicate_policy,
+                internal_local_path=str(spool_path),
+            )
+            record.add_event(record.created_at, "queued")
+            await self._register_and_run(record)
+            return record
+        except Exception:
+            spool_path.unlink(missing_ok=True)
+            raise
 
     async def enqueue_download(
         self,
@@ -424,6 +473,15 @@ class TransferManager:
         remote = await self.sync.stat(record.serial, record.source_path)
         if not remote.exists or remote.is_directory:
             raise TransferValidationError("download source is not a regular file", details={"sourcePath": record.source_path})
+        if remote.size > self.maximum_file_size:
+            raise TransferValidationError(
+                "download exceeds configured maximum size",
+                details={
+                    "sourcePath": record.source_path,
+                    "size": remote.size,
+                    "maximumFileSize": self.maximum_file_size,
+                },
+            )
         record.size = remote.size
         record.state = TransferState.TRANSFERRING
         record.add_event(time.time(), "transferring")
@@ -495,8 +553,22 @@ class TransferManager:
 
     def _check_queue_capacity(self) -> None:
         active = sum(record.state not in _FINAL_STATES for record in self._records.values())
+        active += len(self._spool_reservations)
         if active >= self.maximum_queue_length:
             raise TransferConflictError("transfer queue is full", details={"maximumQueueLength": self.maximum_queue_length})
+
+    def _sweep_orphan_spool_files(self) -> None:
+        referenced = {
+            Path(record.internal_local_path).resolve()
+            for record in self._records.values()
+            if record.direction == TransferDirection.UPLOAD and record.internal_local_path
+        }
+        for path in self.upload_spool.glob("*.part"):
+            try:
+                if path.resolve() not in referenced:
+                    path.unlink(missing_ok=True)
+            except OSError:
+                continue
 
     def _profile(self, profile_id: str) -> Path:
         try:
