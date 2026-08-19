@@ -28,6 +28,7 @@ from droid_web_display.transfers.paths import join_android_path, normalize_andro
 _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _DISK_FREE_RESERVE = 16 * 1024 * 1024
+_MAX_FINAL_RECORDS = 500
 
 # Directories the OS runs code from on login/boot. A file pulled off the phone
 # must never land in one of these.
@@ -138,7 +139,17 @@ class TransferManager:
         self._started = False
 
     def list_records(self) -> list[TransferRecord]:
-        return sorted(self._records.values(), key=lambda item: item.created_at, reverse=True)
+        values = sorted(self._records.values(), key=lambda item: item.created_at, reverse=True)
+        kept: list[TransferRecord] = []
+        final_count = 0
+        for record in values:
+            if record.state in _FINAL_STATES:
+                final_count += 1
+                if final_count > _MAX_FINAL_RECORDS:
+                    self._records.pop(record.transfer_id, None)
+                    continue
+            kept.append(record)
+        return kept
 
     def get(self, transfer_id: str) -> TransferRecord:
         try:
@@ -687,6 +698,7 @@ class TransferManager:
                 record.error = "bridge restarted before transfer completed"
                 record.add_event(now, "interrupted", reason="service_restart")
             self._records[record.transfer_id] = record
+        self.list_records()
 
     async def _persist(self) -> None:
         self.data_directory.mkdir(parents=True, exist_ok=True)
