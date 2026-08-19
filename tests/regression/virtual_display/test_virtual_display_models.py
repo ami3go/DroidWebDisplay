@@ -137,11 +137,10 @@ def test_recommended_samsung_hil_arguments_match_upstream_compact_style() -> Non
         "audio=false",
         "max_fps=60",
         "tunnel_forward=true",
-        "clipboard_autosync=false",
         "new_display=1600x900/240",
         "keep_active=true",
     )
-    assert len(args) == 10
+    assert len(args) == 9
 
 
 def test_hide_ime_policy_is_virtual_display_only() -> None:
