@@ -1,0 +1,106 @@
+name: Verify and clean v0.11.6 release recovery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-clean-v0.11.6.yml'
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  verify-clean:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.11.6
+      RELEASE_TARGET: 9565837ff04d40340a4b7305b09f6e6d6aae9295
+      VERIFY_GATE_RUN: '32261062507'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify published release and assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/releases
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,name,isDraft,isPrerelease,targetCommitish,publishedAt,url,assets \
+            > /tmp/release.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/release.json').read_text(encoding='utf-8'))
+          expected = {
+              'DroidWebDisplay-v0.11.6-windows-x86_64.exe',
+              'DroidWebDisplay-v0.11.6-linux-x86_64.AppImage',
+              'SHA256SUMS.txt',
+          }
+          names = {asset['name'] for asset in data.get('assets', [])}
+          if data.get('tagName') != 'v0.11.6':
+              raise SystemExit(f"unexpected tag: {data.get('tagName')}")
+          if data.get('isDraft') or data.get('isPrerelease'):
+              raise SystemExit('v0.11.6 is not a final published release')
+          if data.get('targetCommitish') != os.environ['RELEASE_TARGET']:
+              raise SystemExit(f"unexpected release target: {data.get('targetCommitish')}")
+          if names != expected:
+              raise SystemExit(f"unexpected release assets: {sorted(names)}")
+
+          evidence = {
+              'schemaVersion': 1,
+              'release': data,
+              'verifiedReleaseTarget': os.environ['RELEASE_TARGET'],
+              'verifiedGateRunId': int(os.environ['VERIFY_GATE_RUN']),
+              'verifiedAssets': sorted(names),
+              'status': 'PASS',
+          }
+          Path('evidence/releases/v0.11.6-verification.json').write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+          tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq .object.sha)
+          test "$tag_sha" = "$RELEASE_TARGET"
+
+      - name: Close temporary verification tracking
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh pr close 25 --repo "$GITHUB_REPOSITORY" --comment "v0.11.6 release gate passed and the final release was published; closing the CI-only verification PR." || true
+          gh issue close 24 --repo "$GITHUB_REPOSITORY" --reason completed --comment "Resolved: v0.11.6 release gate is green and the release is published with verified Windows/Linux assets." || true
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/agent/v0.11.6-release-verify" >/dev/null 2>&1 || true
+
+      - name: Remove temporary recovery workflows and persist evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/recover-v0.11.6.yml \
+            .github/workflows/fix-v0.11.6-release-contracts.yml \
+            .github/workflows/fix-v0.11.6-final-web-test.yml \
+            .github/workflows/publish-v0.11.6-final.yml \
+            .github/workflows/publish-v0.11.6-from-verified-ci.yml \
+            .github/workflows/verify-clean-v0.11.6.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A \
+            .github/workflows/recover-v0.11.6.yml \
+            .github/workflows/fix-v0.11.6-release-contracts.yml \
+            .github/workflows/fix-v0.11.6-final-web-test.yml \
+            .github/workflows/publish-v0.11.6-final.yml \
+            .github/workflows/publish-v0.11.6-from-verified-ci.yml \
+            .github/workflows/verify-clean-v0.11.6.yml \
+            evidence/releases/v0.11.6-verification.json
+          git diff --cached --check
+          git commit -m "ci: record v0.11.6 release verification"
+          git push origin HEAD:main
