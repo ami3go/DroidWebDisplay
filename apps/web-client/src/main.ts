@@ -85,6 +85,79 @@ function bindAndroidCopyWriteThrough(): void {
   });
 }
 
+function browserGpuRenderer(): string {
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl");
+    if (!gl) return "WebGL unavailable";
+    const debug = gl.getExtension("WEBGL_debug_renderer_info") as { readonly UNMASKED_RENDERER_WEBGL: number } | null;
+    const value = gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER);
+    return typeof value === "string" && value.trim() ? value.trim() : "WebGL available";
+  } catch {
+    return "GPU renderer unavailable";
+  }
+}
+
+function installBrowserDiagnostics(capabilities: ReturnType<typeof inspectBrowserCapabilities>): void {
+  const statistics = required<HTMLElement>("#statistics");
+  const gpu = browserGpuRenderer();
+  const webCodecs = capabilities.supported ? "WebCodecs ready" : `missing ${capabilities.missing.join(", ")}`;
+  const cpu = capabilities.hardwareConcurrency === null ? "CPU ?" : `${capabilities.hardwareConcurrency} logical CPU`;
+  const summary = `${capabilities.browserName} · ${capabilities.platform} · ${webCodecs} · ${cpu} · GPU ${gpu}`;
+  statistics.textContent = summary;
+  statistics.dataset.browserDiagnostics = summary;
+  statistics.title = `${summary}. If controls work but video is black: update Chrome/Edge and the GPU driver; if needed disable browser hardware acceleration, restart the browser, then reconnect.`;
+}
+
+function bindAdbDeviceGuidance(): void {
+  const device = required<HTMLSelectElement>("#device");
+  const status = required<HTMLElement>("#status");
+  const details = required<HTMLElement>("#details");
+  const statusContainer = required<HTMLElement>("#connection-status");
+  const guidanceTitles = new Set([
+    "USB authorization required",
+    "ADB device offline",
+    "ADB access blocked",
+    "No Android device",
+    "ADB device not ready",
+  ]);
+
+  const update = (): void => {
+    const options = [...device.options];
+    if (options.some((option) => Boolean(option.value) && !option.disabled)) {
+      if (guidanceTitles.has(status.textContent?.trim() ?? "")) {
+        status.textContent = "Ready";
+        details.textContent = "An authorized Android device is available. Select it and connect.";
+        statusContainer.setAttribute("aria-label", "disconnected: Ready. An authorized Android device is available.");
+      }
+      return;
+    }
+
+    const labels = options.map((option) => option.textContent?.toLowerCase() ?? "").join(" ");
+    if (labels.includes("unauthorized") || labels.includes("authorizing")) {
+      status.textContent = "USB authorization required";
+      details.textContent = "Unlock the Android device, accept “Allow USB debugging?”, then refresh devices.";
+    } else if (labels.includes("no permissions")) {
+      status.textContent = "ADB access blocked";
+      details.textContent = "The phone is visible but ADB cannot access it. On Windows, install/update the phone OEM USB driver and reconnect USB.";
+    } else if (labels.includes("offline")) {
+      status.textContent = "ADB device offline";
+      details.textContent = "Reconnect USB, unlock the phone, and toggle USB debugging if the device remains offline.";
+    } else if (!options.length) {
+      status.textContent = "No Android device";
+      details.textContent = "Connect the phone with USB debugging enabled. Windows may require the manufacturer/OEM USB driver.";
+    } else {
+      status.textContent = "ADB device not ready";
+      details.textContent = `Connected device state: ${options[0]?.textContent?.trim() || "unknown"}. Resolve the USB/Android state and refresh devices.`;
+    }
+    statusContainer.setAttribute("aria-label", `disconnected: ${status.textContent}. ${details.textContent}`);
+  };
+
+  new MutationObserver(update).observe(device, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
+  device.addEventListener("change", update);
+  update();
+}
+
 async function bootstrap(): Promise<void> {
   const auth = new AuthController({
     gate: required<HTMLElement>("#auth-gate"),
@@ -124,6 +197,7 @@ async function bootstrap(): Promise<void> {
     unsupported.textContent = `This browser is unsupported. Missing: ${capabilities.missing.join(", ")}. Use a current Chromium browser with WebCodecs.`;
   } else {
     app.hidden = false;
+    installBrowserDiagnostics(capabilities);
     const networkController = new NetworkAccessController({
       card: required<HTMLElement>("#network-card"),
       badge: required<HTMLElement>("#network-mode-badge"),
@@ -274,7 +348,10 @@ async function bootstrap(): Promise<void> {
     });
     window.addEventListener("beforeunload", () => { controller.stopOnUnload(); runningAppController.close(); transferController.close(); autoDownloadController.close(); });
     void controller.initialize()
-      .then(() => Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]))
+      .then(() => {
+        bindAdbDeviceGuidance();
+        return Promise.all([transferController.initialize(), autoDownloadController.initialize(), runningAppController.initialize()]);
+      })
       .catch((error: unknown) => {
       required<HTMLElement>("#status").textContent = "Initialization failed";
       required<HTMLElement>("#details").textContent = error instanceof Error ? error.message : String(error);
