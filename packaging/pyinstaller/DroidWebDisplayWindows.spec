@@ -2,6 +2,7 @@
 from pathlib import Path
 import base64
 import os
+import re
 import sys
 
 from PyInstaller.utils.hooks import collect_submodules
@@ -21,10 +22,14 @@ if sys.platform != "win32":
 ROOT = Path(SPECPATH).resolve().parents[1]
 ADB_DIR = Path(os.environ["DWD_ADB_DIR"]).resolve()
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-parts = [int(part) for part in VERSION.split(".")]
-if len(parts) != 3:
-    raise SystemExit(f"Expected semantic VERSION, got {VERSION!r}")
-numeric_version = (*parts, 0)
+# The Windows VS_FIXEDFILEINFO field takes four integers, so a prerelease
+# suffix has to be stripped before parsing. int() on "8-rc.1" raises, which
+# would have failed the build outright the first time VERSION carried one --
+# and this project has already published -rc tags.
+core = re.match(r"^(\d+)\.(\d+)\.(\d+)", VERSION)
+if not core:
+    raise SystemExit(f"Expected VERSION to start with MAJOR.MINOR.PATCH, got {VERSION!r}")
+numeric_version = (int(core.group(1)), int(core.group(2)), int(core.group(3)), 0)
 
 # Decode the tracked base64 icon into PyInstaller's work directory rather than
 # back into packaging/windows/. Writing it into the source tree left an
