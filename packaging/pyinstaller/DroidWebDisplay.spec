@@ -32,6 +32,10 @@ datas = [
     (str(ROOT / "SECURITY.md"), "."),
 ]
 
+# upx is intentionally disabled, matching both Windows specs. It was never
+# installed on the Linux runner, so upx=True silently did nothing -- and would
+# have activated unreviewed the moment upx appeared, which on Qt binaries is a
+# known source of corrupt executables and antivirus false positives.
 a = Analysis(
     [str(ROOT / "tools" / "desktop_entry.py")],
     pathex=[str(ROOT), str(ROOT / "tools")],
@@ -58,7 +62,7 @@ if sys.platform == "win32":
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
-        upx=True,
+        upx=False,
         upx_exclude=[],
         runtime_tmpdir=None,
         console=False,
@@ -78,7 +82,7 @@ else:
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
-        upx=True,
+        upx=False,
         console=True,
         disable_windowed_traceback=False,
         argv_emulation=False,
@@ -91,7 +95,7 @@ else:
         a.binaries,
         a.datas,
         strip=False,
-        upx=True,
+        upx=False,
         upx_exclude=[],
         name="DroidWebDisplay",
     )
