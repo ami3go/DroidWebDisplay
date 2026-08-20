@@ -50,10 +50,16 @@ jobs:
           test "$(.tools/uv/uv --version | awk '{print $1 " " $2}')" = "uv 0.12.4"
       - name: Sync locked Python environment
         run: .tools/uv/uv sync --locked --extra dev
-      - working-directory: packages/scrcpy-protocol
-        run: npm ci
-      - working-directory: apps/web-client
-        run: npm ci
+      - name: Build protocol package before integrity checks
+        working-directory: packages/scrcpy-protocol
+        run: |
+          npm ci
+          npm run build
+      - name: Build web client before integrity checks
+        working-directory: apps/web-client
+        run: |
+          npm ci
+          npm run build
       - name: Run release gate
         run: .tools/uv/uv run python tools/release_gate.py --require-web-client-build --output /tmp/release-gate.json
       - name: Generate build SBOM and license inventory
