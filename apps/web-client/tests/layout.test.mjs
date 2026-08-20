@@ -358,3 +358,18 @@ test("Files drawer uses Explorer-only transfers with custom PC destination", () 
   assert.match(html, /id="duplicate-policy"/);
   assert.match(transferSource, /destinationPath/);
 });
+
+test("re-locking re-reads whether a PIN exists instead of reusing the setup form", async () => {
+  const auth = await readFile(resolve(root, "src/auth-controller.ts"), "utf8");
+  // The gate renders two different forms: setup (Confirm PIN visible) and
+  // unlock. Only unhiding it on droidwebdisplay-auth-required left the setup
+  // form on screen after a lock later in the same page session.
+  assert.match(auth, /addEventListener\("droidwebdisplay-auth-required".*#reopenGate\(\)/);
+  const reopen = auth.slice(auth.indexOf("async #reopenGate"), auth.indexOf("#renderGate(configured: boolean)"));
+  assert.match(reopen, /await this\.#api\.authStatus\(\)/);
+  assert.match(reopen, /this\.#renderGate\(configured\)/);
+  // A burst of 401s must not clear the PIN box under someone mid-typing.
+  assert.match(reopen, /if \(!this\.elements\.gate\.hidden \|\| this\.#reopening\) return;/);
+  // The listener must not simply unhide the gate any more.
+  assert.doesNotMatch(auth, /"droidwebdisplay-auth-required", \(\) => \{\s*this\.elements\.gate\.hidden = false;/);
+});
