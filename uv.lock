@@ -222,7 +222,7 @@ wheels = [
 
 [[package]]
 name = "droid-web-display"
-version = "0.11.6"
+version = "0.11.7"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.7 — Clipboard reliability fix
+
+- Restored normal Android → PC clipboard synchronization by keeping scrcpy native clipboard autosync enabled for control sessions.
+- Hardened manual Android Copy and Ctrl+C so an expired request cannot copy stale clipboard text or claim a later unrelated Android clipboard event.
+- Reset clipboard dedupe and pending-copy state when sessions disconnect, reconnect, or start again.
+- Remember PC → Android clipboard values only after Android acknowledges them, so failed synchronization remains retryable instead of being incorrectly deduplicated.
+- Preserved non-pasting automatic synchronization (`SetClipboard(paste=false)`) so clipboard sync does not interfere with normal keyboard typing.
+- Added regression coverage for stale-copy rejection, copy timeout cleanup, reconnect/session reset, and retry after an unconfirmed clipboard synchronization.
+
 ## 0.11.6 — Windows console flash fix
 
 - Fixed the Windows packaged application repeatedly opening and immediately closing console windows while the server was running.
