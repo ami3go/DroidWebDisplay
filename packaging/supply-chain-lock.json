@@ -15,8 +15,8 @@
     },
     "setupPython": {
       "repository": "actions/setup-python",
-      "ref": "a26af69be951a213d495a4c3e4e4022e16d87065",
-      "label": "v5"
+      "ref": "ece7cb06caefa5fff74198d8649806c4678c61a1",
+      "label": "v6"
     },
     "setupNode": {
       "repository": "actions/setup-node",
