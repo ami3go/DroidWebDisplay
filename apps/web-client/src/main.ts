@@ -1,5 +1,7 @@
 import { inspectBrowserCapabilities } from "./browser-support.js";
 import { DroidWebDisplayController } from "./controller.js";
+import { CLIPBOARD_STATUS } from "./clipboard-status.js";
+import { clipboardShortcut } from "./input.js";
 import { AutoDownloadController } from "./auto-download-controller.js";
 import { TransferController } from "./transfer-controller.js";
 import { RunningAppController } from "./running-app-controller.js";
@@ -18,9 +20,27 @@ function bindAndroidCopyWriteThrough(): void {
   const clipboardText = required<HTMLTextAreaElement>("#clipboard-text");
   const status = required<HTMLElement>("#status");
   const details = required<HTMLElement>("#details");
+  const statusContainer = required<HTMLElement>("#connection-status");
   let generation = 0;
 
+  /** Mirror the side effects of controller.setStatus for the fields that describe
+      the status line itself. data-state is deliberately untouched: a copy does
+      not change the connection state, but title and aria-label describe the
+      visible text and go stale if only textContent is written. */
+  const writeStatus = (headline: string, detail: string): void => {
+    status.textContent = headline;
+    details.textContent = detail;
+    statusContainer.title = detail;
+    statusContainer.setAttribute("aria-label", `${statusContainer.dataset.state ?? "unknown"}: ${headline}. ${detail}`);
+  };
+
   const finishCopy = async (): Promise<void> => {
+    // Ctrl+C reaches this listener whenever the canvas has focus, including with
+    // no device attached. The controller suppresses its own "not confirmed"
+    // message in that case, so claiming a failed copy here would reinstate the
+    // very message it takes care to avoid.
+    if (statusContainer.dataset.state !== "connected") return;
+
     const request = ++generation;
     const initialText = clipboardText.value;
     const initialStatus = status.textContent?.trim() ?? "";
@@ -32,9 +52,9 @@ function bindAndroidCopyWriteThrough(): void {
       const currentStatus = status.textContent?.trim() ?? "";
       const textChanged = clipboardText.value !== initialText;
       const statusChanged = currentStatus !== initialStatus;
-      if (statusChanged && currentStatus === "Copy not confirmed") return;
-      if ((textChanged || statusChanged) && currentStatus === "Clipboard copied") return;
-      if (textChanged || (statusChanged && currentStatus === "Clipboard received")) {
+      if (statusChanged && currentStatus === CLIPBOARD_STATUS.notConfirmed) return;
+      if ((textChanged || statusChanged) && currentStatus === CLIPBOARD_STATUS.copied) return;
+      if (textChanged || (statusChanged && currentStatus === CLIPBOARD_STATUS.received)) {
         responseObserved = true;
         break;
       }
@@ -43,44 +63,59 @@ function bindAndroidCopyWriteThrough(): void {
 
     if (request !== generation) return;
     if (!responseObserved) {
-      status.textContent = "Copy not confirmed";
-      details.textContent = "Android did not return a new clipboard value. The previous PC clipboard was left unchanged.";
+      // Only claim "not confirmed" when nothing else has explained the silence.
+      // A disconnect or an over-limit clipboard sets its own terminal status,
+      // and overwriting it replaces an accurate diagnosis with a wrong one.
+      const currentStatus = status.textContent?.trim() ?? "";
+      if (currentStatus === initialStatus || currentStatus === CLIPBOARD_STATUS.copying) {
+        writeStatus(CLIPBOARD_STATUS.notConfirmed, "Android did not return a new clipboard value. The previous PC clipboard was left unchanged.");
+      }
       return;
     }
     const text = clipboardText.value;
     if (!text) {
-      status.textContent = "Copy not confirmed";
-      details.textContent = "Android did not return clipboard text.";
+      writeStatus(CLIPBOARD_STATUS.notConfirmed, "Android did not return clipboard text.");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(text);
       if (request !== generation) return;
-      status.textContent = "Clipboard copied";
-      details.textContent = "Android selection was copied to the PC clipboard.";
+      writeStatus(CLIPBOARD_STATUS.copied, "Android selection was copied to the PC clipboard.");
       return;
     } catch {
+      // Every other exit re-checks the generation; without it here a superseded
+      // copy still yanks focus and writes its result over the newer request.
+      if (request !== generation) return;
+      // execCommand copies the live selection, so it can only be trusted while
+      // the textarea still holds the text this request validated.
+      if (clipboardText.value !== text) return;
       const selectionStart = clipboardText.selectionStart;
       const selectionEnd = clipboardText.selectionEnd;
+      const previouslyFocused = document.activeElement;
       clipboardText.focus();
       clipboardText.select();
       const copied = document.execCommand("copy");
       clipboardText.setSelectionRange(selectionStart, selectionEnd);
-      canvas.focus();
+      // Restore where focus actually was rather than assuming the canvas: this
+      // path runs on every copy in browsers without the async Clipboard API, and
+      // parking focus on the canvas sends the next keystroke to Android.
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+      else canvas.focus();
+      if (request !== generation) return;
       if (copied) {
-        status.textContent = "Clipboard copied";
-        details.textContent = "Android selection was copied to the PC clipboard using the browser fallback.";
+        writeStatus(CLIPBOARD_STATUS.copied, "Android selection was copied to the PC clipboard using the browser fallback.");
       } else {
-        status.textContent = "Clipboard received";
-        details.textContent = "Android clipboard reached the browser, but the browser blocked writing to the PC clipboard.";
+        writeStatus(CLIPBOARD_STATUS.received, "Android clipboard reached the browser, but the browser blocked writing to the PC clipboard.");
       }
     }
   };
 
   button.addEventListener("click", () => void finishCopy());
   canvas.addEventListener("keydown", (event) => {
-    if (event.altKey || (!event.ctrlKey && !event.metaKey) || event.key.toLowerCase() !== "c") return;
+    // Reuse the controller's predicate instead of restating it: a copy of this
+    // condition drifts out of step with the keydown handler it shadows.
+    if (event.repeat || clipboardShortcut(event) !== "copy") return;
     void finishCopy();
   });
 }

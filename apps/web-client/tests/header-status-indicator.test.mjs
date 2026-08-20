@@ -17,7 +17,7 @@ test("header status icon animates connection transitions and recent actions", ()
     assert.match(drawerSource, new RegExp(`${action}:`));
   }
   for (const control of ["back", "home", "recent", "power", "fullscreen", "running-app-icon", "running-app-select"]) {
-    assert.ok(drawerSource.includes(control));
+    assert.match(drawerSource, new RegExp(`['"\`]${control}['"\`]`));
   }
   assert.match(drawerSource, /status-action-glyph/);
   assert.match(drawerSource, /bindStatusActivityIndicator\(\);/);

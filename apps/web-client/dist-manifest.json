@@ -70,13 +70,23 @@
     },
     {
       "path": "assets/browser-support.js",
-      "bytes": 671,
-      "sha256": "010a0b76cbe8bb6ae9e20ff5a60836b4fcfe94010678ee09fcaf349380675529"
+      "bytes": 1444,
+      "sha256": "1a67546561cd6236156c8282187e9324d176ae7922d896a24de822647abcd37a"
     },
     {
       "path": "assets/browser-support.js.map",
       "bytes": 719,
       "sha256": "412b951eb2bbf8b3614024506c288498b5033e62c07a49385cd754101f0e8d74"
+    },
+    {
+      "path": "assets/clipboard-status.d.ts",
+      "bytes": 212,
+      "sha256": "3098fe0bb9f107c24d91673af1024d329553fa16922caf965f92f86b93b72b6d"
+    },
+    {
+      "path": "assets/clipboard-status.js",
+      "bytes": 864,
+      "sha256": "509cb41e03eb47e68b55bed5f2aac9158b7a177b4d4da9209b9b7c6be8abba50"
     },
     {
       "path": "assets/controller.d.ts",
@@ -85,8 +95,8 @@
     },
     {
       "path": "assets/controller.js",
-      "bytes": 57121,
-      "sha256": "35577dbe1abb009a81530d785c6243c7f79947c8b5d0bc3b81d4c0f3cc7ee230"
+      "bytes": 57213,
+      "sha256": "9e2df97ba6f1876070322b09adec3284477b9983c466fa1a791a4c469ff56d63"
     },
     {
       "path": "assets/controller.js.map",
@@ -130,8 +140,8 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 14522,
-      "sha256": "746ee71599bdc6625c5eccaecef8869ebd3b17daf434a490e7830635f7b59b3f"
+      "bytes": 21120,
+      "sha256": "a2946a8f334091a636c56410183bcb45502c66408aac59ee8ede8e3ca9139af3"
     },
     {
       "path": "assets/main.js.map",
@@ -235,13 +245,13 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.css",
-      "bytes": 5670,
-      "sha256": "fdf37a0bcb9ad994d2771f5ae8c6aa8f1871f401a206d28e76e62df1fa4bc0aa"
+      "bytes": 5917,
+      "sha256": "dd8ae94da10bcd2ef6596f81cbf49da938cde5e7403b0fdb4430a0ef5bdd57f2"
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
-      "bytes": 26484,
-      "sha256": "57291e2c349f95159d731dd90010f42bf0748fc019a4c32e922d6fed72af097d"
+      "bytes": 26302,
+      "sha256": "18214ff7a6bb60fb75e5b31aaa59e178cf47d5183c170ccdff0c2ae7abc45c6e"
     },
     {
       "path": "favicon.svg",

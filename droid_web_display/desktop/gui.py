@@ -99,7 +99,8 @@ def _make_header_icon_button(
     button.setObjectName("headerIconButton")
     button.setIcon(icon)
     button.setIconSize(QSize(20, 20))
-    button.setFixedSize(38, 38)
+    # Size lives in theme.py (QPushButton#headerIconButton). Setting it here too
+    # gave the stylesheet a 36px box inside a 38px widget.
     button.setToolTip(tooltip)
     button.setAccessibleName(accessible_name)
     if danger:
@@ -329,7 +330,9 @@ class ServerWindow(QMainWindow):
         overview_row.setSpacing(12)
 
         summary, summary_layout = _make_card("Summary")
-        summary_layout.setAlignment(Qt.AlignTop)
+        # Top alignment comes from the addStretch(1) below. The single-argument
+        # setAlignment positions a layout inside a PARENT layout item, and this
+        # one is installed directly on the card, so it was never read.
         summary_layout.setSpacing(8)
 
         self._url_value = _field_value()
@@ -816,9 +819,18 @@ class ServerWindow(QMainWindow):
         }
         self._set_status_visual(snapshot.state, labels[snapshot.state])
         safe_url = escape(snapshot.url, quote=True)
-        self._url_value.setText(
-            f'<a href="{safe_url}" style="color:#82a6ff; text-decoration:none;">{safe_url}</a>'
-        )
+        url_is_live = snapshot.state in {ServerState.RUNNING, ServerState.EXTERNAL}
+        # Only offer the link when the header Open button is offered too. A live
+        # hyperlink beside a greyed-out Open button just routes the user to
+        # ERR_CONNECTION_REFUSED. The colour comes from the palette so it tracks
+        # WEB_THEME["focus"]; an inline literal here silently overrides the
+        # QLabel#summaryUrl rule, because inline HTML style beats QSS.
+        if url_is_live:
+            self._url_value.setText(
+                f'<a href="{safe_url}" style="text-decoration:none;">{safe_url}</a>'
+            )
+        else:
+            self._url_value.setText(safe_url)
         self._network_value.setText(snapshot.network_mode)
         self._diag_url.setText(snapshot.url)
         if snapshot.device:
@@ -900,6 +912,10 @@ class ServerWindow(QMainWindow):
         self._set_status_visual(ServerState.ERROR, "Status unavailable")
         self._error_value.setText(message)
         self._set_health(self._health_server, "error", "● Status unavailable")
+        # The probe failed, so the server state is unknown. _apply_snapshot is
+        # the only other place that gates this button, and it does not run on
+        # this path -- leaving Open enabled and blue indefinitely.
+        self._header_open_button.setEnabled(False)
         self._status_finished()
 
     def _status_finished(self) -> None:

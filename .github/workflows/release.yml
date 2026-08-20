@@ -5,10 +5,17 @@ on:
     branches: [main]
     paths:
       - '.github/releases/v*.md'
+  # Manual re-entry. `prepare` self-aborts once VERSION already matches, so
+  # without this a failed publish leaves no way to finish the release except
+  # hand-crafted recovery commits.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. 0.11.8 (must have .github/releases/v<version>.md)'
+        required: true
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 concurrency:
   group: droidwebdisplay-release
@@ -17,6 +24,9 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.prepare.outputs.version }}
       sha: ${{ steps.prepare.outputs.sha }}
@@ -30,8 +40,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          request=$(git diff --name-only HEAD^ HEAD -- '.github/releases/v*.md' | head -n 1)
-          test -n "$request"
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            request=".github/releases/v${{ github.event.inputs.version }}.md"
+            test -f "$request"
+          else
+            # head -n 1 silently published only the alphabetically-first file and
+            # could select an OLD request file touched by an unrelated edit,
+            # attempting a version downgrade. Require exactly one added file.
+            mapfile -t requests < <(git diff --name-only --diff-filter=A HEAD^ HEAD -- '.github/releases/v*.md')
+            if [ "${#requests[@]}" -ne 1 ]; then
+              echo "expected exactly one added release request, got ${#requests[@]}: ${requests[*]:-none}" >&2
+              exit 1
+            fi
+            request="${requests[0]}"
+            test -f "$request"
+          fi
           file=$(basename "$request")
           version=${file#v}
           version=${version%.md}
@@ -121,6 +144,12 @@ jobs:
   publish:
     needs: prepare
     runs-on: ubuntu-24.04
+    # Bounded so a hung smoke job cannot hold the droidwebdisplay-release
+    # concurrency slot for the six-hour default and block every later release.
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: write
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}

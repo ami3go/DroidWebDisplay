@@ -45,19 +45,24 @@ def test_primary_open_and_exit_actions_live_in_header_as_icons() -> None:
     assert "header_layout.addWidget(self._status_value" in gui
     assert "header_layout.addWidget(self._header_open_button" in gui
     assert "header_layout.addWidget(self._header_exit_button" in gui
-    assert 'footer_open = QPushButton("Open DroidWebDisplay")' not in gui
-    assert 'footer_exit = QPushButton("Exit")' not in gui
+    # Assert on the user-visible strings, not on a local variable name: the old
+    # form passed if the footer button came back as `open_btn = QPushButton(...)`.
+    assert gui.count('QPushButton("Open DroidWebDisplay")') == 0
+    assert gui.count('QPushButton("Exit")') == 0
 
 
 def test_summary_is_compact_and_local_url_is_clickable() -> None:
     gui = (ROOT / "droid_web_display/desktop/gui.py").read_text(encoding="utf-8")
-    assert "summary_layout.setAlignment(Qt.AlignTop)" in gui
     assert "summary_layout.addStretch(1)" in gui
     assert '("Local URL", self._url_value)' in gui
     assert 'self._url_value.setObjectName("summaryUrl")' in gui
     assert "Qt.TextBrowserInteraction" in gui
     assert "self._url_value.linkActivated.connect(self._open_summary_url)" in gui
     assert "QDesktopServices.openUrl(QUrl(href))" in gui
+    # The link must only be offered while the server can serve it, matching the
+    # gating on the header Open button.
+    assert "url_is_live = snapshot.state in {ServerState.RUNNING, ServerState.EXTERNAL}" in gui
+    assert 'style="color:#82a6ff' not in gui
 
 
 def test_settings_include_only_minimal_update_checker() -> None:
