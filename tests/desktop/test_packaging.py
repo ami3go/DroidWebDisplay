@@ -6,10 +6,21 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_windows_package_is_windowed_desktop_host() -> None:
-    spec = (ROOT / "packaging" / "pyinstaller" / "DroidWebDisplay.spec").read_text(encoding="utf-8")
-    assert 'if sys.platform == "win32"' in spec
-    windows_section = spec.split('if sys.platform == "win32":', 1)[1].split("else:", 1)[0]
-    assert "console=False" in windows_section
+    """Both Windows packages must launch without a console window.
+
+    This used to read the win32 branch of DroidWebDisplay.spec, a branch CI
+    never reached and which built an exe with no icon and no version resource.
+    Removing that dead code broke this test, which is to say the test existed
+    to protect it. The property it is named for belongs to the specs Windows
+    actually builds.
+    """
+    for name in ("DroidWebDisplayWindows.spec", "DroidWebDisplayWindowsOnedir.spec"):
+        spec = (ROOT / "packaging" / "pyinstaller" / name).read_text(encoding="utf-8")
+        assert "console=False" in spec, name
+        assert "console=True" not in spec, name
+
+    linux = (ROOT / "packaging" / "pyinstaller" / "DroidWebDisplay.spec").read_text(encoding="utf-8")
+    assert "DroidWebDisplayWindows.spec" in linux, "the Linux spec must redirect Windows builds"
 
 
 def test_package_smoke_uses_headless_mode() -> None:

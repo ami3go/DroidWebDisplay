@@ -3,5 +3,6 @@ Type=Application
 Name=DroidWebDisplay
 Comment=Open the local DroidWebDisplay browser interface
 Exec=@LAUNCHER@
+Icon=droidwebdisplay
 Terminal=false
 Categories=Development;Utility;

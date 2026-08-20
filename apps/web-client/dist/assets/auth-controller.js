@@ -12,6 +12,7 @@ export class AuthController {
     elements;
     #api;
     #status = null;
+    #reopening = false;
     constructor(elements, api = new BridgeApi()) {
         this.elements = elements;
         this.#api = api;
@@ -21,10 +22,7 @@ export class AuthController {
         elements.logout.addEventListener("click", () => { void this.logout(); });
         elements.changePin.addEventListener("click", () => { void this.changePin(); });
         elements.revokeAll.addEventListener("click", () => { void this.revokeAll(); });
-        globalThis.addEventListener("droidwebdisplay-auth-required", () => {
-            this.elements.gate.hidden = false;
-            this.elements.securityStatus.textContent = "Session expired or revoked. Authenticate again.";
-        });
+        globalThis.addEventListener("droidwebdisplay-auth-required", () => { void this.#reopenGate(); });
     }
     async ensureAuthenticated() {
         const status = await this.#api.authStatus();
@@ -85,6 +83,42 @@ export class AuthController {
         }
         catch (error) {
             this.#showSecurityError(error);
+        }
+    }
+    /** Re-open the gate after a session expires or is revoked.
+
+        This used to only unhide the gate, which left whatever form was rendered
+        last on screen. After first-run setup that is the setup form, so a lock
+        later in the same page session showed "Create bridge PIN" with the
+        Confirm PIN box still visible, even though the PIN already exists and the
+        submit would perform a login. The server is the authority on whether a
+        PIN is configured, so re-read it. */
+    async #reopenGate() {
+        this.elements.securityStatus.textContent = "Session expired or revoked. Authenticate again.";
+        // Several in-flight requests can each answer 401 at once. Re-rendering per
+        // event would clear the PIN field under someone already typing into it.
+        if (!this.elements.gate.hidden || this.#reopening)
+            return;
+        this.#reopening = true;
+        try {
+            let configured = this.#status?.configured ?? false;
+            try {
+                const status = await this.#api.authStatus();
+                this.#status = status;
+                if (status.authenticated) {
+                    this.#showAuthenticated(status);
+                    return;
+                }
+                configured = status.configured;
+            }
+            catch {
+                // Status is unreachable; fall back to the last known value rather than
+                // leaving the user with no way back in.
+            }
+            this.#renderGate(configured);
+        }
+        finally {
+            this.#reopening = false;
         }
     }
     #renderGate(configured) {

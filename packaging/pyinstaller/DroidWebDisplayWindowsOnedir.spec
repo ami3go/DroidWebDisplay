@@ -1,10 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
-import base64
-import os
 import sys
 
-from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.win32.versioninfo import (
     FixedFileInfo,
     StringFileInfo,
@@ -15,19 +12,15 @@ from PyInstaller.utils.win32.versioninfo import (
     VSVersionInfo,
 )
 
+sys.path.insert(0, SPECPATH)
+import _dwd_common as common
+
 if sys.platform != "win32":
     raise SystemExit("DroidWebDisplayWindowsOnedir.spec is a Windows-only target")
 
-ROOT = Path(SPECPATH).resolve().parents[1]
-ADB_DIR = Path(os.environ["DWD_ADB_DIR"]).resolve()
-VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-parts = [int(part) for part in VERSION.split(".")]
-if len(parts) != 3:
-    raise SystemExit(f"Expected semantic VERSION, got {VERSION!r}")
-numeric_version = (*parts, 0)
-
-ICON = ROOT / "packaging" / "windows" / "droidwebdisplay.ico"
-ICON.write_bytes(base64.b64decode((ICON.with_suffix(".ico.base64")).read_text(encoding="ascii")))
+ROOT = common.repo_root(SPECPATH)
+VERSION, numeric_version = common.read_version(ROOT)
+ICON = common.windows_icon(ROOT, Path(globals().get("workpath") or (ROOT / "build")))
 
 version_info = VSVersionInfo(
     ffi=FixedFileInfo(
@@ -57,35 +50,12 @@ version_info = VSVersionInfo(
     ],
 )
 
-adb_names = ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"]
-adb_binaries = [(str(ADB_DIR / name), "adb") for name in adb_names if (ADB_DIR / name).is_file()]
-if not any(Path(source).name.lower() == "adb.exe" for source, _ in adb_binaries):
-    raise SystemExit(f"ADB executable missing from {ADB_DIR}")
-
-server_dir = ROOT / "server"
-if not server_dir.is_dir():
-    raise SystemExit("server directory is missing; run tools/download_server.py first")
-
-hiddenimports = sorted(set(collect_submodules("uvicorn") + collect_submodules("websockets")))
-datas = [
-    (str(ROOT / "apps" / "web-client" / "dist"), "apps/web-client/dist"),
-    (str(ROOT / "apps" / "web-client" / "dist-manifest.json"), "apps/web-client"),
-    (str(ROOT / "packages" / "scrcpy-protocol" / "dist"), "packages/scrcpy-protocol/dist"),
-    (str(ROOT / "packages" / "scrcpy-protocol" / "package.json"), "packages/scrcpy-protocol"),
-    (str(ROOT / "compatibility"), "compatibility"),
-    (str(server_dir), "server"),
-    (str(ROOT / "VERSION"), "."),
-    (str(ROOT / "LICENSE"), "."),
-    (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
-    (str(ROOT / "SECURITY.md"), "."),
-]
-
 a = Analysis(
-    [str(ROOT / "tools" / "desktop_entry.py")],
+    [str(ROOT.joinpath(*common.ENTRY_SCRIPT))],
     pathex=[str(ROOT), str(ROOT / "tools")],
-    binaries=adb_binaries,
-    datas=datas,
-    hiddenimports=hiddenimports,
+    binaries=common.adb_binaries(common.adb_dir(), windows=True),
+    datas=common.bundle_datas(ROOT),
+    hiddenimports=common.hidden_imports(),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

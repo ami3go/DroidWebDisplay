@@ -12,9 +12,27 @@ def test_windows_pyinstaller_targets_disable_upx_and_embed_metadata() -> None:
         assert "ProductName" in text
         assert "ProductVersion" in text
         assert "OriginalFilename" in text
-        assert 'with_suffix(".ico.base64")' in text
+        # The icon must come from the tracked base64 source. The specs delegate
+        # that to _dwd_common.windows_icon, which is asserted below; pinning the
+        # exact path expression here broke on a refactor that changed nothing
+        # about the behaviour.
+        assert "icon=str(ICON)" in text
     assert "runtime_tmpdir=None" in portable
     assert 'name="DroidWebDisplayWindowsOnedir"' in onedir
+
+
+def test_windows_icon_is_decoded_from_the_tracked_source_into_the_build_dir(tmp_path) -> None:
+    """The icon is generated, so it must not be written back into the checkout.
+
+    packaging/windows/droidwebdisplay.ico is not gitignored; writing it there
+    left an untracked binary after every build.
+    """
+    common = (ROOT / "packaging/pyinstaller/_dwd_common.py").read_text(encoding="utf-8")
+    assert "droidwebdisplay.ico.base64" in common
+    for name in ("DroidWebDisplayWindows.spec", "DroidWebDisplayWindowsOnedir.spec"):
+        spec = (ROOT / "packaging/pyinstaller" / name).read_text(encoding="utf-8")
+        assert "common.windows_icon(" in spec, name
+        assert 'ROOT / "packaging" / "windows" / "droidwebdisplay.ico"' not in spec, name
 
 
 def test_windows_icon_source_is_present() -> None:
