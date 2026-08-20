@@ -12,7 +12,7 @@ def test_windows_pyinstaller_targets_disable_upx_and_embed_metadata() -> None:
         assert "ProductName" in text
         assert "ProductVersion" in text
         assert "OriginalFilename" in text
-        assert "droidwebdisplay.ico.base64" in text
+        assert 'with_suffix(".ico.base64")' in text
     assert "runtime_tmpdir=None" in portable
     assert 'name="DroidWebDisplayWindowsOnedir"' in onedir
 
