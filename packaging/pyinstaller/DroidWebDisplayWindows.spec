@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
+import base64
 import os
 import sys
 
@@ -24,6 +25,9 @@ parts = [int(part) for part in VERSION.split(".")]
 if len(parts) != 3:
     raise SystemExit(f"Expected semantic VERSION, got {VERSION!r}")
 numeric_version = (*parts, 0)
+
+ICON = ROOT / "packaging" / "windows" / "droidwebdisplay.ico"
+ICON.write_bytes(base64.b64decode((ICON.with_suffix(".ico.base64")).read_text(encoding="ascii")))
 
 version_info = VSVersionInfo(
     ffi=FixedFileInfo(
@@ -109,6 +113,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(ROOT / "packaging" / "windows" / "droidwebdisplay.ico"),
+    icon=str(ICON),
     version=version_info,
 )
