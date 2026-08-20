@@ -5,12 +5,21 @@ import sys
 
 from PyInstaller.utils.hooks import collect_submodules
 
+if sys.platform == "win32":
+    # Windows has dedicated specs that attach the icon and the VS version
+    # resource. This one produced neither, so falling back to it here built
+    # exactly the binary ci.yml's PE metadata check exists to reject.
+    raise SystemExit(
+        "Use packaging/pyinstaller/DroidWebDisplayWindows.spec or "
+        "DroidWebDisplayWindowsOnedir.spec on Windows"
+    )
+
 ROOT = Path(SPECPATH).resolve().parents[1]
 ADB_DIR = Path(os.environ["DWD_ADB_DIR"]).resolve()
 
-adb_names = ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"] if sys.platform == "win32" else ["adb"]
+adb_names = ["adb"]
 adb_binaries = [(str(ADB_DIR / name), "adb") for name in adb_names if (ADB_DIR / name).is_file()]
-if not any(Path(source).name.lower() in {"adb", "adb.exe"} for source, _ in adb_binaries):
+if not any(Path(source).name.lower() == "adb" for source, _ in adb_binaries):
     raise SystemExit(f"ADB executable missing from {ADB_DIR}")
 
 server_dir = ROOT / "server"
@@ -51,51 +60,29 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-if sys.platform == "win32":
-    exe = EXE(
-        pyz,
-        a.scripts,
-        a.binaries,
-        a.datas,
-        [],
-        name="DroidWebDisplay",
-        debug=False,
-        bootloader_ignore_signals=False,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        runtime_tmpdir=None,
-        console=False,
-        disable_windowed_traceback=False,
-        argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
-        entitlements_file=None,
-    )
-else:
-    exe = EXE(
-        pyz,
-        a.scripts,
-        [],
-        exclude_binaries=True,
-        name="DroidWebDisplay",
-        debug=False,
-        bootloader_ignore_signals=False,
-        strip=False,
-        upx=False,
-        console=True,
-        disable_windowed_traceback=False,
-        argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
-        entitlements_file=None,
-    )
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.datas,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        name="DroidWebDisplay",
-    )
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="DroidWebDisplay",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="DroidWebDisplay",
+)
