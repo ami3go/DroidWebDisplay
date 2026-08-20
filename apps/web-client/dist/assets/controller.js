@@ -614,7 +614,8 @@ export class DroidWebDisplayController {
             // clipboard synchronized with paste=false, then use scrcpy InjectText as the
             // deterministic insertion path (the same strategy as scrcpy legacy paste).
             await session.sendControl(clipboardMessage(text, sequence, false));
-            if (inject) await this.sendMessages(textInjectionMessages(text));
+            if (inject)
+                await this.sendMessages(textInjectionMessages(text));
             if (await acknowledgement) {
                 this.#lastSentClipboard = text;
                 this.setStatus(inject ? "Text pasted" : "Clipboard synchronized", inject

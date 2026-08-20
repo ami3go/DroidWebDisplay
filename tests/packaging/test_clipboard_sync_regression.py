@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -144,7 +145,7 @@ def test_oversized_text_is_synchronized_rather_than_typed_chunk_by_chunk() -> No
         # awaited control message, so injecting a 256 KiB clipboard would be
         # roughly 875 sequential round trips.
         assert "MAX_INJECTED_BYTES" in block
-        assert "if (inject) await this.sendMessages(textInjectionMessages(text))" in block
+        assert re.search(r"if \(inject\)\s+await this\.sendMessages\(textInjectionMessages\(text\)\)", block)
 
     src_type = source[source.index("\n  private async pasteTypedText"):source.index("\n  private async pasteText")]
     built_type = dist[dist.index("\n    async pasteTypedText"):dist.index("\n    async pasteText")]
