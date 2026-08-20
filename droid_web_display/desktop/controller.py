@@ -16,6 +16,7 @@ import webbrowser
 
 import psutil
 
+from droid_web_display.process_utils import subprocess_creation_kwargs
 from droid_web_display.adb.devices import parse_adb_devices
 from droid_web_display.network_access import LAN_HTTPS, NetworkConfigStore
 
@@ -250,8 +251,7 @@ class ServerController:
             "timeout": 1.25,
             "check": False,
         }
-        if os.name == "nt":
-            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        kwargs.update(subprocess_creation_kwargs())
         try:
             result = subprocess.run(command, **kwargs)
         except (OSError, subprocess.SubprocessError):

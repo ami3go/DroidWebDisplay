@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -94,8 +95,11 @@ def test_clipboard_session_state_is_reset_before_use_and_on_cleanup() -> None:
     for reset in (source[src_reset_start:src_reset_end], dist[built_reset_start:built_reset_end]):
         assert '#lastAndroidClipboard = ""' in reset
         assert '#lastSentClipboard = ""' in reset
-        assert 'clipboardText.value = ""' in reset
+        assert "#unacknowledgedSync = null" in reset
         assert "completeAndroidCopyRequest()" in reset
+        # The visible text box is user input, not cached device state. Clearing
+        # it on connect discards text typed while disconnected.
+        assert 'clipboardText.value = ""' not in reset
 
 
 def test_failed_pc_clipboard_sync_remains_retryable() -> None:
@@ -109,6 +113,13 @@ def test_failed_pc_clipboard_sync_remains_retryable() -> None:
         assert "clipboardMessage(text, sequence, false)" in block
         assert "pasteText(text" not in block
         assert "clipboardMessage(text, sequence, true)" not in block
+        # Retryable, but bounded: pollPcClipboard runs every 1800ms and skips
+        # only text recorded as sent, so an unbounded retry re-sends the same
+        # text every tick for as long as it stays on the PC clipboard.
+        assert "MAX_UNACKNOWLEDGED_SYNC_ATTEMPTS" in block
+        assert "#unacknowledgedSync" in block
+        gave_up = block.index("Clipboard sync gave up")
+        assert block.index("this.#lastSentClipboard = text", gave_up - 400) < gave_up
 
 
 def test_clipboard_permission_prompt_keeps_user_activation_and_drawer_does_not_force_textarea_focus() -> None:
@@ -123,3 +134,21 @@ def test_clipboard_permission_prompt_keeps_user_activation_and_drawer_does_not_f
 
     assert "this.elements.clipboardText.focus()" not in source
     assert "this.elements.clipboardText.focus()" not in dist
+
+
+def test_oversized_text_is_synchronized_rather_than_typed_chunk_by_chunk() -> None:
+    source, dist = _controller_blocks()
+    src = source[source.index("\n  private async pasteText"):source.index("\n  private waitForClipboardAcknowledgement")]
+    built = dist[dist.index("\n    async pasteText"):dist.index("\n    waitForClipboardAcknowledgement")]
+    for block in (src, built):
+        # textInjectionMessages chunks at 300 UTF-8 bytes and each chunk is an
+        # awaited control message, so injecting a 256 KiB clipboard would be
+        # roughly 875 sequential round trips.
+        assert "MAX_INJECTED_BYTES" in block
+        assert re.search(r"if \(inject\)\s+await this\.sendMessages\(textInjectionMessages\(text\)\)", block)
+
+    src_type = source[source.index("\n  private async pasteTypedText"):source.index("\n  private async pasteText")]
+    built_type = dist[dist.index("\n    async pasteTypedText"):dist.index("\n    async pasteText")]
+    for block in (src_type, built_type):
+        assert "MAX_INJECTED_BYTES" in block
+        assert "too large to type into Android" in block
