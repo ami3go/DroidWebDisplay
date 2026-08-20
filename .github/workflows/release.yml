@@ -171,11 +171,14 @@ jobs:
           gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name linux-appimage-smoke --dir artifacts/linux
 
           windows=$(find artifacts/windows -type f -name 'DroidWebDisplay.exe' -print -quit)
+          windows_zip=$(find artifacts/windows -type f -name 'DroidWebDisplay-windows-x86_64.zip' -print -quit)
           linux=$(find artifacts/linux -type f -name '*.AppImage' -print -quit)
           test -n "$windows"
+          test -n "$windows_zip"
           test -n "$linux"
 
           cp "$windows" "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.exe"
+          cp "$windows_zip" "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.zip"
           cp "$linux" "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
           chmod +x "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
           (cd release-assets && sha256sum DroidWebDisplay-* > SHA256SUMS.txt)
@@ -195,5 +198,6 @@ jobs:
             --title "DroidWebDisplay $tag" \
             --notes-file ".github/releases/${tag}.md" \
             release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.exe \
+            release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.zip \
             release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage \
             release-assets/SHA256SUMS.txt

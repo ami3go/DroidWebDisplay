@@ -17,6 +17,10 @@ _IME_POLICY_FAILURE_MARKERS = (
     "attempted to set ime policy to an untrusted virtual display",
     "display ime policy",
 )
+_ANDROID16_DISPLAY_LISTENER_MARKERS = (
+    "abstractmethoderror",
+    "idisplaywindowlistener",
+)
 
 
 def samsung_local_ime_policy_risk(device: AndroidDevice) -> bool:
@@ -46,6 +50,8 @@ def apply_device_virtual_display_compatibility(
 
 def classify_virtual_display_failure(lines: list[str] | tuple[str, ...]) -> str:
     text = "\n".join(lines).lower()
+    if all(marker in text for marker in _ANDROID16_DISPLAY_LISTENER_MARKERS):
+        return "android16-display-listener-incompatibility"
     if "stack corruption detected" in text or "-fstack-protector" in text:
         return "app-process-stack-corruption"
     if any(marker in text for marker in _IME_POLICY_FAILURE_MARKERS):
@@ -115,6 +121,11 @@ def virtual_display_capabilities(
         warnings.append(
             "Local virtual-display IME policy is disabled for this Samsung Android build; "
             "use default or fallback routing."
+        )
+    if sdk >= 36:
+        warnings.append(
+            "Android 16 compatibility is device-build dependent with scrcpy 4.1. "
+            "If startup fails with AbstractMethodError/IDisplayWindowListener, DWD classifies it as an upstream display-listener incompatibility."
         )
     if requested_package and package_installed is False:
         warnings.append(f"Application is not installed: {requested_package}")

@@ -30,7 +30,7 @@ jobs:
             libxcb-render-util0 \
             libxcb-shape0 \
             libxcb-xkb1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11.15'
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -50,10 +50,16 @@ jobs:
           test "$(.tools/uv/uv --version | awk '{print $1 " " $2}')" = "uv 0.12.4"
       - name: Sync locked Python environment
         run: .tools/uv/uv sync --locked --extra dev
-      - working-directory: packages/scrcpy-protocol
-        run: npm ci
-      - working-directory: apps/web-client
-        run: npm ci
+      - name: Build protocol package before integrity checks
+        working-directory: packages/scrcpy-protocol
+        run: |
+          npm ci
+          npm run build
+      - name: Build web client before integrity checks
+        working-directory: apps/web-client
+        run: |
+          npm ci
+          npm run build
       - name: Run release gate
         run: .tools/uv/uv run python tools/release_gate.py --require-web-client-build --output /tmp/release-gate.json
       - name: Generate build SBOM and license inventory
@@ -68,7 +74,7 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11.9'
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -99,24 +105,58 @@ jobs:
           Expand-Archive -Path platform-tools.zip -DestinationPath platform-tools
           $adb = (Resolve-Path "platform-tools/platform-tools").Path
           "DWD_ADB_DIR=$adb" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Build Windows executable
-        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplay.spec
-      - name: Smoke-test Windows desktop host
+      - name: Build Windows portable executable
+        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplayWindows.spec
+      - name: Build Windows stable onedir package
+        run: python -m PyInstaller --noconfirm --clean packaging/pyinstaller/DroidWebDisplayWindowsOnedir.spec
+      - name: Verify Windows PE metadata and bundled ADB
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath ".\dist\DroidWebDisplay.exe" -ArgumentList "--desktop-smoke" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
-      - name: Smoke-test Windows executable CLI
+          $version = (Get-Content VERSION -Raw).Trim()
+          $packages = @(
+            ".\dist\DroidWebDisplay.exe",
+            ".\dist\DroidWebDisplayWindowsOnedir\DroidWebDisplay.exe"
+          )
+          foreach ($path in $packages) {
+            $info = (Get-Item $path).VersionInfo
+            if ($info.ProductName -ne "DroidWebDisplay") { throw "ProductName missing from $path" }
+            if (-not $info.FileVersion.StartsWith($version)) { throw "FileVersion $($info.FileVersion) does not match $version in $path" }
+            if (-not $info.ProductVersion.StartsWith($version)) { throw "ProductVersion $($info.ProductVersion) does not match $version in $path" }
+            if ($info.OriginalFilename -ne "DroidWebDisplay.exe") { throw "OriginalFilename missing from $path" }
+          }
+          $adb = Get-ChildItem ".\dist\DroidWebDisplayWindowsOnedir" -Recurse -Filter adb.exe | Select-Object -First 1
+          if (-not $adb) { throw "Bundled adb.exe missing from onedir package" }
+          & $adb.FullName version
+          if ($LASTEXITCODE -ne 0) { throw "Bundled adb.exe failed to execute" }
+      - name: Smoke-test Windows portable desktop, CLI and bundled ADB
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath ".\dist\DroidWebDisplay.exe" -ArgumentList "--help" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
-      - name: Smoke-test Windows executable service
-        run: python tools/smoke_desktop_package.py .\dist\DroidWebDisplay.exe --timeout 60
+          foreach ($arg in @("--desktop-smoke", "--help", "--adb-smoke")) {
+            $process = Start-Process -FilePath ".\dist\DroidWebDisplay.exe" -ArgumentList $arg -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Portable smoke $arg failed: $($process.ExitCode)" }
+          }
+      - name: Smoke-test Windows onedir desktop, CLI and bundled ADB
+        shell: pwsh
+        run: |
+          $exe = ".\dist\DroidWebDisplayWindowsOnedir\DroidWebDisplay.exe"
+          foreach ($arg in @("--desktop-smoke", "--help", "--adb-smoke")) {
+            $process = Start-Process -FilePath $exe -ArgumentList $arg -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Onedir smoke $arg failed: $($process.ExitCode)" }
+          }
+      - name: Repeat Windows service start-stop smoke
+        shell: pwsh
+        run: |
+          1..3 | ForEach-Object { python tools/smoke_desktop_package.py .\dist\DroidWebDisplay.exe --timeout 60 }
+          1..3 | ForEach-Object { python tools/smoke_desktop_package.py .\dist\DroidWebDisplayWindowsOnedir\DroidWebDisplay.exe --timeout 60 }
+      - name: Build Windows stable onedir ZIP
+        shell: pwsh
+        run: Compress-Archive -Path ".\dist\DroidWebDisplayWindowsOnedir\*" -DestinationPath ".\dist\DroidWebDisplay-windows-x86_64.zip" -CompressionLevel Optimal
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-package-smoke
-          path: dist/DroidWebDisplay.exe
+          path: |
+            dist/DroidWebDisplay.exe
+            dist/DroidWebDisplay-windows-x86_64.zip
           if-no-files-found: error
 
   linux-appimage-smoke:
@@ -136,7 +176,7 @@ jobs:
             libxcb-render-util0 \
             libxcb-shape0 \
             libxcb-xkb1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11.15'
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

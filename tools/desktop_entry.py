@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -35,7 +36,27 @@ def _desktop_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--start-minimized", action="store_true", help="Start the desktop host minimized")
     parser.add_argument("--desktop-smoke", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--adb-smoke", action="store_true", help=argparse.SUPPRESS)
     return parser
+
+
+def _bundled_adb_smoke(paths) -> int:  # type: ignore[no-untyped-def]
+    adb = paths.adb_executable
+    if not isinstance(adb, Path) or not adb.is_file():
+        return 3
+    kwargs: dict[str, object] = {
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "check": False,
+        "timeout": 15,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        result = subprocess.run([str(adb), "version"], **kwargs)
+    except (OSError, subprocess.SubprocessError):
+        return 4
+    return int(result.returncode)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
     install_output_logging(paths.logs_root)
 
     args, server_args = _desktop_parser().parse_known_args(argv)
+    if args.adb_smoke:
+        return _bundled_adb_smoke(paths)
 
     from run_bridge_service import BridgeServiceRuntime, main as bridge_main
 
