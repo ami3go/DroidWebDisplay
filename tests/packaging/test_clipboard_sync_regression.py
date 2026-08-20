@@ -23,6 +23,7 @@ def test_manual_paste_synchronizes_without_android_paste_key_and_injects_text() 
         assert "clipboardMessage(text, sequence, false)" in block
         assert "textInjectionMessages(text)" in block
         assert "clipboardMessage(text, sequence, true)" not in block
+        assert block.index("this.#lastSentClipboard = text") > block.index("if (await acknowledgement)")
 
 
 def test_type_bypasses_clipboard_and_copy_requests_android_selection() -> None:
@@ -38,10 +39,14 @@ def test_type_bypasses_clipboard_and_copy_requests_android_selection() -> None:
     built_copy = dist[dist.index("\n    async copyAndroidClipboard"):dist.index("\n    async startClipboardPolling")]
     for block in (src_copy, built_copy):
         assert "androidClipboardCopyMessage()" in block
+        assert "beginAndroidCopyRequest" in block
+        assert "completeAndroidCopyRequest" in block
+        assert "Copy not confirmed" in block
+        assert "previous PC clipboard was left unchanged" in block
         assert "writeText(this.#lastAndroidClipboard)" not in block
 
 
-def test_android_copy_write_through_preserves_browser_user_activation() -> None:
+def test_android_copy_write_through_never_copies_stale_android_text() -> None:
     source, dist = _main_blocks()
     for block in (source, dist):
         assert "bindAndroidCopyWriteThrough" in block
@@ -50,14 +55,57 @@ def test_android_copy_write_through_preserves_browser_user_activation() -> None:
         assert "navigator.clipboard.writeText(text)" in block
         assert 'document.execCommand("copy")' in block
         assert 'currentStatus === "Clipboard received"' in block
+        assert 'currentStatus === "Copy not confirmed"' in block
+        assert "if (!responseObserved)" in block
+        assert "previous PC clipboard was left unchanged" in block
+        assert "No new Android clipboard event arrived; copied the last Android clipboard value." not in block
         assert "bindAndroidCopyWriteThrough();" in block
 
 
-def test_automatic_clipboard_sync_does_not_request_paste() -> None:
+def test_manual_copy_timeout_clears_pending_and_late_clipboard_events_are_not_claimed() -> None:
+    source, dist = _controller_blocks()
+    src_helpers = source[source.index("\n  private beginAndroidCopyRequest"):source.index("\n  private async startClipboardPolling")]
+    built_helpers = dist[dist.index("\n    beginAndroidCopyRequest"):dist.index("\n    async startClipboardPolling")]
+    for block in (src_helpers, built_helpers):
+        assert "#copyShortcutTimer" in block
+        assert "#copyShortcutPending = false" in block
+        assert "Copy not confirmed" in block
+        assert "completeAndroidCopyRequest" in block
+
+    for block in (source, dist):
+        assert "const copyShortcut = this.completeAndroidCopyRequest();" in block
+
+
+def test_clipboard_session_state_is_reset_before_use_and_on_cleanup() -> None:
+    source, dist = _controller_blocks()
+    for block in (source, dist):
+        connect = block[block.index("this.#protocolSession = await this.#adapter.connect"):block.index("this.#deviceMessageTask = this.consumeDeviceMessages")]
+        assert connect.index("resetClipboardSessionState()") < connect.index("setConnectedControls(true)")
+
+        cleanup_start = block.index("async cleanupSession")
+        cleanup_end = block.index("setConnectedControls", cleanup_start)
+        cleanup = block[cleanup_start:cleanup_end]
+        assert "resetClipboardSessionState()" in cleanup
+
+    src_reset_start = source.index("\n  private resetClipboardSessionState(): void {")
+    src_reset_end = source.index("\n  private async startClipboardPolling", src_reset_start)
+    built_reset_start = dist.index("\n    resetClipboardSessionState() {")
+    built_reset_end = dist.index("\n    async startClipboardPolling", built_reset_start)
+    for reset in (source[src_reset_start:src_reset_end], dist[built_reset_start:built_reset_end]):
+        assert '#lastAndroidClipboard = ""' in reset
+        assert '#lastSentClipboard = ""' in reset
+        assert 'clipboardText.value = ""' in reset
+        assert "completeAndroidCopyRequest()" in reset
+
+
+def test_failed_pc_clipboard_sync_remains_retryable() -> None:
     source, dist = _controller_blocks()
     src = source[source.index("\n  private async synchronizePcClipboard"):source.index("\n  private scheduleReconnect")]
     built = dist[dist.index("\n    async synchronizePcClipboard"):dist.index("\n    scheduleReconnect")]
     for block in (src, built):
+        acknowledgement = block.index("if (await acknowledgement)")
+        remembered = block.index("this.#lastSentClipboard = text")
+        assert remembered > acknowledgement
         assert "clipboardMessage(text, sequence, false)" in block
         assert "pasteText(text" not in block
         assert "clipboardMessage(text, sequence, true)" not in block

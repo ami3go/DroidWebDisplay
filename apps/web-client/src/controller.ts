@@ -105,6 +105,7 @@ export class DroidWebDisplayController {
   #clipboardReadAllowed = false;
   #clipboardPollBusy = false;
   #copyShortcutPending = false;
+  #copyShortcutTimer: number | null = null;
   #latestStatistics: VideoStatistics | null = null;
   #deviceMessageTask: Promise<void> | null = null;
   #capabilities: VirtualDisplayCapabilities | null = null;
@@ -180,6 +181,7 @@ export class DroidWebDisplayController {
         audio: this.elements.audioEnabled.checked,
         control: true,
       });
+      this.resetClipboardSessionState();
       this.setConnectedControls(true);
       this.elements.canvas.focus();
       this.#deviceMessageTask = this.consumeDeviceMessages(this.#protocolSession);
@@ -568,7 +570,7 @@ export class DroidWebDisplayController {
     const shortcut = clipboardShortcut(event);
     if (shortcut === "copy") {
       event.preventDefault();
-      this.#copyShortcutPending = true;
+      this.beginAndroidCopyRequest("Ctrl+C");
       await this.sendMessages([androidClipboardCopyMessage()]);
       return;
     }
@@ -639,7 +641,6 @@ export class DroidWebDisplayController {
     const session = this.#protocolSession;
     const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
     if (new TextEncoder().encode(text).byteLength > maximum) throw new Error(`Clipboard text exceeds the configured ${maximum / 1024} KiB limit`);
-    this.#lastSentClipboard = text;
     if (!session) return;
     const sequence = this.#clipboardSequence++;
     this.setStatus("Pasting", `Synchronizing ${source} and injecting it into the focused Android input field…`);
@@ -652,6 +653,7 @@ export class DroidWebDisplayController {
       await session.sendControl(clipboardMessage(text, sequence, false));
       await this.sendMessages(textInjectionMessages(text));
       if (await acknowledgement) {
+        this.#lastSentClipboard = text;
         this.setStatus("Text pasted", `${source} was injected directly and the Android clipboard synchronization was acknowledged.`);
       } else {
         this.setStatus("Text sent", `${source} was injected directly, but Android clipboard synchronization was not acknowledged.`);
@@ -706,8 +708,7 @@ export class DroidWebDisplayController {
         }
         this.#lastAndroidClipboard = message.text;
         this.elements.clipboardText.value = message.text;
-        const copyShortcut = this.#copyShortcutPending;
-        this.#copyShortcutPending = false;
+        const copyShortcut = this.completeAndroidCopyRequest();
         if (this.elements.clipboardAutoSync.checked || copyShortcut) {
           try {
             await navigator.clipboard.writeText(message.text);
@@ -746,7 +747,7 @@ export class DroidWebDisplayController {
     this.#audioPlayer.stop();
     this.#audioTask = null;
     this.stopClipboardPolling();
-    this.#copyShortcutPending = false;
+    this.resetClipboardSessionState();
     for (const sequence of [...this.#clipboardAcks.keys()]) this.resolveClipboardAcknowledgement(sequence, false);
     try {
       await protocol?.close();
@@ -837,9 +838,36 @@ export class DroidWebDisplayController {
 
   private async copyAndroidClipboard(): Promise<void> {
     if (!this.#protocolSession) return;
-    this.#copyShortcutPending = true;
-    this.setStatus("Copying", "Requesting COPY from the focused Android selection…");
+    this.beginAndroidCopyRequest("Copy");
     await this.sendMessages([androidClipboardCopyMessage()]);
+  }
+
+  private beginAndroidCopyRequest(source: string): void {
+    if (this.#copyShortcutTimer !== null) window.clearTimeout(this.#copyShortcutTimer);
+    this.#copyShortcutPending = true;
+    this.#copyShortcutTimer = window.setTimeout(() => {
+      this.#copyShortcutTimer = null;
+      if (!this.#copyShortcutPending) return;
+      this.#copyShortcutPending = false;
+      if (!this.#protocolSession) return;
+      this.setStatus("Copy not confirmed", `Android did not report a clipboard update for ${source}. The previous PC clipboard was left unchanged.`);
+    }, 1_200);
+    this.setStatus("Copying", `Requesting ${source} from the focused Android selection…`);
+  }
+
+  private completeAndroidCopyRequest(): boolean {
+    const pending = this.#copyShortcutPending;
+    this.#copyShortcutPending = false;
+    if (this.#copyShortcutTimer !== null) window.clearTimeout(this.#copyShortcutTimer);
+    this.#copyShortcutTimer = null;
+    return pending;
+  }
+
+  private resetClipboardSessionState(): void {
+    this.#lastAndroidClipboard = "";
+    this.#lastSentClipboard = "";
+    this.elements.clipboardText.value = "";
+    this.completeAndroidCopyRequest();
   }
 
   private async startClipboardPolling(requestPermission: boolean): Promise<void> {
@@ -934,7 +962,6 @@ export class DroidWebDisplayController {
       this.setStatus("Clipboard skipped", `PC clipboard exceeds the configured ${maximum / 1024} KiB limit.`);
       return;
     }
-    this.#lastSentClipboard = text;
     const sequence = this.#clipboardSequence++;
     // Automatic synchronization updates Android's clipboard only.  It MUST NOT
     // request a paste action, because repeated paste=true messages steal focus
@@ -943,6 +970,7 @@ export class DroidWebDisplayController {
     try {
       await session.sendControl(clipboardMessage(text, sequence, false));
       if (await acknowledgement) {
+        this.#lastSentClipboard = text;
         this.setStatus("Clipboard synchronized", "PC clipboard was acknowledged by Android without pasting into the focused field.");
       } else {
         this.setStatus("Clipboard sync not confirmed", "PC clipboard update was sent, but Android did not acknowledge it.");
