@@ -9,6 +9,8 @@ from pathlib import Path
 import socket
 import ssl
 import subprocess
+
+from droid_web_display.process_utils import subprocess_creation_kwargs
 import tempfile
 from typing import Any, Iterable
 
@@ -449,7 +451,16 @@ class FirewallManager:
         if os.name != "nt":
             return {"applied": False, "reason": "Windows-only", "command": argv}
         try:
-            result = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
+            # Windows-only path: without the creation flags this pops a visible
+            # PowerShell window every time LAN access is applied or removed.
+            result = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+                **subprocess_creation_kwargs(),
+            )
         except OSError as exc:
             return {"applied": False, "reason": str(exc), "command": argv}
         return {

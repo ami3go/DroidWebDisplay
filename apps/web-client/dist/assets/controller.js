@@ -6,6 +6,16 @@ import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
 const DEVICE_DROPDOWN_REFRESH_STALE_MS = 1500;
+// textInjectionMessages chunks at 300 UTF-8 bytes and sendMessages awaits every
+// chunk, so injection cost grows linearly with the text: ~875 sequential round
+// trips at the 256 KiB clipboard limit. Above this size the clipboard is still
+// synchronized and the user pastes on the device.
+const MAX_INJECTED_BYTES = 8 * 1024;
+// An unacknowledged automatic sync is deliberately retryable, but the poller
+// runs every 1800ms and only skips text it has recorded as sent, so without a
+// cap the same text is re-sent every tick for as long as it stays on the PC
+// clipboard. Give up after this many attempts and stop asking.
+const MAX_UNACKNOWLEDGED_SYNC_ATTEMPTS = 3;
 export class DroidWebDisplayController {
     elements;
     #api = new BridgeApi();
@@ -26,6 +36,7 @@ export class DroidWebDisplayController {
     #lastConnectValues = null;
     #lastAndroidClipboard = "";
     #lastSentClipboard = "";
+    #unacknowledgedSync = null;
     #clipboardPollTimer = null;
     #clipboardReadAllowed = false;
     #clipboardPollBusy = false;
@@ -573,8 +584,12 @@ export class DroidWebDisplayController {
         if (!text)
             throw new Error("Enter or paste text into the fallback box first");
         const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
-        if (new TextEncoder().encode(text).byteLength > maximum)
+        const bytes = new TextEncoder().encode(text).byteLength;
+        if (bytes > maximum)
             throw new Error(`Text exceeds the configured ${maximum / 1024} KiB limit`);
+        if (bytes > MAX_INJECTED_BYTES) {
+            throw new Error(`Text is too large to type into Android (${Math.ceil(bytes / 1024)} KiB). Use Paste, which synchronizes the clipboard instead of typing.`);
+        }
         this.setStatus("Typing", "Injecting the text box directly into the focused Android input field…");
         await this.sendMessages(textInjectionMessages(text));
         this.setStatus("Text typed", "Text box content was injected directly into Android without using the clipboard.");
@@ -582,12 +597,16 @@ export class DroidWebDisplayController {
     async pasteText(text, source) {
         const session = this.#protocolSession;
         const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
-        if (new TextEncoder().encode(text).byteLength > maximum)
+        const bytes = new TextEncoder().encode(text).byteLength;
+        if (bytes > maximum)
             throw new Error(`Clipboard text exceeds the configured ${maximum / 1024} KiB limit`);
         if (!session)
             return;
+        const inject = bytes <= MAX_INJECTED_BYTES;
         const sequence = this.#clipboardSequence++;
-        this.setStatus("Pasting", `Synchronizing ${source} and injecting it into the focused Android input field…`);
+        this.setStatus("Pasting", inject
+            ? `Synchronizing ${source} and injecting it into the focused Android input field…`
+            : `Synchronizing ${source} with the Android clipboard…`);
         const acknowledgement = this.waitForClipboardAcknowledgement(sequence);
         try {
             // SetClipboard(paste=true) only proves that Android processed the clipboard
@@ -595,13 +614,17 @@ export class DroidWebDisplayController {
             // clipboard synchronized with paste=false, then use scrcpy InjectText as the
             // deterministic insertion path (the same strategy as scrcpy legacy paste).
             await session.sendControl(clipboardMessage(text, sequence, false));
-            await this.sendMessages(textInjectionMessages(text));
+            if (inject) await this.sendMessages(textInjectionMessages(text));
             if (await acknowledgement) {
                 this.#lastSentClipboard = text;
-                this.setStatus("Text pasted", `${source} was injected directly and the Android clipboard synchronization was acknowledged.`);
+                this.setStatus(inject ? "Text pasted" : "Clipboard synchronized", inject
+                    ? `${source} was injected directly and the Android clipboard synchronization was acknowledged.`
+                    : `${source} is on the Android clipboard. It is too large to type, so paste it on the device.`);
             }
             else {
-                this.setStatus("Text sent", `${source} was injected directly, but Android clipboard synchronization was not acknowledged.`);
+                this.setStatus("Text sent", inject
+                    ? `${source} was injected directly, but Android clipboard synchronization was not acknowledged.`
+                    : `${source} was sent to the Android clipboard but not acknowledged. If it arrived, paste it on the device.`);
             }
         }
         catch (error) {
@@ -811,9 +834,12 @@ export class DroidWebDisplayController {
         return pending;
     }
     resetClipboardSessionState() {
+        // Cached device clipboard state must not leak across sessions. The visible
+        // text box is user input, not cached state, so it is deliberately left
+        // alone: clearing it discards text typed while disconnected.
         this.#lastAndroidClipboard = "";
         this.#lastSentClipboard = "";
-        this.elements.clipboardText.value = "";
+        this.#unacknowledgedSync = null;
         this.completeAndroidCopyRequest();
     }
     async startClipboardPolling(requestPermission) {
@@ -918,10 +944,20 @@ export class DroidWebDisplayController {
             await session.sendControl(clipboardMessage(text, sequence, false));
             if (await acknowledgement) {
                 this.#lastSentClipboard = text;
+                this.#unacknowledgedSync = null;
                 this.setStatus("Clipboard synchronized", "PC clipboard was acknowledged by Android without pasting into the focused field.");
             }
             else {
-                this.setStatus("Clipboard sync not confirmed", "PC clipboard update was sent, but Android did not acknowledge it.");
+                const attempts = this.#unacknowledgedSync?.text === text ? this.#unacknowledgedSync.attempts + 1 : 1;
+                this.#unacknowledgedSync = { text, attempts };
+                if (attempts >= MAX_UNACKNOWLEDGED_SYNC_ATTEMPTS) {
+                    // Record it as sent so the poller stops retrying this text.
+                    this.#lastSentClipboard = text;
+                    this.setStatus("Clipboard sync gave up", `Android did not acknowledge the PC clipboard after ${attempts} attempts. Copy again or use Paste to retry.`);
+                }
+                else {
+                    this.setStatus("Clipboard sync not confirmed", "PC clipboard update was sent, but Android did not acknowledge it. It will be retried.");
+                }
             }
         }
         catch (error) {

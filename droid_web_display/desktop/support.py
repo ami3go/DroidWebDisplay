@@ -11,6 +11,7 @@ import sys
 import zipfile
 
 from droid_web_display import __version__
+from droid_web_display.process_utils import subprocess_creation_kwargs
 from droid_web_display.desktop.controller import DesktopPaths, ServerSnapshot
 from droid_web_display.diagnostics import redact_text
 
@@ -125,8 +126,7 @@ def _run_version(command: list[str]) -> str:
         "timeout": 2.0,
         "check": False,
     }
-    if os.name == "nt":
-        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    kwargs.update(subprocess_creation_kwargs())
     try:
         result = subprocess.run(command, **kwargs)
     except (OSError, subprocess.SubprocessError):

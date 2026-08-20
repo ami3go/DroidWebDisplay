@@ -4,11 +4,11 @@ import asyncio
 import os
 import re
 import shutil
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
+from droid_web_display.process_utils import subprocess_creation_kwargs
 from droid_web_display.errors import AdbCommandError, AdbUnavailableError
 from droid_web_display.models import AndroidDevice
 
@@ -34,11 +34,7 @@ async def _terminate(process: asyncio.subprocess.Process) -> None:
 
 def _subprocess_creation_kwargs(platform_name: str | None = None) -> dict[str, int]:
     """Return platform-specific flags for invisible background child processes."""
-    if (platform_name or os.name) != "nt":
-        return {}
-    # CREATE_NO_WINDOW is 0x08000000. Keep the literal fallback so tests and
-    # alternate Python runtimes can still validate the Windows launch contract.
-    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+    return subprocess_creation_kwargs(platform_name)
 
 
 @dataclass(frozen=True)
