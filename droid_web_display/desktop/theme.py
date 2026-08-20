@@ -243,6 +243,18 @@ QPushButton#headerIconButton[headerDanger="true"]:hover {{
     border-color: {c['danger_border']};
 }}
 
+/* An id selector outranks the bare QPushButton:disabled and :pressed rules
+   below, so without these the header buttons keep their enabled background
+   when disabled and give no press feedback. */
+QPushButton#headerIconButton:disabled {{
+    background-color: #171b23;
+    border-color: #242a37;
+}}
+
+QPushButton#headerIconButton:pressed {{
+    background-color: #1d2430;
+}}
+
 QPushButton:pressed {{
     background-color: #1d2430;
 }}

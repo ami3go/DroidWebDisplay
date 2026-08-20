@@ -1,5 +1,6 @@
 import { ControlMessageType, DeviceMessageType, ScrcpyV41Adapter, } from "@droid-web-display/scrcpy-protocol";
 import { BridgeApi } from "./api.js";
+import { CLIPBOARD_STATUS } from "./clipboard-status.js";
 import { alignedFlexSize, buildSessionRequest, validateDisplayForm, VIRTUAL_DISPLAY_PROFILES, } from "./display-config.js";
 import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
@@ -687,11 +688,11 @@ export class DroidWebDisplayController {
                             : "Android clipboard was copied to the PC clipboard.");
                     }
                     catch {
-                        this.setStatus("Clipboard received", "Android clipboard is available in the clipboard panel; browser write permission was unavailable.");
+                        this.setStatus(CLIPBOARD_STATUS.received, "Android clipboard is available in the clipboard panel; browser write permission was unavailable.");
                     }
                 }
                 else {
-                    this.setStatus("Clipboard received", "Android clipboard is available in the clipboard panel.");
+                    this.setStatus(CLIPBOARD_STATUS.received, "Android clipboard is available in the clipboard panel.");
                 }
             }
         }
@@ -822,9 +823,9 @@ export class DroidWebDisplayController {
             this.#copyShortcutPending = false;
             if (!this.#protocolSession)
                 return;
-            this.setStatus("Copy not confirmed", `Android did not report a clipboard update for ${source}. The previous PC clipboard was left unchanged.`);
+            this.setStatus(CLIPBOARD_STATUS.notConfirmed, `Android did not report a clipboard update for ${source}. The previous PC clipboard was left unchanged.`);
         }, 1_200);
-        this.setStatus("Copying", `Requesting ${source} from the focused Android selection…`);
+        this.setStatus(CLIPBOARD_STATUS.copying, `Requesting ${source} from the focused Android selection…`);
     }
     completeAndroidCopyRequest() {
         const pending = this.#copyShortcutPending;

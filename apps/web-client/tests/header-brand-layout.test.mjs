@@ -12,8 +12,8 @@ test("header override removes legacy pseudo logo and keeps brand on one row", ()
   assert.match(css, /content: none !important/);
   assert.match(css, /grid-template-columns: 54px minmax\(10\.6rem, auto\)/);
   assert.match(css, /grid-template-rows: 27px 27px/);
-  assert.match(css, /\.topbar \{[\s\S]*flex-wrap: nowrap !important/);
-  assert.match(css, /\.connection-row \{[\s\S]*flex-basis: auto !important/);
+  assert.match(css, /\.topbar \{[^}]*flex-wrap: nowrap !important/);
+  assert.match(css, /\.connection-row \{[^}]*flex-basis: auto !important/);
 });
 
 test("header override exposes independent phone and display states while keeping wordmark white", () => {

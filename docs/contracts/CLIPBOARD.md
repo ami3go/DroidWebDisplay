@@ -39,12 +39,38 @@ Control sessions intentionally keep scrcpy's native clipboard autosync enabled. 
 
 ```text
 Copy button or Ctrl+C
-    -> explicit clipboard request / current Android clipboard value
-    -> browser-side write-through
-    -> Clipboard API or fallback copy path
+    -> controller.ts requests the Android clipboard (GetClipboard)
+    -> device reply lands in #clipboard-text and the status line
+    -> main.ts bindAndroidCopyWriteThrough observes that reply, still inside
+       the originating gesture, and performs the PC write
+    -> Clipboard API, or document.execCommand("copy") fallback
 ```
 
 The manual path exists independently of automatic synchronization. Manual Copy must continue to work even when the Android clipboard text has not changed since the previous notification.
+
+**Why the write lives in main.ts, not in the device-message loop.**
+`navigator.clipboard.writeText` requires transient user activation. Writing
+from `consumeDeviceMessages` would happen outside the click or keypress and be
+refused. `bindAndroidCopyWriteThrough` therefore stays inside the gesture and
+polls the DOM for the controller's reply for up to 1200 ms.
+
+**The coupling this creates.** That poll recognises the reply by matching the
+status headline against exact strings. Those strings are therefore a contract
+between the two modules, not display copy, and they live in
+`apps/web-client/src/clipboard-status.ts` (`CLIPBOARD_STATUS`). Both
+`controller.ts` and `main.ts` import them.
+
+Do not restate a sentinel as a literal at a `setStatus` call site. Doing so
+breaks the Copy button silently: no exception, no console error, and the
+existing tests stay green because they only pin the `main.ts` side.
+`tests/packaging/test_clipboard_sync_regression.py::test_clipboard_status_sentinels_are_defined_once_and_shared`
+guards this.
+
+One further ordering dependency worth knowing: `bindAndroidCopyWriteThrough` is
+registered *after* the controller's own listeners, and the controller sets the
+transient `Copying` status synchronously. That is what lets a repeated identical
+Android clipboard value still register as a reply, since the textarea contents
+do not change in that case.
 
 ### PC -> Android
 
@@ -64,6 +90,13 @@ Automatic PC -> Android synchronization depends on browser clipboard-read permis
 Do not solve a manual Copy problem by disabling scrcpy native clipboard autosync.
 
 Do not solve browser permission problems by blocking keyboard input or repeatedly prompting/focusing a paste UI.
+
+Exception, documented rather than silent: the `execCommand` fallback in
+`main.ts` does focus `#clipboard-text`, select it, and restore focus, because
+that is the only way to copy without the async Clipboard API. It runs only
+when `writeText` has already been refused, and it restores focus to wherever
+it was rather than parking it on the canvas.
+
 
 ## Regression history
 

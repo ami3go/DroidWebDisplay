@@ -42,7 +42,7 @@ def test_type_bypasses_clipboard_and_copy_requests_android_selection() -> None:
         assert "androidClipboardCopyMessage()" in block
         assert "beginAndroidCopyRequest" in block
         assert "completeAndroidCopyRequest" in block
-        assert "Copy not confirmed" in block
+        assert "CLIPBOARD_STATUS.notConfirmed" in block
         assert "previous PC clipboard was left unchanged" in block
         assert "writeText(this.#lastAndroidClipboard)" not in block
 
@@ -55,11 +55,14 @@ def test_android_copy_write_through_never_copies_stale_android_text() -> None:
         assert '"#screen"' in block
         assert "navigator.clipboard.writeText(text)" in block
         assert 'document.execCommand("copy")' in block
-        assert 'currentStatus === "Clipboard received"' in block
-        assert 'currentStatus === "Copy not confirmed"' in block
+        # These sentinels are the contract between controller.ts and main.ts.
+        # They live in clipboard-status.ts precisely so that rewording one at a
+        # call site cannot silently break the Copy button; assert on the shared
+        # symbol, and pin the literal values in the dedicated test below.
+        assert "currentStatus === CLIPBOARD_STATUS.received" in block
+        assert "currentStatus === CLIPBOARD_STATUS.notConfirmed" in block
         assert "if (!responseObserved)" in block
         assert "previous PC clipboard was left unchanged" in block
-        assert "No new Android clipboard event arrived; copied the last Android clipboard value." not in block
         assert "bindAndroidCopyWriteThrough();" in block
 
 
@@ -70,7 +73,7 @@ def test_manual_copy_timeout_clears_pending_and_late_clipboard_events_are_not_cl
     for block in (src_helpers, built_helpers):
         assert "#copyShortcutTimer" in block
         assert "#copyShortcutPending = false" in block
-        assert "Copy not confirmed" in block
+        assert "CLIPBOARD_STATUS.notConfirmed" in block
         assert "completeAndroidCopyRequest" in block
 
     for block in (source, dist):
@@ -152,3 +155,27 @@ def test_oversized_text_is_synchronized_rather_than_typed_chunk_by_chunk() -> No
     for block in (src_type, built_type):
         assert "MAX_INJECTED_BYTES" in block
         assert "too large to type into Android" in block
+
+
+def test_clipboard_status_sentinels_are_defined_once_and_shared() -> None:
+    """The copy write-through matches these strings against the status line.
+
+    Rewording one at a call site used to break the Copy button with a green
+    suite, so the literals now live in one module and both sides import them.
+    """
+    root = Path(__file__).resolve().parents[2]
+    contract = (root / "apps/web-client/src/clipboard-status.ts").read_text(encoding="utf-8")
+    built = (root / "apps/web-client/dist/assets/clipboard-status.js").read_text(encoding="utf-8")
+    for block in (contract, built):
+        assert 'copying: "Copying"' in block
+        assert 'copied: "Clipboard copied"' in block
+        assert 'received: "Clipboard received"' in block
+        assert 'notConfirmed: "Copy not confirmed"' in block
+
+    controller = (root / "apps/web-client/src/controller.ts").read_text(encoding="utf-8")
+    main = (root / "apps/web-client/src/main.ts").read_text(encoding="utf-8")
+    for block in (controller, main):
+        assert 'from "./clipboard-status.js"' in block
+    # No call site may restate a sentinel as a literal.
+    for literal in ('setStatus("Clipboard received"', 'setStatus("Copy not confirmed"', 'setStatus("Copying"'):
+        assert literal not in controller
