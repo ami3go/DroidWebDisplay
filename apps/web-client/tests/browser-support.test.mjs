@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inspectBrowserCapabilities } from "../dist/assets/browser-support.js";
+import { browserName, inspectBrowserCapabilities } from "../dist/assets/browser-support.js";
 import { decoderBacklogAction } from "../dist/assets/video-renderer.js";
 
 test("reports all mandatory Chromium/WebCodecs capabilities", () => {
@@ -13,12 +13,22 @@ test("reports all mandatory Chromium/WebCodecs capabilities", () => {
     AudioDecoder: class {},
     EncodedAudioChunk: class {},
     AudioContext: class {},
-    navigator: { userAgent: "Chromium test" },
+    navigator: { userAgent: "Mozilla/5.0 Chrome/150.0.0.0 Safari/537.36", platform: "Win32", hardwareConcurrency: 8 },
   });
   assert.equal(report.supported, true);
   assert.deepEqual(report.missing, []);
   assert.equal(report.audioSupported, true);
   assert.deepEqual(report.missingAudio, []);
+  assert.equal(report.browserName, "Chrome 150.0.0.0");
+  assert.equal(report.platform, "Win32");
+  assert.equal(report.hardwareConcurrency, 8);
+});
+
+test("extracts Edge before the embedded Chromium token", () => {
+  assert.equal(
+    browserName("Mozilla/5.0 Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"),
+    "Edge 150.0.0.0",
+  );
 });
 
 test("rejects a browser without WebCodecs", () => {
@@ -31,7 +41,6 @@ test("rejects a browser without WebCodecs", () => {
   assert.equal(report.supported, false);
   assert.deepEqual(report.missing, ["VideoDecoder"]);
 });
-
 
 test("reports optional audio independently from mandatory video support", () => {
   const report = inspectBrowserCapabilities({
