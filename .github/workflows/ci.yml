@@ -249,6 +249,33 @@ jobs:
             "$APPDIR" \
             "release/DroidWebDisplay-ci-linux-x86_64.AppImage"
           chmod +x release/DroidWebDisplay-ci-linux-x86_64.AppImage
+      - name: Verify AppImage version metadata and bundled ADB
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The Windows job verifies PE FileVersion/ProductVersion against VERSION.
+          # Without an equivalent here, release.yml renames this artifact to
+          # DroidWebDisplay-v<version>-linux-x86_64.AppImage and publishes a
+          # filename asserting a version nothing checked.
+          version=$(tr -d '[:space:]' < VERSION)
+          appimage="$PWD/release/DroidWebDisplay-ci-linux-x86_64.AppImage"
+          workdir=$(mktemp -d)
+          cd "$workdir"
+          "$appimage" --appimage-extract > /dev/null
+          root="$workdir/squashfs-root/usr/lib/droidwebdisplay"
+          test -d "$root"
+          bundled=$(find "$root" -maxdepth 3 -name VERSION -type f | head -n 1)
+          test -n "$bundled"
+          got=$(tr -d '[:space:]' < "$bundled")
+          if [ "$got" != "$version" ]; then
+            echo "AppImage bundles VERSION $got but the tree says $version" >&2
+            exit 1
+          fi
+          adb=$(find "$root" -name adb -type f | head -n 1)
+          test -n "$adb"
+          echo "AppImage version $got verified, bundled adb at ${adb#$root/}"
+          cd - > /dev/null
+          rm -rf "$workdir"
       - name: Smoke-test AppImage desktop host
         run: QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 ./release/DroidWebDisplay-ci-linux-x86_64.AppImage --desktop-smoke
       - name: Smoke-test AppImage CLI
