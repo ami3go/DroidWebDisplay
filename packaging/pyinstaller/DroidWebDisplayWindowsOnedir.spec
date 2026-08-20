@@ -26,8 +26,14 @@ if len(parts) != 3:
     raise SystemExit(f"Expected semantic VERSION, got {VERSION!r}")
 numeric_version = (*parts, 0)
 
-ICON = ROOT / "packaging" / "windows" / "droidwebdisplay.ico"
-ICON.write_bytes(base64.b64decode((ICON.with_suffix(".ico.base64")).read_text(encoding="ascii")))
+# Decode the tracked base64 icon into PyInstaller's work directory rather than
+# back into packaging/windows/. Writing it into the source tree left an
+# untracked binary behind after every build, which `git add -A` would commit.
+ICON_SOURCE = ROOT / "packaging" / "windows" / "droidwebdisplay.ico.base64"
+ICON_DIR = Path(globals().get("workpath") or (ROOT / "build"))
+ICON_DIR.mkdir(parents=True, exist_ok=True)
+ICON = ICON_DIR / "droidwebdisplay.ico"
+ICON.write_bytes(base64.b64decode(ICON_SOURCE.read_text(encoding="ascii")))
 
 version_info = VSVersionInfo(
     ffi=FixedFileInfo(
