@@ -60,6 +60,23 @@ jobs:
         run: |
           npm ci
           npm run build
+      - name: Verify committed generated artifacts match source
+        shell: bash
+        run: |
+          set -euo pipefail
+          changes=$(git status --porcelain -- \
+            packages/scrcpy-protocol/dist \
+            apps/web-client/dist \
+            apps/web-client/dist-manifest.json)
+          if [ -n "$changes" ]; then
+            echo "Generated artifacts differ from the committed checkout. Rebuild and commit them." >&2
+            printf '%s\n' "$changes" >&2
+            git diff -- \
+              packages/scrcpy-protocol/dist \
+              apps/web-client/dist \
+              apps/web-client/dist-manifest.json
+            exit 1
+          fi
       - name: Run release gate
         run: .tools/uv/uv run python tools/release_gate.py --require-web-client-build --output /tmp/release-gate.json
       - name: Generate build SBOM and license inventory
@@ -220,13 +237,13 @@ jobs:
           APPDIR="$PWD/AppDir"
           mkdir -p "$APPDIR/usr/lib/droidwebdisplay"
           cp -a dist/DroidWebDisplay/. "$APPDIR/usr/lib/droidwebdisplay/"
-          cat > "$APPDIR/AppRun" <<'EOF'
+          cat > "$APPDIR/AppRun" <<'EOAPP'
           #!/usr/bin/env sh
           HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
           exec "$HERE/usr/lib/droidwebdisplay/DroidWebDisplay" "$@"
-          EOF
+          EOAPP
           chmod +x "$APPDIR/AppRun"
-          cat > "$APPDIR/droidwebdisplay.desktop" <<'EOF'
+          cat > "$APPDIR/droidwebdisplay.desktop" <<'EODESKTOP'
           [Desktop Entry]
           Type=Application
           Name=DroidWebDisplay
@@ -235,7 +252,7 @@ jobs:
           Icon=droidwebdisplay
           Terminal=false
           Categories=Development;Utility;
-          EOF
+          EODESKTOP
           cp packaging/linux/droidwebdisplay.svg "$APPDIR/droidwebdisplay.svg"
           ln -s droidwebdisplay.svg "$APPDIR/.DirIcon"
 
@@ -264,15 +281,25 @@ jobs:
           "$appimage" --appimage-extract > /dev/null
           root="$workdir/squashfs-root/usr/lib/droidwebdisplay"
           test -d "$root"
-          bundled=$(find "$root" -maxdepth 3 -name VERSION -type f | head -n 1)
-          test -n "$bundled"
+          mapfile -t bundled_versions < <(find "$root" -maxdepth 3 -name VERSION -type f -print)
+          if [ "${#bundled_versions[@]}" -ne 1 ]; then
+            echo "Expected exactly one bundled VERSION file, found ${#bundled_versions[@]}" >&2
+            printf '  %s\n' "${bundled_versions[@]}" >&2
+            exit 1
+          fi
+          bundled="${bundled_versions[0]}"
           got=$(tr -d '[:space:]' < "$bundled")
           if [ "$got" != "$version" ]; then
             echo "AppImage bundles VERSION $got but the tree says $version" >&2
             exit 1
           fi
-          adb=$(find "$root" -name adb -type f | head -n 1)
-          test -n "$adb"
+          mapfile -t adbs < <(find "$root" -name adb -type f -print)
+          if [ "${#adbs[@]}" -ne 1 ]; then
+            echo "Expected exactly one bundled adb executable, found ${#adbs[@]}" >&2
+            printf '  %s\n' "${adbs[@]}" >&2
+            exit 1
+          fi
+          adb="${adbs[0]}"
           echo "AppImage version $got verified, bundled adb at ${adb#$root/}"
           cd - > /dev/null
           rm -rf "$workdir"

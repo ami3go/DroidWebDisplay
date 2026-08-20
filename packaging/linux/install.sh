@@ -28,30 +28,30 @@ mkdir -p "$INSTALL_ROOT" "$BIN_DIR" "$SYSTEMD_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 for state in data downloads logs; do mkdir -p "$INSTALL_ROOT/$state"; done
 
 # Refresh executable application files while preserving runtime state and any
-# installed virtual environment. Python stdlib copying avoids an rsync dependency.
-SOURCE="$SOURCE" INSTALL_ROOT="$INSTALL_ROOT" python3 - <<'PY'
-from pathlib import Path
-import os, shutil
-src = Path(os.environ["SOURCE"]).resolve()
-dst = Path(os.environ["INSTALL_ROOT"]).resolve()
-preserve = {"data", "downloads", "logs", ".venv"}
-ignore = {"evidence", "node_modules", ".pytest_cache", "__pycache__", ".git"}
-for child in list(dst.iterdir()):
-    if child.name in preserve:
-        continue
-    if child.is_dir() and not child.is_symlink():
-        shutil.rmtree(child)
-    else:
-        child.unlink(missing_ok=True)
-for child in src.iterdir():
-    if child.name in preserve or child.name in ignore:
-        continue
-    target = dst / child.name
-    if child.is_dir():
-        shutil.copytree(child, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache", "node_modules", ".git"))
-    elif child.is_file():
-        shutil.copy2(child, target)
-PY
+# installed virtual environment. Use standard shell/coreutils so a complete
+# bundled release does not depend on a host Python installation just to copy
+# itself into place.
+while IFS= read -r -d '' child; do
+  name=${child##*/}
+  case "$name" in
+    data|downloads|logs|.venv) continue ;;
+  esac
+  rm -rf -- "$child"
+done < <(find "$INSTALL_ROOT" -mindepth 1 -maxdepth 1 -print0)
+
+while IFS= read -r -d '' child; do
+  name=${child##*/}
+  case "$name" in
+    data|downloads|logs|.venv|evidence|node_modules|.pytest_cache|__pycache__|.git) continue ;;
+  esac
+  cp -a -- "$child" "$INSTALL_ROOT/"
+  target="$INSTALL_ROOT/$name"
+  if [[ -d "$target" && ! -L "$target" ]]; then
+    find "$target" -type d \( -name __pycache__ -o -name .pytest_cache -o -name node_modules -o -name .git \) \
+      -prune -exec rm -rf -- {} +
+    find "$target" -type f -name '*.pyc' -delete
+  fi
+done < <(find "$SOURCE" -mindepth 1 -maxdepth 1 -print0)
 
 RUNTIME=""
 for candidate in "$INSTALL_ROOT/runtime/python/bin/python3" "$INSTALL_ROOT/runtime/python/python3"; do

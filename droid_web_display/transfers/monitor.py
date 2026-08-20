@@ -253,28 +253,33 @@ class AutoDownloadMonitor:
     async def configure(self, config: AutoDownloadConfig) -> dict[str, Any]:
         validated = config.validate()
         self.transfers.destination_path(validated.destination_profile)
-        async with self._lock:
-            remote_changed = (
-                validated.serial != self.config.serial
-                or validated.source_path != self.config.source_path
-                or validated.include_existing != self.config.include_existing
-            )
-            local_changed = (
-                validated.serial != self.config.serial
-                or validated.source_path != self.config.source_path
-                or validated.destination_profile != self.config.destination_profile
-                or validated.include_existing_pc != self.config.include_existing_pc
-            )
-            self.config = validated
-            if remote_changed:
-                self.runtime.baseline_initialized = False
-                self._observed.clear()
-            if local_changed:
-                self.runtime.pc_baseline_initialized = False
-                self._local_observed.clear()
-            self.runtime.state = "watching" if validated.active else "disabled"
-            self.runtime.last_error = None
-            await self._persist_unlocked()
+        # A scan deliberately releases _lock across ADB and queue awaits. Take
+        # the whole-scan lock before changing configuration so an in-flight scan
+        # cannot resume with a mixture of the old device/folder and new values.
+        # Keep the same lock order as _scan_once(): _scan_lock, then _lock.
+        async with self._scan_lock:
+            async with self._lock:
+                remote_changed = (
+                    validated.serial != self.config.serial
+                    or validated.source_path != self.config.source_path
+                    or validated.include_existing != self.config.include_existing
+                )
+                local_changed = (
+                    validated.serial != self.config.serial
+                    or validated.source_path != self.config.source_path
+                    or validated.destination_profile != self.config.destination_profile
+                    or validated.include_existing_pc != self.config.include_existing_pc
+                )
+                self.config = validated
+                if remote_changed:
+                    self.runtime.baseline_initialized = False
+                    self._observed.clear()
+                if local_changed:
+                    self.runtime.pc_baseline_initialized = False
+                    self._local_observed.clear()
+                self.runtime.state = "watching" if validated.active else "disabled"
+                self.runtime.last_error = None
+                await self._persist_unlocked()
         self._wake.set()
         return self.snapshot()
 

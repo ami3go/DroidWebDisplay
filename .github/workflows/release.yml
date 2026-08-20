@@ -5,9 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/releases/v*.md'
-  # Manual re-entry. `prepare` self-aborts once VERSION already matches, so
-  # without this a failed publish leaves no way to finish the release except
-  # hand-crafted recovery commits.
+  # Manual re-entry for a failed candidate gate or a publish failure after the
+  # qualified release commit has already been promoted to main.
   workflow_dispatch:
     inputs:
       version:
@@ -30,13 +29,16 @@ jobs:
     outputs:
       version: ${{ steps.prepare.outputs.version }}
       sha: ${{ steps.prepare.outputs.sha }}
+      base_sha: ${{ steps.prepare.outputs.base_sha }}
+      ref: ${{ steps.prepare.outputs.ref }}
+      promote: ${{ steps.prepare.outputs.promote }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
 
       - id: prepare
-        name: Prepare versioned release commit
+        name: Prepare isolated release candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -44,9 +46,8 @@ jobs:
             request=".github/releases/v${{ github.event.inputs.version }}.md"
             test -f "$request"
           else
-            # head -n 1 silently published only the alphabetically-first file and
-            # could select an OLD request file touched by an unrelated edit,
-            # attempting a version downgrade. Require exactly one added file.
+            # Require exactly one newly-added release request so an unrelated
+            # edit cannot accidentally select an older request and downgrade.
             mapfile -t requests < <(git diff --name-only --diff-filter=A HEAD^ HEAD -- '.github/releases/v*.md')
             if [ "${#requests[@]}" -ne 1 ]; then
               echo "expected exactly one added release request, got ${#requests[@]}: ${requests[*]:-none}" >&2
@@ -59,6 +60,7 @@ jobs:
           version=${file#v}
           version=${version%.md}
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          base_sha=$(git rev-parse HEAD)
           export RELEASE_VERSION="$version"
           export RELEASE_REQUEST="$request"
 
@@ -69,8 +71,13 @@ jobs:
           version = os.environ["RELEASE_VERSION"]
           request = Path(os.environ["RELEASE_REQUEST"])
           current = Path("VERSION").read_text(encoding="utf-8").strip()
-          if current == version:
-              raise SystemExit(f"VERSION already equals {version}")
+
+          def version_tuple(value: str) -> tuple[int, int, int]:
+              try:
+                  major, minor, patch = value.split(".")
+                  return int(major), int(minor), int(patch)
+              except (ValueError, TypeError) as exc:
+                  raise SystemExit(f"Invalid semantic version: {value!r}") from exc
 
           def replace_once(path: str, old: str, new: str) -> None:
               target = Path(path)
@@ -79,73 +86,114 @@ jobs:
                   raise SystemExit(f"Expected version marker not found in {path}: {old!r}")
               target.write_text(text.replace(old, new, 1), encoding="utf-8")
 
-          Path("VERSION").write_text(version + "\n", encoding="utf-8")
-          replace_once(
-              "droid_web_display/__init__.py",
-              f'__version__ = "{current}"',
-              f'__version__ = "{version}"',
-          )
-          replace_once(
-              "pyproject.toml",
-              f'version = "{current}"',
-              f'version = "{version}"',
-          )
-          replace_once(
-              "requirements-runtime.txt",
-              f"# DroidWebDisplay v{current} pinned runtime environment.",
-              f"# DroidWebDisplay v{version} pinned runtime environment.",
-          )
-          replace_once(
-              "packages/bridge-api/openapi/openapi-v1.json",
-              f'"version": "{current}"',
-              f'"version": "{version}"',
-          )
-          replace_once(
-              "uv.lock",
-              f'name = "droid-web-display"\nversion = "{current}"',
-              f'name = "droid-web-display"\nversion = "{version}"',
-          )
-
           notes = request.read_text(encoding="utf-8").strip()
           if not notes.startswith(f"## {version} "):
               raise SystemExit(f"Release notes must start with '## {version} '")
+
           changelog_path = Path("CHANGELOG.md")
           changelog = changelog_path.read_text(encoding="utf-8")
-          if f"## {version} " in changelog:
-              raise SystemExit(f"CHANGELOG already contains {version}")
-          prefix = "# Changelog\n"
-          if not changelog.startswith(prefix):
-              raise SystemExit("Unexpected CHANGELOG header")
-          existing = changelog[len(prefix):].lstrip("\n")
-          changelog_path.write_text(
-              f"# Changelog\n\n{notes}\n\n{existing}",
-              encoding="utf-8",
-          )
+
+          if current == version:
+              # Idempotent manual recovery: main may already contain a fully
+              # qualified release commit when only publication failed. Accept
+              # that state, but only when every version marker and the release
+              # notes are already consistent.
+              expected_markers = {
+                  "droid_web_display/__init__.py": f'__version__ = "{version}"',
+                  "pyproject.toml": f'version = "{version}"',
+                  "requirements-runtime.txt": f"# DroidWebDisplay v{version} pinned runtime environment.",
+                  "packages/bridge-api/openapi/openapi-v1.json": f'"version": "{version}"',
+                  "uv.lock": f'name = "droid-web-display"\nversion = "{version}"',
+              }
+              for path, marker in expected_markers.items():
+                  if marker not in Path(path).read_text(encoding="utf-8"):
+                      raise SystemExit(f"VERSION is {version}, but {path} is inconsistent")
+              if notes not in changelog:
+                  raise SystemExit(f"VERSION is {version}, but CHANGELOG does not contain the matching release notes")
+          else:
+              if version_tuple(version) < version_tuple(current):
+                  raise SystemExit(f"Refusing version downgrade from {current} to {version}")
+
+              Path("VERSION").write_text(version + "\n", encoding="utf-8")
+              replace_once(
+                  "droid_web_display/__init__.py",
+                  f'__version__ = "{current}"',
+                  f'__version__ = "{version}"',
+              )
+              replace_once(
+                  "pyproject.toml",
+                  f'version = "{current}"',
+                  f'version = "{version}"',
+              )
+              replace_once(
+                  "requirements-runtime.txt",
+                  f"# DroidWebDisplay v{current} pinned runtime environment.",
+                  f"# DroidWebDisplay v{version} pinned runtime environment.",
+              )
+              replace_once(
+                  "packages/bridge-api/openapi/openapi-v1.json",
+                  f'"version": "{current}"',
+                  f'"version": "{version}"',
+              )
+              replace_once(
+                  "uv.lock",
+                  f'name = "droid-web-display"\nversion = "{current}"',
+                  f'name = "droid-web-display"\nversion = "{version}"',
+              )
+
+              if f"## {version} " in changelog:
+                  raise SystemExit(f"CHANGELOG already contains {version} while VERSION is still {current}")
+              prefix = "# Changelog\n"
+              if not changelog.startswith(prefix):
+                  raise SystemExit("Unexpected CHANGELOG header")
+              existing = changelog[len(prefix):].lstrip("\n")
+              changelog_path.write_text(
+                  f"# Changelog\n\n{notes}\n\n{existing}",
+                  encoding="utf-8",
+              )
           PY
 
           git diff --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
+          if git diff --quiet -- \
             CHANGELOG.md \
             VERSION \
             droid_web_display/__init__.py \
             pyproject.toml \
             requirements-runtime.txt \
             packages/bridge-api/openapi/openapi-v1.json \
-            uv.lock
-          git commit -m "Prepare v${version} release"
-          git push origin HEAD:main
+            uv.lock; then
+            # Recovery path: the exact release commit is already main. Do not
+            # create a second release-preparation commit.
+            sha="$base_sha"
+            release_ref="main"
+            promote="false"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              CHANGELOG.md \
+              VERSION \
+              droid_web_display/__init__.py \
+              pyproject.toml \
+              requirements-runtime.txt \
+              packages/bridge-api/openapi/openapi-v1.json \
+              uv.lock
+            git commit -m "Prepare v${version} release"
+            sha=$(git rev-parse HEAD)
+            release_ref="release-candidate/v${version}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            git push origin HEAD:"refs/heads/$release_ref"
+            promote="true"
+          fi
 
-          sha=$(git rev-parse HEAD)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "ref=$release_ref" >> "$GITHUB_OUTPUT"
+          echo "promote=$promote" >> "$GITHUB_OUTPUT"
 
   publish:
     needs: prepare
     runs-on: ubuntu-24.04
-    # Bounded so a hung smoke job cannot hold the droidwebdisplay-release
-    # concurrency slot for the six-hour default and block every later release.
     timeout-minutes: 60
     permissions:
       contents: write
@@ -154,21 +202,27 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
+      RELEASE_BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+      RELEASE_REF: ${{ needs.prepare.outputs.ref }}
+      PROMOTE_RELEASE: ${{ needs.prepare.outputs.promote }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 2
 
-      - name: Dispatch release gate for exact release commit
+      - name: Dispatch release gate for exact candidate
         shell: bash
         run: |
           set -euo pipefail
-          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
-          if [ "$current" != "$RELEASE_SHA" ]; then
-            echo "main moved from release commit $RELEASE_SHA to $current" >&2
-            exit 1
+          if [ "$PROMOTE_RELEASE" = "true" ]; then
+            current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+            if [ "$current" != "$RELEASE_BASE_SHA" ]; then
+              echo "main moved from candidate base $RELEASE_BASE_SHA to $current" >&2
+              exit 1
+            fi
           fi
-          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$RELEASE_REF"
 
       - name: Wait for release gate and download packages
         shell: bash
@@ -212,14 +266,37 @@ jobs:
           chmod +x "release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage"
           (cd release-assets && sha256sum DroidWebDisplay-* > SHA256SUMS.txt)
 
+      - name: Promote qualified candidate to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$PROMOTE_RELEASE" = "true" ]; then
+            current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+            if [ "$current" != "$RELEASE_BASE_SHA" ]; then
+              echo "main moved from candidate base $RELEASE_BASE_SHA to $current" >&2
+              exit 1
+            fi
+            git push origin "$RELEASE_SHA:refs/heads/main"
+          fi
+          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$current" != "$RELEASE_SHA" ]; then
+            echo "main is $current, expected qualified release commit $RELEASE_SHA" >&2
+            exit 1
+          fi
+
       - name: Publish GitHub release
         shell: bash
         run: |
           set -euo pipefail
           tag="v${RELEASE_VERSION}"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $tag already exists" >&2
-            exit 1
+            published_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+            if [ "$published_sha" != "$RELEASE_SHA" ]; then
+              echo "Release $tag already exists at $published_sha, expected $RELEASE_SHA" >&2
+              exit 1
+            fi
+            echo "Release $tag already exists at the qualified commit; treating rerun as successful."
+            exit 0
           fi
           gh release create "$tag" \
             --repo "$GITHUB_REPOSITORY" \
@@ -230,3 +307,8 @@ jobs:
             release-assets/DroidWebDisplay-v${RELEASE_VERSION}-windows-x86_64.zip \
             release-assets/DroidWebDisplay-v${RELEASE_VERSION}-linux-x86_64.AppImage \
             release-assets/SHA256SUMS.txt
+
+      - name: Cleanup release candidate branch
+        if: ${{ always() && env.RELEASE_REF != 'main' }}
+        shell: bash
+        run: git push origin --delete "$RELEASE_REF" >/dev/null 2>&1 || true
