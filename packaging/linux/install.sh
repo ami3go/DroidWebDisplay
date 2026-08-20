@@ -6,6 +6,7 @@ INSTALL_ROOT="${DROID_WEB_DISPLAY_INSTALL_ROOT:-$HOME/.local/share/droidwebdispl
 BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
 
 SOURCE_REAL="$(cd "$SOURCE" && pwd)"
 mkdir -p "$INSTALL_ROOT"
@@ -23,7 +24,7 @@ for candidate in "$INSTALL_ROOT/runtime/python/bin/python3" "$INSTALL_ROOT/runti
   fi
 done
 
-mkdir -p "$INSTALL_ROOT" "$BIN_DIR" "$SYSTEMD_DIR" "$DESKTOP_DIR"
+mkdir -p "$INSTALL_ROOT" "$BIN_DIR" "$SYSTEMD_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 for state in data downloads logs; do mkdir -p "$INSTALL_ROOT/$state"; done
 
 # Refresh executable application files while preserving runtime state and any
@@ -95,6 +96,11 @@ chmod +x "$BIN_DIR/droidwebdisplay-stop"
 
 sed "s|@INSTALL_ROOT@|$INSTALL_ROOT|g" "$INSTALL_ROOT/packaging/linux/droidwebdisplay.service.in" > "$SYSTEMD_DIR/droidwebdisplay.service"
 sed "s|@LAUNCHER@|$BIN_DIR/droidwebdisplay|g" "$INSTALL_ROOT/packaging/linux/droidwebdisplay.desktop.in" > "$DESKTOP_DIR/droidwebdisplay.desktop"
+# The desktop entry names Icon=droidwebdisplay, so the SVG has to be on the
+# icon search path or the launcher shows a generic placeholder. The AppImage
+# ships its own copy; a system install had none.
+install -m 0644 "$INSTALL_ROOT/packaging/linux/droidwebdisplay.svg" "$ICON_DIR/droidwebdisplay.svg"
+gtk-update-icon-cache -f -t "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor" >/dev/null 2>&1 || true
 systemctl --user daemon-reload >/dev/null 2>&1 || true
 printf 'Installed DroidWebDisplay to %s\n' "$INSTALL_ROOT"
 printf 'Start now: systemctl --user start droidwebdisplay.service\n'
