@@ -116,14 +116,16 @@ export class AuthController {
     }
   }
 
-  /** Re-open the gate after a session expires or is revoked.
-
-      This used to only unhide the gate, which left whatever form was rendered
-      last on screen. After first-run setup that is the setup form, so a lock
-      later in the same page session showed "Create bridge PIN" with the
-      Confirm PIN box still visible, even though the PIN already exists and the
-      submit would perform a login. The server is the authority on whether a
-      PIN is configured, so re-read it. */
+  /**
+   * Re-open the gate after a session expires or is revoked.
+   *
+   * This used to only unhide the gate, which left whatever form was rendered
+   * last on screen. After first-run setup that is the setup form, so a lock
+   * later in the same page session showed "Create bridge PIN" with the
+   * Confirm PIN box still visible, even though the PIN already exists and the
+   * submit would perform a login. The server is the authority on whether a
+   * PIN is configured, so re-read it.
+   */
   async #reopenGate(): Promise<void> {
     this.elements.securityStatus.textContent = "Session expired or revoked. Authenticate again.";
     // Several in-flight requests can each answer 401 at once. Re-rendering per

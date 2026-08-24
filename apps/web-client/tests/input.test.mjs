@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, keyboardMessages, mapClientPoint, textInjectionMessages } from "../dist/assets/input.js";
+import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, isEditableTarget, keyboardMessages, mapClientPoint, textInjectionMessages } from "../dist/assets/input.js";
 
 test("maps pointer coordinates and clamps outside positions", () => {
   const rect = { left: 100, top: 50, width: 400, height: 800 };
@@ -68,4 +68,13 @@ test("Ctrl+C stays explicit while Ctrl/Cmd+V is left to the native paste event",
   assert.equal(clipboardShortcut({ key: "C", ctrlKey: true, metaKey: false, altKey: false }), "copy");
   assert.equal(clipboardShortcut({ key: "v", ctrlKey: false, metaKey: false, altKey: false }), null);
   assert.deepEqual(androidClipboardCopyMessage(), { type: 8, copyKey: 1 });
+});
+
+test("clipboard shortcuts preserve editable controls and selected PC text targets", () => {
+  assert.equal(isEditableTarget({ tagName: "input" }), true);
+  assert.equal(isEditableTarget({ tagName: "TEXTAREA" }), true);
+  assert.equal(isEditableTarget({ tagName: "select" }), true);
+  assert.equal(isEditableTarget({ tagName: "DIV", isContentEditable: true }), true);
+  assert.equal(isEditableTarget({ tagName: "BUTTON", isContentEditable: false }), false);
+  assert.equal(isEditableTarget(null), false);
 });

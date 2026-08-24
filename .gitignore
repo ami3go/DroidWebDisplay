@@ -115,14 +115,17 @@ captures/
 data/
 downloads/
 
-# Bundled/generated scrcpy server artifacts are supplied separately.
-server/scrcpy-server-v4.1
+# The stable patched v4.1 server is tracked and checksum-pinned. Other local
+# build manifests remain generated.
 server/scrcpy-server.manifest.json
 
 # -----------------------------------------------------------------------------
 # DroidWebDisplay generated release / integration output
 # -----------------------------------------------------------------------------
 dist/
+# The browser distribution is a committed runtime artifact verified by CI.
+!apps/web-client/dist/
+!apps/web-client/dist/**
 out/
 release-output/
 DroidWebDisplayReleaseOutput/

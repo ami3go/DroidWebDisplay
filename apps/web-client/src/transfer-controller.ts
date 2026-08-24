@@ -511,11 +511,13 @@ export class TransferController {
     this.#contextTarget = null;
   }
 
-  /** Drop files anywhere on the mirrored screen to send them to the Android inbox.
-
-      The Explorer already accepts drops, but only inside the Files drawer, which
-      means navigating there first. The stage is where the user is already
-      looking, so it doubles as a zero-navigation upload target. */
+  /**
+   * Drop files anywhere on the mirrored screen to send them to the Android inbox.
+   *
+   * The Explorer already accepts drops, but only inside the Files drawer, which
+   * means navigating there first. The stage is where the user is already
+   * looking, so it doubles as a zero-navigation upload target.
+   */
   private bindStageDropZone(): void {
     const { stage } = this.elements;
     stage.addEventListener("dragenter", (event) => {
@@ -551,10 +553,12 @@ export class TransferController {
     this.elements.stageDropOverlay.hidden = !active;
   }
 
-  /** Upload to the server's configured inbox directory.
-
-      destinationPath is deliberately omitted so the server's
-      default_android_upload_directory stays the single source of truth. */
+  /**
+   * Upload to the server's configured inbox directory.
+   *
+   * destinationPath is deliberately omitted so the server's
+   * default_android_upload_directory stays the single source of truth.
+   */
   private async uploadToInbox(files: readonly File[]): Promise<void> {
     await this.uploadFiles(undefined, files);
   }

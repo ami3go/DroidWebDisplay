@@ -289,15 +289,16 @@ def main() -> int:
         "automaticSyncPaste": False,
         "backgroundPermissionPromptLoopPrevented": True,
     }
-    # Ctrl+V is a native browser paste routed from a document "paste" listener,
-    # never a keydown shortcut: the paste event fires on the focused element and
-    # the app moves focus off the canvas, so a keydown branch (or a canvas-scoped
-    # listener) leaves Ctrl+V silently dead. Assert the real routing and assert
-    # the dead shape stays gone.
+    # Ctrl+V is a native browser paste routed from a document "paste" listener.
+    # Ctrl+C is a document keydown routed to an explicit remote-copy request.
+    # Drawer controls move focus off the canvas, so either shortcut becomes
+    # silently dead if it is canvas-scoped. Assert the real routing while keeping
+    # normal copy/paste behavior for the page's own editable text.
     checks["clipboardKeyboardShortcuts"] = {
-        "status": "PASS" if all(token in controller_source + html_source for token in (
+        "status": "PASS" if all(token in controller_source + main_source + html_source for token in (
             'document.addEventListener("paste"', 'pasteText(text, "Ctrl+V")',
-            "isEditableTarget(event.target)", 'shortcut === "copy"',
+            'document.addEventListener("keydown"', "isEditableTarget(event.target)",
+            'clipboardShortcut(event) !== "copy"', "!selection.isCollapsed",
             "androidClipboardCopyMessage()", "Ctrl+V pastes and Ctrl+C copies",
         )) and not any(token in controller_source for token in (
             'shortcut === "paste"', 'canvas.addEventListener("paste"',
@@ -481,7 +482,7 @@ def main() -> int:
     packaging_all = packaging_source + packaging_doc + windows_installer + linux_installer + windows_uninstaller + linux_uninstaller
     checks["phase11Packaging"] = {
         "status": "PASS" if all(token in packaging_all for token in (
-            "VERSION.json", "scrcpy-server.manifest.json", "officialReleaseServerSha256",
+            "VERSION.json", "scrcpy-server.manifest.json", "serverSha256", "officialReleaseServerSha256",
             "requirements-runtime.txt", "wheelhouse", "DroidWebDisplay.ps1", "DroidWebDisplay.sh",
             "migrate_runtime_state", "DroidWebDisplay-LICENSE.txt", "scrcpy-LICENSE.txt",
             "PurgeData", "--purge-data", "Android Platform-Tools",

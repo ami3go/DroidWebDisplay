@@ -42,7 +42,6 @@ def _find_server_artifact(workspace: Path) -> Path:
     candidates: list[Path] = []
     for pattern in (
         "server/build/outputs/apk/release/*.apk",
-        "server/build/outputs/apk/release/*",
         "server/build/outputs/server-*.jar",
     ):
         candidates.extend(path for path in workspace.glob(pattern) if path.is_file())

@@ -1,0 +1,25 @@
+diff --git a/server/src/main/java/com/genymobile/scrcpy/control/Controller.java b/server/src/main/java/com/genymobile/scrcpy/control/Controller.java
+index 55d6e11..4617375 100644
+--- a/server/src/main/java/com/genymobile/scrcpy/control/Controller.java
++++ b/server/src/main/java/com/genymobile/scrcpy/control/Controller.java
+@@ -687,2 +687,3 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
+     private void getClipboard(int copyKey) {
++        boolean copyOrCutInjected = false;
+         // On Android >= 7, press the COPY or CUT key if requested
+@@ -691,3 +692,3 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
+             // Wait until the event is finished, to ensure that the clipboard text we read just after is the correct one
+-            pressReleaseKeycode(key, Device.INJECT_MODE_WAIT_FOR_FINISH);
++            copyOrCutInjected = pressReleaseKeycode(key, Device.INJECT_MODE_WAIT_FOR_FINISH);
+         }
+@@ -695,5 +696,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
+-        // If clipboard autosync is enabled, then the device clipboard is synchronized to the computer clipboard whenever it changes, in
+-        // particular when COPY or CUT are injected, so it should not be synchronized twice. On Android < 7, do not synchronize at all rather than
+-        // copying an old clipboard content.
+-        if (!clipboardAutosync) {
++        // Native autosync only reports clipboard changes. A successfully injected
++        // COPY or CUT must also return the current value when it is identical to
++        // the existing clipboard, otherwise the client waits forever for an event
++        // that Android correctly does not emit. Keep passive GetClipboard requests
++        // deduplicated while making user-initiated requests deterministic.
++        if (!clipboardAutosync || copyOrCutInjected) {
+             String clipboardText = Device.getClipboardText();

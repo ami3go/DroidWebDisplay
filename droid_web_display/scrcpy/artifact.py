@@ -39,7 +39,7 @@ class ScrcpyArtifact:
             raise ArtifactError(f"Compatibility entry is missing for {adapter_id!r}")
 
         version = str(entry.get("version", ""))
-        expected_sha = str(entry.get("officialReleaseServerSha256", "")).lower()
+        expected_sha = str(entry.get("serverSha256") or entry.get("officialReleaseServerSha256", "")).lower()
         if len(expected_sha) != 64:
             raise ArtifactError("Expected scrcpy server SHA-256 is invalid")
 
@@ -52,8 +52,7 @@ class ScrcpyArtifact:
         artifact_path = next((candidate for candidate in candidates if candidate.is_file()), None)
         if artifact_path is None:
             raise ArtifactError(
-                "scrcpy server artifact is missing; install the pinned official server or run "
-                "tools/download_official_server.py",
+                "scrcpy server artifact is missing; restore or build the pinned compatible server",
                 details={"expectedCandidates": [str(path) for path in candidates]},
             )
 

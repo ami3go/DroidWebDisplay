@@ -38,6 +38,21 @@ def test_artifact_accepts_pinned_hash(tmp_path: Path) -> None:
     assert artifact.sha256 == sha
 
 
+def test_artifact_prefers_patched_server_hash_over_official_base(tmp_path: Path) -> None:
+    patched = b"patched-server"
+    sha = write_compatibility(tmp_path, patched)
+    compatibility_path = tmp_path / "compatibility" / "scrcpy-versions.json"
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    entry = compatibility["supportedVersions"]["scrcpy-4.1"]
+    entry["serverSha256"] = sha
+    entry["officialReleaseServerSha256"] = hashlib.sha256(b"official-base").hexdigest()
+    compatibility_path.write_text(json.dumps(compatibility), encoding="utf-8")
+
+    artifact = ScrcpyArtifact.from_repository(tmp_path)
+
+    assert artifact.sha256 == sha
+
+
 def test_incompatible_local_manifest_is_rejected(tmp_path: Path) -> None:
     sha = write_compatibility(tmp_path, b"server")
     (tmp_path / "server" / "scrcpy-server.manifest.json").write_text(

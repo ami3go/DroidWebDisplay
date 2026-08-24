@@ -62,6 +62,14 @@ export function clipboardShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" |
   return null;
 }
 
+/** True when a clipboard shortcut belongs to DroidWebDisplay's own text entry. */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!target || typeof target !== "object") return false;
+  const element = target as { readonly tagName?: unknown; readonly isContentEditable?: unknown };
+  const tagName = typeof element.tagName === "string" ? element.tagName.toUpperCase() : "";
+  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || element.isContentEditable === true;
+}
+
 export function androidClipboardCopyMessage(): ControlMessage {
   return { type: ControlMessageType.GetClipboard, copyKey: 1 } as ControlMessage;
 }

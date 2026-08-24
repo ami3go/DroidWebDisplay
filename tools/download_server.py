@@ -19,7 +19,7 @@ def sha256_file(path: Path) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Download and verify the pinned official scrcpy server")
+    parser = argparse.ArgumentParser(description="Verify or download the pinned compatible scrcpy server")
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -28,25 +28,33 @@ def main() -> int:
     entry = manifest["supportedVersions"][manifest["defaultAdapter"]]
     output = (args.output or root / "server" / f"scrcpy-server-v{entry['version']}").resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    expected = entry["officialReleaseServerSha256"]
+    expected = str(entry.get("serverSha256") or entry["officialReleaseServerSha256"]).lower()
     if output.is_file():
         actual = sha256_file(output)
         if actual == expected:
-            print(f"Verified existing official server: {output}")
+            print(f"Verified existing compatible server: {output}")
             return 0
         raise RuntimeError(f"Refusing to overwrite server with SHA-256 {actual}; expected {expected}")
+    download_url = entry.get("serverUrl")
+    if not download_url and expected == str(entry.get("officialReleaseServerSha256", "")).lower():
+        download_url = entry.get("officialReleaseServerUrl")
+    if not download_url:
+        raise RuntimeError(
+            "The pinned patched scrcpy server is missing. Restore it from the repository checkout "
+            "or rebuild it from the recorded upstream commit and patch series."
+        )
     temporary = output.with_suffix(output.suffix + ".part")
     try:
-        with urllib.request.urlopen(entry["officialReleaseServerUrl"], timeout=120) as response, temporary.open("wb") as handle:
+        with urllib.request.urlopen(str(download_url), timeout=120) as response, temporary.open("wb") as handle:
             for chunk in iter(lambda: response.read(1024 * 1024), b""):
                 handle.write(chunk)
         actual = sha256_file(temporary)
         if actual != expected:
-            raise RuntimeError(f"Official server SHA-256 mismatch: {actual}; expected {expected}")
+            raise RuntimeError(f"Downloaded server SHA-256 mismatch: {actual}; expected {expected}")
         temporary.replace(output)
     finally:
         temporary.unlink(missing_ok=True)
-    print(f"Verified official server: {output}")
+    print(f"Verified downloaded server: {output}")
     return 0
 
 

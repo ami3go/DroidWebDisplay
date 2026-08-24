@@ -65,6 +65,26 @@ def test_android_copy_write_through_never_copies_stale_android_text() -> None:
         assert "previous PC clipboard was left unchanged" in block
         assert "bindAndroidCopyWriteThrough();" in block
 
+        copy_binding = block[block.index("function bindAndroidCopyWriteThrough"):block.index("function browserGpuRenderer")]
+        assert 'document.addEventListener("keydown"' in copy_binding
+        assert "isEditableTarget(event.target)" in copy_binding
+        assert "!selection.isCollapsed" in copy_binding
+        assert 'canvas.addEventListener("keydown"' not in copy_binding
+
+
+def test_manual_copy_suppresses_only_the_expected_native_autosync_duplicate() -> None:
+    root = Path(__file__).resolve().parents[2]
+    guard_source = (root / "apps/web-client/src/clipboard-events.ts").read_text(encoding="utf-8")
+    guard_dist = (root / "apps/web-client/dist/assets/clipboard-events.js").read_text(encoding="utf-8")
+    controller_source, controller_dist = _controller_blocks()
+    for block in (guard_source, guard_dist):
+        assert "ManualCopyDuplicateGuard" in block
+        assert "this.reset()" in block
+    for block in (controller_source, controller_dist):
+        assert "#manualCopyDuplicate.consume(message.text, performance.now())" in block
+        assert "#manualCopyDuplicate.arm(message.text, performance.now())" in block
+        assert "#manualCopyDuplicate.reset()" in block
+
 
 def test_manual_copy_timeout_clears_pending_and_late_clipboard_events_are_not_claimed() -> None:
     source, dist = _controller_blocks()
@@ -99,6 +119,7 @@ def test_clipboard_session_state_is_reset_before_use_and_on_cleanup() -> None:
         assert '#lastAndroidClipboard = ""' in reset
         assert '#lastSentClipboard = ""' in reset
         assert "#unacknowledgedSync = null" in reset
+        assert "#manualCopyDuplicate.reset()" in reset
         assert "completeAndroidCopyRequest()" in reset
         # The visible text box is user input, not cached device state. Clearing
         # it on connect discards text typed while disconnected.

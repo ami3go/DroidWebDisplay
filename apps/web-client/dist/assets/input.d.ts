@@ -10,9 +10,10 @@ export interface ScreenSize {
     readonly height: number;
 }
 export declare function mapClientPoint(clientX: number, clientY: number, rect: RectLike, screen: ScreenSize): Position;
-// "paste" is intentionally not a member: Ctrl/Cmd+V is never a shortcut here.
 export type ClipboardShortcut = "copy" | null;
 export declare function clipboardShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): ClipboardShortcut;
+/** True when a clipboard shortcut belongs to DroidWebDisplay's own text entry. */
+export declare function isEditableTarget(target: EventTarget | null): boolean;
 export declare function androidClipboardCopyMessage(): ControlMessage;
 export declare function keyboardMessages(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "repeat">): ControlMessage[];
 export declare function clipboardMessage(text: string, sequence: bigint, paste: boolean): ControlMessage;

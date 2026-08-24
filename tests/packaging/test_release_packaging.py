@@ -21,6 +21,7 @@ def _minimal_release_repo(source_root: Path, target: Path, server_content: bytes
         "apps/web-client/dist-manifest.json",
         "packages/scrcpy-protocol/dist",
         "packages/scrcpy-protocol/package.json",
+        "patches/scrcpy",
         "tools/run_bridge_service.py",
         "tools/stop_bridge_service.py",
         "tools/reset_auth.py",
@@ -50,8 +51,11 @@ def _minimal_release_repo(source_root: Path, target: Path, server_content: bytes
                 "version": "4.1",
                 "status": "stable",
                 "upstreamCommit": "test",
-                "officialReleaseServerSha256": digest,
+                "serverSha256": digest,
+                "officialReleaseServerSha256": hashlib.sha256(b"official-base").hexdigest(),
                 "officialReleaseServerUrl": "https://example.invalid/server",
+                "serverProvenance": "droidwebdisplay-patched",
+                "patchSeries": [{"path": "patches/scrcpy/test.patch", "sha256": "a" * 64}],
             }
         },
     }
@@ -72,6 +76,8 @@ def test_release_tree_verifies_server_and_excludes_runtime_state(tmp_path: Path)
     output = tmp_path / "release"
     result = build_release_tree(repo, output, ReleaseInputs(target="windows", scrcpy_server=server))
     assert result["manifest"]["scrcpy"]["server"]["present"] is True
+    assert result["manifest"]["scrcpy"]["server"]["serverProvenance"] == "droidwebdisplay-patched"
+    assert result["manifest"]["scrcpy"]["server"]["patchSeries"]
     assert (output / "DroidWebDisplay.ps1").is_file()
     assert (output / "packaging/windows/install.ps1").is_file()
     assert (output / "tools/stop_bridge_service.py").is_file()

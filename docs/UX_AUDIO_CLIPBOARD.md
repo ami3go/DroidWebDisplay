@@ -10,10 +10,11 @@ Clipboard behavior is a protected compatibility surface. Before changing clipboa
 
 - **Paste PC clipboard** reads the browser clipboard and sends it to the focused Android field.
 - **Paste typed text** uses the text box when browser clipboard permission is unavailable.
-- **Copy Android clipboard** writes the most recently received Android clipboard text to the PC clipboard.
+- **Copy Android clipboard** requests the current Android selection and writes the returned text to the PC clipboard.
 - Automatic Android -> PC synchronization relies on scrcpy native clipboard change notifications.
 - Automatic PC -> Android synchronization is optional and browser-permission constrained.
 - Manual Copy/Ctrl+C and automatic Android -> PC synchronization are independent requirements; fixing one must not disable the other.
+- Ctrl+C works across the app except while editing a PC field or copying selected PC text.
 - Automatic synchronization is constrained by the configured maximum size.
 
 Clipboard text is not written to diagnostics.

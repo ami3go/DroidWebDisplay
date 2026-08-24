@@ -6,6 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const files = [
   resolve(root, "tests/browser-support.test.mjs"),
   resolve(root, "tests/input.test.mjs"),
+  resolve(root, "tests/clipboard-events.test.mjs"),
   resolve(root, "tests/api.test.mjs"),
   resolve(root, "tests/transfer.test.mjs"),
   resolve(root, "tests/display-config.test.mjs"),

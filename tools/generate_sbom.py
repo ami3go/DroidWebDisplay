@@ -212,6 +212,17 @@ def _scrcpy_component() -> tuple[dict[str, object], dict[str, str]]:
     entry = manifest["supportedVersions"][manifest["defaultAdapter"]]
     version = str(entry["version"])
     tag = str(entry["upstreamTag"])
+    server_sha = str(entry.get("serverSha256") or entry["officialReleaseServerSha256"])
+    properties = [
+        {"name": "droidwebdisplay:upstream-commit", "value": entry["upstreamCommit"]},
+        {"name": "droidwebdisplay:server-provenance", "value": entry.get("serverProvenance", "official-release")},
+        {"name": "droidwebdisplay:official-base-sha256", "value": entry["officialReleaseServerSha256"]},
+    ]
+    for index, patch in enumerate(entry.get("patchSeries", []), start=1):
+        properties.extend((
+            {"name": f"droidwebdisplay:patch-{index}-path", "value": str(patch["path"])},
+            {"name": f"droidwebdisplay:patch-{index}-sha256", "value": str(patch["sha256"])},
+        ))
     return _component(
         ecosystem="scrcpy",
         name="scrcpy-server",
@@ -220,12 +231,10 @@ def _scrcpy_component() -> tuple[dict[str, object], dict[str, str]]:
         purl=_github_purl("Genymobile/scrcpy", tag),
         source=str(manifest_path.relative_to(ROOT)),
         component_type="application",
-        hashes=[{"alg": "SHA-256", "content": entry["officialReleaseServerSha256"]}],
-        properties=[
-            {"name": "droidwebdisplay:upstream-commit", "value": entry["upstreamCommit"]},
-        ],
+        hashes=[{"alg": "SHA-256", "content": server_sha}],
+        properties=properties,
         external_references=[
-            {"type": "distribution", "url": entry["officialReleaseServerUrl"]},
+            {"type": "vcs", "url": f"https://github.com/Genymobile/scrcpy/tree/{entry['upstreamCommit']}"},
         ],
     )
 

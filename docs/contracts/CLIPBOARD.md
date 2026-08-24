@@ -40,6 +40,8 @@ Control sessions intentionally keep scrcpy's native clipboard autosync enabled. 
 ```text
 Copy button or Ctrl+C
     -> controller.ts requests the Android clipboard (GetClipboard)
+    -> pinned scrcpy patch returns explicit COPY/CUT requests even when the
+       Android clipboard value did not change
     -> device reply lands in #clipboard-text and the status line
     -> main.ts bindAndroidCopyWriteThrough observes that reply, still inside
        the originating gesture, and performs the PC write
@@ -47,6 +49,18 @@ Copy button or Ctrl+C
 ```
 
 The manual path exists independently of automatic synchronization. Manual Copy must continue to work even when the Android clipboard text has not changed since the previous notification.
+
+The v4.1 server is built from the exact pinned upstream commit with
+`patches/scrcpy/001-deterministic-manual-clipboard.patch`. Native autosync still
+reports ordinary Android clipboard changes. Explicit COPY/CUT requests also
+return a direct response; if Android's listener reports the same change too,
+`ManualCopyDuplicateGuard` consumes that one expected duplicate in the browser.
+The patched binary, patch, and both SHA-256 values are pinned in
+`compatibility/scrcpy-versions.json`.
+
+Ctrl+C is handled on `document`, not only on the Android canvas, so opening a
+drawer does not disable it. Editable controls and active PC text selections are
+excluded so normal browser copy behavior remains intact.
 
 **Why the write lives in main.ts, not in the device-message loop.**
 `navigator.clipboard.writeText` requires transient user activation. Writing
@@ -100,7 +114,13 @@ it was rather than parking it on the canvas.
 
 ## Regression history
 
-In v0.11.6, `clipboard_autosync=false` was added to control sessions to make direct `GetClipboard` behavior deterministic. That also disabled normal Android clipboard-change notifications and broke Android -> PC synchronization. The regression was fixed by restoring scrcpy native clipboard autosync while retaining the browser-side manual Copy/Ctrl+C fallback.
+In v0.11.6, `clipboard_autosync=false` was added to control sessions to make direct `GetClipboard` behavior deterministic. That also disabled normal Android clipboard-change notifications and broke Android -> PC synchronization. The regression was fixed by restoring scrcpy native clipboard autosync.
+
+In v0.11.7 that restoration exposed scrcpy's unchanged-value behavior: with
+autosync enabled, explicit COPY relied on Android emitting a clipboard-change
+notification, so repeated identical selections returned nothing. The stable
+server patch now preserves native autosync and makes explicit COPY/CUT replies
+deterministic instead of trading one required path for the other.
 
 This history is an architectural warning: implementation-level fixes must be evaluated against the full behavior matrix, not only the immediate failing path.
 
@@ -111,6 +131,9 @@ At minimum, code changes in this area should preserve automated checks that veri
 - control sessions do not disable native clipboard autosync;
 - non-control sessions still disable the control channel correctly;
 - manual Android Copy behavior remains present;
+- the tracked server and patch match their pinned SHA-256 values;
+- explicit COPY/CUT is patched to respond while native autosync remains enabled;
+- Ctrl+C remains document-level without overriding editable/selected PC text;
 - browser clipboard permission handling does not trigger background permission prompts;
 - clipboard automation does not block normal typing;
 - release/web-client tests remain green.

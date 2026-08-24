@@ -7,6 +7,7 @@ import shutil
 import pytest
 
 from droid_web_display.upstream_update.compatibility import PromotionError, promote_adapter, register_experimental_adapter
+from droid_web_display.upstream_update.build import _find_server_artifact
 from droid_web_display.upstream_update.git import ensure_clean, run_git
 from droid_web_display.upstream_update.inspection import inspect_protocol_changes, write_protocol_report
 from droid_web_display.upstream_update.patches import PatchApplicationError, apply_patch_series
@@ -118,6 +119,18 @@ def test_patch_failure_stops_and_resets_workspace(tmp_path: Path) -> None:
         apply_patch_series(workspace, patch_dir)
     assert target.read_text(encoding="utf-8") == "base\n"
     ensure_clean(workspace)
+
+
+def test_server_artifact_discovery_ignores_gradle_metadata(tmp_path: Path) -> None:
+    release = tmp_path / "server/build/outputs/apk/release"
+    release.mkdir(parents=True)
+    apk = release / "server-release-unsigned.apk"
+    apk.write_bytes(b"android-server")
+    metadata = release / "output-metadata.json"
+    metadata.write_text('{"artifactType":"APK"}\n', encoding="utf-8")
+    metadata.touch()
+
+    assert _find_server_artifact(tmp_path) == apk
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is required")

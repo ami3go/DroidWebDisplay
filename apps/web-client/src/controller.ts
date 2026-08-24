@@ -7,6 +7,7 @@ import {
 } from "@droid-web-display/scrcpy-protocol";
 import { BridgeApi, type StartSessionRequest } from "./api.js";
 import { CLIPBOARD_STATUS } from "./clipboard-status.js";
+import { ManualCopyDuplicateGuard } from "./clipboard-events.js";
 import {
   alignedFlexSize,
   buildSessionRequest,
@@ -14,7 +15,7 @@ import {
   VIRTUAL_DISPLAY_PROFILES,
   type DisplayFormValues,
 } from "./display-config.js";
-import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
+import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, isEditableTarget, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
 import type { AndroidDevice, SessionDto, VirtualDisplayCapabilities } from "./types.js";
 import { WebCodecsVideoRenderer, type VideoStatistics } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
@@ -128,6 +129,7 @@ export class DroidWebDisplayController {
   #lastResizeAt = 0;
   #lastRequestedSize: { width: number; height: number } | null = null;
   readonly #clipboardAcks = new Map<bigint, ClipboardAckWaiter>();
+  readonly #manualCopyDuplicate = new ManualCopyDuplicateGuard();
 
   public constructor(private readonly elements: Elements) {
     this.#renderer = new WebCodecsVideoRenderer(elements.canvas, (stats) => this.updateStatistics(stats));
@@ -320,7 +322,20 @@ export class DroidWebDisplayController {
     this.elements.canvas.addEventListener("pointercancel", (event) => void this.pointer(event, 3));
     this.elements.canvas.addEventListener("wheel", (event) => void this.scroll(event), { passive: false });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
+      if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); return; }
+      const selection = document.getSelection();
+      if (
+        !this.#protocolSession
+        || event.repeat
+        || isEditableTarget(event.target)
+        || (selection !== null && !selection.isCollapsed)
+        || clipboardShortcut(event) !== "copy"
+      ) return;
+      event.preventDefault();
+      void this.runUiAction(async () => {
+        this.beginAndroidCopyRequest("Ctrl+C");
+        await this.sendMessages([androidClipboardCopyMessage()]);
+      });
     });
     this.elements.canvas.addEventListener("keydown", (event) => void this.keydown(event));
     // Ctrl+V is routed from the native paste event rather than from keydown, so
@@ -577,15 +592,8 @@ export class DroidWebDisplayController {
   }
 
   private async keydown(event: KeyboardEvent): Promise<void> {
-    // Ctrl+V is deliberately absent here: it stays a native browser paste and
-    // is handled by the document "paste" listener bound in bindEvents().
-    const shortcut = clipboardShortcut(event);
-    if (shortcut === "copy") {
-      event.preventDefault();
-      this.beginAndroidCopyRequest("Ctrl+C");
-      await this.sendMessages([androidClipboardCopyMessage()]);
-      return;
-    }
+    // Clipboard shortcuts are document-level so drawer focus cannot silently
+    // disable them. Ctrl+V stays on the native paste event.
     const messages = keyboardMessages(event);
     if (!messages.length) return;
     event.preventDefault();
@@ -725,6 +733,7 @@ export class DroidWebDisplayController {
         continue;
       }
       if (message.type === DeviceMessageType.Clipboard) {
+        if (this.#manualCopyDuplicate.consume(message.text, performance.now())) continue;
         const maximum = Math.max(1, Math.min(256, Number(this.elements.clipboardMaxKib.value) || 256)) * 1024;
         if (new TextEncoder().encode(message.text).byteLength > maximum) {
           this.setStatus("Clipboard skipped", `Android clipboard exceeds the configured ${maximum / 1024} KiB limit.`);
@@ -733,6 +742,7 @@ export class DroidWebDisplayController {
         this.#lastAndroidClipboard = message.text;
         this.elements.clipboardText.value = message.text;
         const copyShortcut = this.completeAndroidCopyRequest();
+        if (copyShortcut) this.#manualCopyDuplicate.arm(message.text, performance.now());
         if (this.elements.clipboardAutoSync.checked || copyShortcut) {
           try {
             await navigator.clipboard.writeText(message.text);
@@ -894,6 +904,7 @@ export class DroidWebDisplayController {
     this.#lastAndroidClipboard = "";
     this.#lastSentClipboard = "";
     this.#unacknowledgedSync = null;
+    this.#manualCopyDuplicate.reset();
     this.completeAndroidCopyRequest();
   }
 
@@ -1153,13 +1164,6 @@ function deviceLabel(device: AndroidDevice): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-/** True when a paste belongs to the page's own text entry rather than to Android. */
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return true;
-  return target.isContentEditable;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

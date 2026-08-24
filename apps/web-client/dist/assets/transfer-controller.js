@@ -228,6 +228,9 @@ export class TransferController {
                     this.#sortKey = key;
                     this.#sortDirection = "ascending";
                 }
+                // The anchor indexes into the rendered order, which is about to
+                // change; keeping it would make the next shift-click select rows the
+                // user never clicked.
                 this.#lastSelectedIndex = null;
                 this.renderStorage(this.#currentEntries);
             });
@@ -473,6 +476,8 @@ export class TransferController {
         }
     }
     setSortHeaderLabel(button, text) {
+        // The label lives in its own span so the column resizer the drawer appends
+        // to these buttons is a sibling, not something this write has to preserve.
         const target = button.querySelector(".explorer-header-text") ?? button;
         target.textContent = text;
     }
@@ -497,11 +502,13 @@ export class TransferController {
         this.elements.contextMenu.hidden = true;
         this.#contextTarget = null;
     }
-    /** Drop files anywhere on the mirrored screen to send them to the Android inbox.
-
-        The Explorer already accepts drops, but only inside the Files drawer, which
-        means navigating there first. The stage is where the user is already
-        looking, so it doubles as a zero-navigation upload target. */
+    /**
+     * Drop files anywhere on the mirrored screen to send them to the Android inbox.
+     *
+     * The Explorer already accepts drops, but only inside the Files drawer, which
+     * means navigating there first. The stage is where the user is already
+     * looking, so it doubles as a zero-navigation upload target.
+     */
     bindStageDropZone() {
         const { stage } = this.elements;
         stage.addEventListener("dragenter", (event) => {
@@ -541,10 +548,12 @@ export class TransferController {
         this.elements.stage.classList.toggle("stage-drop-active", active);
         this.elements.stageDropOverlay.hidden = !active;
     }
-    /** Upload to the server's configured inbox directory.
-
-        destinationPath is deliberately omitted so the server's
-        default_android_upload_directory stays the single source of truth. */
+    /**
+     * Upload to the server's configured inbox directory.
+     *
+     * destinationPath is deliberately omitted so the server's
+     * default_android_upload_directory stays the single source of truth.
+     */
     async uploadToInbox(files) {
         await this.uploadFiles(undefined, files);
     }

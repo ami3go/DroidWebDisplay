@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Made Android Copy/Ctrl+C deterministic for repeated unchanged selections while preserving native Android → PC clipboard autosync.
+- Moved Ctrl+C handling to the document level so it remains available after drawer controls move focus, without overriding editable fields or selected PC text.
+- Pinned the patched scrcpy v4.1 server and patch series by SHA-256, and added browser, packaging, and server-integrity regression coverage.
+
 ## 0.11.7 — Clipboard reliability fix
 
 - Restored normal Android → PC clipboard synchronization by keeping scrcpy native clipboard autosync enabled for control sessions.

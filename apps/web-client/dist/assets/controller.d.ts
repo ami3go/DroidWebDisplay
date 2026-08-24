@@ -101,6 +101,9 @@ export declare class DroidWebDisplayController {
     private toggleAudioMute;
     private setAudioVolume;
     private copyAndroidClipboard;
+    private beginAndroidCopyRequest;
+    private completeAndroidCopyRequest;
+    private resetClipboardSessionState;
     private startClipboardPolling;
     private stopClipboardPolling;
     private pollPcClipboard;

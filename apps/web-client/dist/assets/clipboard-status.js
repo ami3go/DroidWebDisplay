@@ -17,3 +17,4 @@ export const CLIPBOARD_STATUS = {
     received: "Clipboard received",
     notConfirmed: "Copy not confirmed",
 };
+//# sourceMappingURL=clipboard-status.js.map

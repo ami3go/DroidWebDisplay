@@ -4,7 +4,7 @@
 
 A complete offline bundle requires three externally supplied, platform-sensitive artifacts:
 
-1. the pinned official `scrcpy-server-v4.1` (SHA-256 is verified against the compatibility manifest);
+1. the pinned compatible `scrcpy-server-v4.1` (built from upstream v4.1 plus the recorded clipboard patch, with SHA-256 verified against the compatibility manifest);
 2. Android Platform-Tools (`adb`) for the target host;
 3. either a bundled Python runtime or an offline wheelhouse compatible with the target host.
 

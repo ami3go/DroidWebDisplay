@@ -1,7 +1,7 @@
 import { inspectBrowserCapabilities } from "./browser-support.js";
 import { DroidWebDisplayController } from "./controller.js";
 import { CLIPBOARD_STATUS } from "./clipboard-status.js";
-import { clipboardShortcut } from "./input.js";
+import { clipboardShortcut, isEditableTarget } from "./input.js";
 import { AutoDownloadController } from "./auto-download-controller.js";
 import { TransferController } from "./transfer-controller.js";
 import { RunningAppController } from "./running-app-controller.js";
@@ -35,10 +35,10 @@ function bindAndroidCopyWriteThrough(): void {
   };
 
   const finishCopy = async (): Promise<void> => {
-    // Ctrl+C reaches this listener whenever the canvas has focus, including with
-    // no device attached. The controller suppresses its own "not confirmed"
-    // message in that case, so claiming a failed copy here would reinstate the
-    // very message it takes care to avoid.
+    // Ctrl+C reaches this listener anywhere outside editable/selected PC text,
+    // including with no device attached. The controller suppresses its own
+    // "not confirmed" message in that case, so claiming a failed copy here
+    // would reinstate the very message it takes care to avoid.
     if (statusContainer.dataset.state !== "connected") return;
 
     const request = ++generation;
@@ -112,10 +112,16 @@ function bindAndroidCopyWriteThrough(): void {
   };
 
   button.addEventListener("click", () => void finishCopy());
-  canvas.addEventListener("keydown", (event) => {
+  document.addEventListener("keydown", (event) => {
     // Reuse the controller's predicate instead of restating it: a copy of this
     // condition drifts out of step with the keydown handler it shadows.
-    if (event.repeat || clipboardShortcut(event) !== "copy") return;
+    const selection = document.getSelection();
+    if (
+      event.repeat
+      || isEditableTarget(event.target)
+      || (selection !== null && !selection.isCollapsed)
+      || clipboardShortcut(event) !== "copy"
+    ) return;
     void finishCopy();
   });
 }

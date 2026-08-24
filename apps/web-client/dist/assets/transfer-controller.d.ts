@@ -47,10 +47,24 @@ export declare class TransferController {
     private updateSelectionUi;
     private updateSelectionControls;
     private updateSortHeaders;
+    private setSortHeaderLabel;
     private showContextMenu;
     private hideContextMenu;
+    /**
+     * Drop files anywhere on the mirrored screen to send them to the Android inbox.
+     *
+     * The Explorer already accepts drops, but only inside the Files drawer, which
+     * means navigating there first. The stage is where the user is already
+     * looking, so it doubles as a zero-navigation upload target.
+     */
     private bindStageDropZone;
     private setStageDropActive;
+    /**
+     * Upload to the server's configured inbox directory.
+     *
+     * destinationPath is deliberately omitted so the server's
+     * default_android_upload_directory stays the single source of truth.
+     */
     private uploadToInbox;
     private clearDropTarget;
     private chooseUploadFiles;

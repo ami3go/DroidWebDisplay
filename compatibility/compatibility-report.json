@@ -8,7 +8,7 @@
       "knownLimitations": [
         "Browser audio remains experimental and may have interruptions or delay."
       ],
-      "serverSha256": "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae",
+      "serverSha256": "fada7d4515e20903c051e9a6c22d4ebc04aa0facbc3053f666d0fb9c093422eb",
       "status": "stable",
       "upstreamCommit": "2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0",
       "version": "4.1"

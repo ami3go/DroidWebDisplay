@@ -23,6 +23,7 @@ RUNTIME_COPY_PATHS = (
     "packages/scrcpy-protocol/dist",
     "packages/scrcpy-protocol/package.json",
     "compatibility/scrcpy-versions.json",
+    "patches/scrcpy",
     "tools/run_bridge_service.py",
     "tools/stop_bridge_service.py",
     "tools/reset_auth.py",
@@ -146,7 +147,7 @@ def _compatibility(root: Path) -> tuple[str, dict[str, Any]]:
 def _copy_server(root: Path, release: Path, inputs: ReleaseInputs) -> dict[str, Any]:
     adapter, entry = _compatibility(root)
     version = str(entry["version"])
-    expected_sha = str(entry["officialReleaseServerSha256"]).lower()
+    expected_sha = str(entry.get("serverSha256") or entry["officialReleaseServerSha256"]).lower()
     source = inputs.scrcpy_server
     if source is None:
         candidates = (root / "server" / f"scrcpy-server-v{version}", root / "server" / "scrcpy-server")
@@ -164,7 +165,9 @@ def _copy_server(root: Path, release: Path, inputs: ReleaseInputs) -> dict[str, 
             "scrcpyVersion": version,
             "adapter": adapter,
             "expectedSha256": expected_sha,
-            "officialReleaseUrl": entry.get("officialReleaseServerUrl"),
+            "serverProvenance": entry.get("serverProvenance", "official-release"),
+            "patchSeries": entry.get("patchSeries", []),
+            "officialBaseReleaseUrl": entry.get("officialReleaseServerUrl"),
         }
         (server_dir / "scrcpy-server.manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         return manifest
@@ -182,7 +185,9 @@ def _copy_server(root: Path, release: Path, inputs: ReleaseInputs) -> dict[str, 
         "adapter": adapter,
         "upstreamCommit": entry.get("upstreamCommit"),
         "sha256": actual_sha,
-        "officialReleaseUrl": entry.get("officialReleaseServerUrl"),
+        "serverProvenance": entry.get("serverProvenance", "official-release"),
+        "patchSeries": entry.get("patchSeries", []),
+        "officialBaseReleaseUrl": entry.get("officialReleaseServerUrl"),
     }
     (server_dir / "scrcpy-server.manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest
