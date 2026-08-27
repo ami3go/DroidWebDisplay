@@ -110,18 +110,18 @@
     },
     {
       "path": "assets/controller.d.ts",
-      "bytes": 4942,
-      "sha256": "058a76de721eaa184e3006313d673c487d357cac1212215790d32fbf5c1c4316"
+      "bytes": 4993,
+      "sha256": "9cf3b979b64094998b3f8c34b0939d182909109c8ab99b97dcf31e9d33eef6de"
     },
     {
       "path": "assets/controller.js",
-      "bytes": 73213,
-      "sha256": "f5a5416c0f52c9e9cc4a4bec158a4aeb134ffebd1c65fb4eb9bc9339b41ac896"
+      "bytes": 72707,
+      "sha256": "a792a781e75c545ad8696a1cca4ea4e24cc33cb46d7df24033739c5d0b02394a"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 64924,
-      "sha256": "03fa841378c63a7eb557c2fe106867ab37acf621ee8989fb468d3b40b7ca80d9"
+      "bytes": 64529,
+      "sha256": "8c393c648e944cda5923905674e29af55065c24fbccae4cd92b48a5ccb750586"
     },
     {
       "path": "assets/display-config.d.ts",
@@ -160,13 +160,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 21567,
-      "sha256": "3e825cdc79825ce98388f631c67ec843b50b7c3ca9f34ec3448e6ac8ddee0eff"
+      "bytes": 21632,
+      "sha256": "072faf86349bc2c522b1ca70a8fb0938acd08e6f2ef1301a844e07b21f8d5b66"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 15451,
-      "sha256": "2592eef1a5c6a5994b8679d96d0375e3a1e6f6e283893ea3d012e5a1a463727f"
+      "bytes": 15492,
+      "sha256": "632eb93f501f2fe36904283cd62d13f33bb3fa4e686c9b0a9241a3bcdba39ceb"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -295,13 +295,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 34433,
-      "sha256": "c8df65a1bd9e2a0a72df64dea701b150ec7c5f6a732b86fb637187c761084065"
+      "bytes": 34443,
+      "sha256": "c97df3539b3ecc5339e5ac139587da1e1a6ee95fb3e4b55d0abd464212a34f23"
     },
     {
       "path": "styles.css",
-      "bytes": 32965,
-      "sha256": "839b1aa4650a177c07bd7aef43a727f40476ecec9159bd6cb945595d96cfb5c7"
+      "bytes": 33043,
+      "sha256": "2945aa18a9db9467ca22586949443ab38dd8b251150dc7fdcc383284414efe9f"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",

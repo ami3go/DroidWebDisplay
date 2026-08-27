@@ -240,6 +240,7 @@ export class DroidWebDisplayController {
             void this.runUiAction(() => this.pasteTypedText());
         } });
         this.elements.fullscreen.addEventListener("click", () => void this.toggleFullscreen());
+        this.elements.quickAppConfigure.addEventListener("click", () => this.openQuickAppSettings());
         this.elements.audioMute.addEventListener("click", () => this.toggleAudioMute());
         this.elements.audioVolume.addEventListener("input", () => this.setAudioVolume());
         this.elements.audioEnabled.addEventListener("change", () => this.saveBrowserSettings());
@@ -522,15 +523,7 @@ export class DroidWebDisplayController {
                     : `Connect the Android display to open ${label} · ${packageName}`;
             this.elements.quickAppHeader.append(button);
         }
-        const configure = document.createElement("button");
-        configure.id = "quick-app-configure";
-        configure.type = "button";
-        configure.className = "quick-app-configure-button";
-        configure.textContent = "Add app";
-        configure.title = "Open Quick applications settings";
-        configure.setAttribute("aria-label", "Add a quick Android application");
-        this.elements.quickAppHeader.append(configure);
-        this.elements.quickAppHeader.hidden = false;
+        this.elements.quickAppHeader.hidden = configured.length === 0 || !this.#launchableAppsLoaded;
         this.elements.quickAppList.replaceChildren();
         if (!serial) {
             this.elements.quickAppList.append(this.quickAppEmptyState("Select an authorized Android device."));
@@ -677,11 +670,6 @@ export class DroidWebDisplayController {
         const target = event.target;
         if (!(target instanceof Element))
             return;
-        const configure = target.closest("#quick-app-configure");
-        if (configure && this.elements.quickAppHeader.contains(configure)) {
-            this.openQuickAppSettings();
-            return;
-        }
         const button = target.closest("button[data-quick-app-package]");
         if (!button || !this.elements.quickAppHeader.contains(button))
             return;

@@ -33,7 +33,7 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .quick-app-header[hidden] { display: none; }
 .connection-row .quick-app-button { max-width: 9rem; height: 2.12rem; min-height: 2.12rem; padding: 0.42rem 0.68rem; overflow: hidden; border: 1px solid #405272; background: #1a2941; color: #dfe9ff; text-overflow: ellipsis; font-size: 0.74rem; }
 .connection-row .quick-app-button[data-launching="true"] { border-color: #6689d8; color: #9db8ff; }
-.connection-row .quick-app-configure-button { height: 2.12rem; min-height: 2.12rem; padding: 0.42rem 0.62rem; border: 1px dashed #516078; background: #18202e; color: #b9c5d8; font-size: 0.72rem; }
+.android-control-row .quick-app-configure-button { width: 2.12rem; min-width: 2.12rem; height: 2.12rem; min-height: 2.12rem; padding: 0; display: grid; place-items: center; border: 1px solid #343d50; background: #202838; color: #dfe6f3; font-size: 1.15rem; line-height: 1; }
 .android-control-row .screen-power-button { position: relative; width: 2.12rem; min-width: 2.12rem; height: 2.12rem; min-height: 2.12rem; padding: 0; display: grid; place-items: center; color: #aeb7c8; }
 .screen-power-button svg { width: 1.22rem; height: 1.22rem; overflow: visible; }
 .screen-power-phone, .screen-power-home { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }

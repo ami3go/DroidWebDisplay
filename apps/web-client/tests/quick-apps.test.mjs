@@ -14,6 +14,7 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = await readFile(resolve(root, "static/index.html"), "utf8");
 const source = await readFile(resolve(root, "src/controller.ts"), "utf8");
+const styles = await readFile(resolve(root, "static/styles.css"), "utf8");
 
 const catalog = [
   { label: "ChatGPT", packageName: "com.openai.chatgpt", secondaryDisplayCompatibility: "supported" },
@@ -51,9 +52,9 @@ test("quick applications sit beside Android controls and are configurable in Set
   const headerStart = html.indexOf('<header class="topbar">');
   const headerEnd = html.indexOf("</header>", headerStart);
   const header = html.slice(headerStart, headerEnd);
-  assert.ok(header.indexOf('class="android-control-row"') < header.indexOf('id="quick-app-header"'));
+  assert.match(header, /id="fullscreen"[\s\S]*?<\/button>\s*<button id="quick-app-configure"[\s\S]*?>\+<\/button>\s*<\/div>\s*<nav id="quick-app-header"/);
   assert.ok(header.indexOf('id="quick-app-header"') < header.indexOf('class="running-app-header"'));
-  assert.match(header, /id="quick-app-configure"[\s\S]*>Add app<\/button>/);
+  assert.match(header, /id="quick-app-configure"[\s\S]*>\+<\/button>/);
   for (const id of ["quick-app-add", "quick-app-list", "quick-app-settings-status"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
@@ -61,14 +62,16 @@ test("quick applications sit beside Android controls and are configurable in Set
   assert.match(source, /normalizeQuickAppsByDevice\(quickApps\?\.byDevice\)/);
 });
 
-test("an empty quick-app header offers Add app and opens its Settings editor", () => {
+test("the square plus control stays beside fullscreen and opens the Settings editor", () => {
   assert.match(html, /id="quick-app-settings" class="quick-app-settings"/);
-  assert.match(source, /configure\.textContent = "Add app"/);
-  assert.match(source, /this\.elements\.quickAppHeader\.hidden = false/);
+  assert.match(html, /id="quick-app-header" class="quick-app-header"[^>]* hidden/);
+  assert.match(source, /this\.elements\.quickAppConfigure\.addEventListener\("click", \(\) => this\.openQuickAppSettings\(\)\)/);
+  assert.match(source, /this\.elements\.quickAppHeader\.hidden = configured\.length === 0 \|\| !this\.#launchableAppsLoaded/);
   assert.match(source, /data-group="settings"/);
   assert.match(source, /#quick-app-settings"\)\?\.scrollIntoView/);
-  assert.match(html, /styles\.css\?v=0\.11\.2-quick-apps1/);
-  assert.match(html, /main\.js\?v=0\.11\.2-native3/);
+  assert.match(styles, /\.android-control-row \.quick-app-configure-button \{[^}]*width: 2\.12rem;[^}]*height: 2\.12rem;/);
+  assert.match(html, /styles\.css\?v=0\.11\.2-quick-apps2/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native4/);
 });
 
 test("quick applications move running virtual tasks and use StartApp as the launch path", () => {

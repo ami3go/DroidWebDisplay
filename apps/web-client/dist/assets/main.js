@@ -311,6 +311,7 @@ async function bootstrap() {
             settingsImport: required("#settings-import"),
             settingsFile: required("#settings-file"),
             settingsStatus: required("#settings-status"),
+            quickAppConfigure: required("#quick-app-configure"),
             quickAppHeader: required("#quick-app-header"),
             quickAppAdd: required("#quick-app-add"),
             quickAppList: required("#quick-app-list"),

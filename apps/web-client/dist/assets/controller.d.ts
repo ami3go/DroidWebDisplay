@@ -32,6 +32,7 @@ interface Elements {
     readonly settingsImport: HTMLButtonElement;
     readonly settingsFile: HTMLInputElement;
     readonly settingsStatus: HTMLElement;
+    readonly quickAppConfigure: HTMLButtonElement;
     readonly quickAppHeader: HTMLElement;
     readonly quickAppAdd: HTMLButtonElement;
     readonly quickAppList: HTMLElement;

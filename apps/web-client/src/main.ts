@@ -309,6 +309,7 @@ async function bootstrap(): Promise<void> {
       settingsImport: required<HTMLButtonElement>("#settings-import"),
       settingsFile: required<HTMLInputElement>("#settings-file"),
       settingsStatus: required<HTMLElement>("#settings-status"),
+      quickAppConfigure: required<HTMLButtonElement>("#quick-app-configure"),
       quickAppHeader: required<HTMLElement>("#quick-app-header"),
       quickAppAdd: required<HTMLButtonElement>("#quick-app-add"),
       quickAppList: required<HTMLElement>("#quick-app-list"),
