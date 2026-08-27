@@ -52,9 +52,12 @@ test("quick applications sit beside Android controls and are configurable in Set
   const headerStart = html.indexOf('<header class="topbar">');
   const headerEnd = html.indexOf("</header>", headerStart);
   const header = html.slice(headerStart, headerEnd);
-  assert.match(header, /id="fullscreen"[\s\S]*?<\/button>\s*<button id="quick-app-configure"[\s\S]*?>\+<\/button>\s*<\/div>\s*<nav id="quick-app-header"/);
+  assert.match(header, /id="fullscreen"[\s\S]*?<\/button>\s*<button id="quick-app-configure"[\s\S]*?<\/button>\s*<\/div>\s*<nav id="quick-app-header"/);
   assert.ok(header.indexOf('id="quick-app-header"') < header.indexOf('class="running-app-header"'));
-  assert.match(header, /id="quick-app-configure"[\s\S]*>\+<\/button>/);
+  const configureButton = header.match(/<button id="quick-app-configure"[\s\S]*?<\/button>/)?.[0] ?? "";
+  assert.match(configureButton, /<svg[^>]*aria-hidden="true"[^>]*>/);
+  assert.match(configureButton, /<path d="M12 5v14"><\/path><path d="M5 12h14"><\/path>/);
+  assert.doesNotMatch(configureButton, />\s*\+\s*</);
   for (const id of ["quick-app-add", "quick-app-list", "quick-app-settings-status"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
@@ -62,7 +65,7 @@ test("quick applications sit beside Android controls and are configurable in Set
   assert.match(source, /normalizeQuickAppsByDevice\(quickApps\?\.byDevice\)/);
 });
 
-test("the square plus control stays beside fullscreen and opens the Settings editor", () => {
+test("the square plus icon stays beside fullscreen and opens the Settings editor", () => {
   assert.match(html, /id="quick-app-settings" class="quick-app-settings"/);
   assert.match(html, /id="quick-app-header" class="quick-app-header"[^>]* hidden/);
   assert.match(source, /this\.elements\.quickAppConfigure\.addEventListener\("click", \(\) => this\.openQuickAppSettings\(\)\)/);
