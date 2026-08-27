@@ -42,7 +42,7 @@ async def test_reconfigure_waits_for_in_flight_scan_before_switching_device(tmp_
 
     reconfigure = asyncio.create_task(
         monitor.configure(
-            AutoDownloadConfig(enabled=True, serial="PHONE_B", source_path="/sdcard/NewDownload")
+            AutoDownloadConfig(enabled=True, serial="PHONE_B", source_path="/sdcard/Download/NewDownload")
         )
     )
     await asyncio.sleep(0)
@@ -58,5 +58,5 @@ async def test_reconfigure_waits_for_in_flight_scan_before_switching_device(tmp_
 
     assert transfers.list_calls == [("PHONE_A", "/sdcard/Download")]
     assert snapshot["config"]["serial"] == "PHONE_B"
-    assert snapshot["config"]["sourcePath"] == "/sdcard/NewDownload"
+    assert snapshot["config"]["sourcePath"] == "/sdcard/Download/NewDownload"
     assert monitor.config.serial == "PHONE_B"

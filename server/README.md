@@ -1,6 +1,6 @@
 # Pinned compatible scrcpy server
 
-The bridge loads the Android server artifact only when a screen-control session is created. Health, authentication, device discovery, and file APIs can start before the artifact is present.
+The bridge loads the Android server artifact when a screen-control session is created or when it asks Android's PackageManager for localized application labels. Health, authentication, device discovery, and file APIs can start before the artifact is present; application discovery retains a package-name fallback when the artifact is unavailable.
 
 The repository tracks the verified v4.1 server used at runtime. Verify it with:
 

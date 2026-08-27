@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+from .app_labels import fallback_app_label, normalize_app_label
 
 _PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$")
 _COMPONENT_RE = re.compile(
@@ -54,13 +57,6 @@ def validate_component_name(value: str) -> str:
     return value
 
 
-def _label_for_package(package_name: str) -> str:
-    if package_name == "com.openai.chatgpt":
-        return "ChatGPT"
-    leaf = package_name.rsplit(".", 1)[-1].replace("_", " ").replace("-", " ").strip()
-    return leaf.title() or package_name
-
-
 def _task_id(line: str) -> int | None:
     for pattern in _TASK_ID_PATTERNS:
         match = pattern.search(line)
@@ -77,7 +73,10 @@ def _display_id(line: str) -> int | None:
     return None
 
 
-def parse_running_gui_apps(text: str) -> list[RunningGuiApp]:
+def parse_running_gui_apps(
+    text: str,
+    application_labels: Mapping[str, str] | None = None,
+) -> list[RunningGuiApp]:
     """Parse GUI tasks from ``dumpsys activity activities`` output.
 
     Android and vendor builds vary in whitespace and in whether display/task
@@ -166,7 +165,11 @@ def parse_running_gui_apps(text: str) -> list[RunningGuiApp]:
                 display_id=item.get("display_id") if isinstance(item.get("display_id"), int) else None,
                 visible=bool(item.get("visible", False)),
                 resumed=bool(item.get("resumed", False)),
-                label=_label_for_package(package_name),
+                label=(
+                    normalize_app_label(application_labels[package_name], package_name)
+                    if application_labels and package_name in application_labels
+                    else fallback_app_label(package_name)
+                ),
             )
         )
 

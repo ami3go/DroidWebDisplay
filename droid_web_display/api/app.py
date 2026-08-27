@@ -311,10 +311,17 @@ def create_app(
 ) -> FastAPI:
     resolved_config = config or BridgeConfig(repo_root=Path(__file__).resolve().parents[2])
     resolved_config.validate()
-    resolved_adb = adb or AdbClient(resolved_config.adb_executable)
+
+    def artifact_loader() -> ScrcpyArtifact:
+        return ScrcpyArtifact.from_repository(resolved_config.repo_root)
+
+    resolved_adb = adb or AdbClient(
+        resolved_config.adb_executable,
+        scrcpy_artifact_loader=artifact_loader,
+    )
     resolved_manager = manager or SessionManager(
         resolved_adb,
-        artifact_loader=lambda: ScrcpyArtifact.from_repository(resolved_config.repo_root),
+        artifact_loader=artifact_loader,
         monitor_interval=resolved_config.device_monitor_interval,
     )
     resolved_transfers = transfers or TransferManager(

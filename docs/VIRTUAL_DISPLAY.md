@@ -15,7 +15,7 @@ System decorations and keep-active are enabled by default. Local IME policy keep
 
 ## Application selection
 
-The browser queries launchable packages. ChatGPT uses the exact package `com.openai.chatgpt`. Manual package entry is validated and cannot contain whitespace, quotes, separators, or command fragments.
+The browser queries launchable packages and displays the localized application labels reported by Android's PackageManager. The installed-application and running-application dropdowns share that package-to-label catalog; a readable package-derived label is used only when Android's label query is unavailable. ChatGPT uses the exact package `com.openai.chatgpt`. Manual package entry is validated and cannot contain whitespace, quotes, separators, or command fragments.
 
 ## Fixed versus flex
 

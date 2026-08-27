@@ -3,21 +3,46 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import secrets
 import shutil
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Protocol, Sequence
+from typing import TYPE_CHECKING, Protocol
 
-from droid_web_display.process_utils import subprocess_creation_kwargs
-from droid_web_display.errors import AdbCommandError, AdbUnavailableError
+from droid_web_display.errors import AdbCommandError, AdbUnavailableError, BridgeError
 from droid_web_display.models import AndroidDevice
+from droid_web_display.process_utils import subprocess_creation_kwargs
 
+from .app_labels import fallback_app_label, parse_scrcpy_app_list
 from .devices import parse_adb_devices
 from .running_apps import RunningGuiApp, parse_running_gui_apps, validate_component_name
 from .storage_metrics import collect_storage_metadata
 
+if TYPE_CHECKING:
+    from droid_web_display.scrcpy.artifact import ScrcpyArtifact
 
-async def _terminate(process: asyncio.subprocess.Process) -> None:
+
+ScrcpyArtifactLoader = Callable[[], "ScrcpyArtifact"]
+_REMOTE_SCRCPY_SERVER = "/data/local/tmp/scrcpy-server.jar"
+_APP_LABEL_RETRY_SECONDS = 30.0
+_APP_LABEL_REFRESH_SECONDS = 300.0
+
+
+class SpawnedAdbProcess(Protocol):
+    returncode: int | None
+    stdout: asyncio.StreamReader | None
+    stderr: asyncio.StreamReader | None
+
+    async def wait(self) -> int: ...
+
+    def terminate(self) -> None: ...
+
+    def kill(self) -> None: ...
+
+
+async def _terminate(process: SpawnedAdbProcess) -> None:
     """Kill and reap a child, shielded so cancellation cannot abandon it."""
     if process.returncode is not None:
         return
@@ -45,16 +70,11 @@ class AdbCommandResult:
     stderr: str
 
 
-class SpawnedAdbProcess(Protocol):
-    returncode: int | None
-    stdout: asyncio.StreamReader | None
-    stderr: asyncio.StreamReader | None
-
-    async def wait(self) -> int: ...
-
-    def terminate(self) -> None: ...
-
-    def kill(self) -> None: ...
+@dataclass(frozen=True)
+class _AppLabelCache:
+    labels: dict[str, str]
+    refreshed_at: float
+    android_resolved: bool
 
 
 class AdbBackend(Protocol):
@@ -78,10 +98,14 @@ class AdbClient:
         *,
         command_timeout: float = 20.0,
         environment: Mapping[str, str] | None = None,
+        scrcpy_artifact_loader: ScrcpyArtifactLoader | None = None,
     ) -> None:
         self.executable = os.fspath(executable)
         self.command_timeout = command_timeout
         self.environment = dict(environment or {})
+        self.scrcpy_artifact_loader = scrcpy_artifact_loader
+        self._app_label_cache: dict[str, _AppLabelCache] = {}
+        self._app_label_locks: dict[str, asyncio.Lock] = {}
 
     def resolved_executable(self) -> str:
         path = Path(self.executable)
@@ -127,7 +151,7 @@ class AdbClient:
                 process.communicate(),
                 timeout=self.command_timeout if timeout is None else timeout,
             )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             await _terminate(process)
             raise AdbCommandError(
                 f"ADB command timed out: {' '.join(argv)}",
@@ -246,7 +270,68 @@ class AdbClient:
         result = await self.shell(serial, "pm", "path", package_name, check=False, timeout=20.0)
         return result.returncode == 0 and any(line.startswith("package:") for line in result.stdout.splitlines())
 
-    async def list_launchable_apps(self, serial: str) -> list[dict[str, str]]:
+    def _app_label_lock(self, serial: str) -> asyncio.Lock:
+        return self._app_label_locks.setdefault(serial, asyncio.Lock())
+
+    async def _scrcpy_application_labels(self, serial: str) -> dict[str, str]:
+        if self.scrcpy_artifact_loader is None:
+            raise AdbCommandError("Android application-label resolver is unavailable")
+
+        artifact = self.scrcpy_artifact_loader()
+        await self.push(serial, artifact.path, _REMOTE_SCRCPY_SERVER)
+        scid = secrets.randbelow(0x80000000)
+        process = await self.spawn_server(
+            serial,
+            (
+                artifact.version,
+                f"scid={scid:08x}",
+                "log_level=info",
+                "list_apps=true",
+                "cleanup=false",
+            ),
+        )
+
+        async def read_stream(reader: asyncio.StreamReader | None) -> bytes:
+            return await reader.read() if reader is not None else b""
+
+        try:
+            stdout_bytes, stderr_bytes, returncode = await asyncio.wait_for(
+                asyncio.gather(
+                    read_stream(process.stdout),
+                    read_stream(process.stderr),
+                    process.wait(),
+                ),
+                timeout=60.0,
+            )
+        except TimeoutError as exc:
+            await _terminate(process)
+            raise AdbCommandError(
+                "Timed out while Android resolved application names",
+                details={"serial": serial, "timeout": 60.0},
+            ) from exc
+        except BaseException:
+            await _terminate(process)
+            raise
+
+        stdout = stdout_bytes.decode("utf-8", errors="replace")
+        stderr = stderr_bytes.decode("utf-8", errors="replace")
+        if returncode != 0:
+            raise AdbCommandError(
+                "Android application-name query failed",
+                details={"serial": serial, "returncode": returncode, "stderr": stderr[-2000:]},
+            )
+
+        labels = parse_scrcpy_app_list(f"{stdout}\n{stderr}")
+        if not labels:
+            raise AdbCommandError(
+                "Android returned no application names",
+                details={"serial": serial, "serverOutput": (stdout or stderr)[-2000:]},
+            )
+        return labels
+
+    async def _fallback_launchable_apps(self, serial: str) -> list[dict[str, str]]:
+        """Retain package discovery when the richer Android label query fails."""
+
         result = await self.shell(
             serial,
             "cmd",
@@ -269,14 +354,35 @@ class AdbClient:
             package = line.split("/", 1)[0]
             if package and all(ch.isalnum() or ch in "._" for ch in package):
                 packages.add(package)
-        apps = []
-        for package in sorted(packages):
-            if package == "com.openai.chatgpt":
-                label = "ChatGPT"
+        return [
+            {"label": fallback_app_label(package), "packageName": package}
+            for package in sorted(packages)
+        ]
+
+    async def list_launchable_apps(self, serial: str) -> list[dict[str, str]]:
+        async with self._app_label_lock(serial):
+            android_resolved = False
+            apps: list[dict[str, str]]
+            try:
+                labels = await self._scrcpy_application_labels(serial)
+            except BridgeError:
+                apps = await self._fallback_launchable_apps(serial)
             else:
-                label = package.rsplit(".", 1)[-1].replace("_", " ").title()
-            apps.append({"label": label, "packageName": package})
-        return apps
+                android_resolved = True
+                apps = [
+                    {"label": label, "packageName": package_name}
+                    for package_name, label in sorted(
+                        labels.items(),
+                        key=lambda item: (item[1].casefold(), item[0]),
+                    )
+                ]
+
+            self._app_label_cache[serial] = _AppLabelCache(
+                labels={item["packageName"]: item["label"] for item in apps},
+                refreshed_at=time.monotonic(),
+                android_resolved=android_resolved,
+            )
+            return apps
 
 
     async def free_memory_bytes(self, serial: str) -> int | None:
@@ -296,7 +402,23 @@ class AdbClient:
                 "Unable to query running Android applications",
                 details={"serial": serial, "stderr": result.stderr[-2000:]},
             )
-        return parse_running_gui_apps(result.stdout)
+        cache = self._app_label_cache.get(serial)
+        apps = parse_running_gui_apps(result.stdout, cache.labels if cache else None)
+        running_packages = {app.package_name for app in apps}
+        cache_age = time.monotonic() - cache.refreshed_at if cache else float("inf")
+        missing_labels = not cache or not running_packages.issubset(cache.labels)
+        should_refresh = cache is None or (
+            self.scrcpy_artifact_loader is not None
+            and (
+                (not cache.android_resolved and cache_age >= _APP_LABEL_RETRY_SECONDS)
+                or (missing_labels and cache_age >= _APP_LABEL_REFRESH_SECONDS)
+            )
+        )
+        if should_refresh:
+            await self.list_launchable_apps(serial)
+            cache = self._app_label_cache.get(serial)
+            apps = parse_running_gui_apps(result.stdout, cache.labels if cache else None)
+        return apps
 
     async def move_running_app_to_display(
         self,
