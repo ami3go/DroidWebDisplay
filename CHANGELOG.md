@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.8 — Quick applications and reliable remote copy
+
+- Added configurable per-device Android quick-application buttons to the web header, allowing installed applications such as ChatGPT, Claude, Grok, and DeepSeek to be opened or brought to the active display.
+- Added Quick applications settings for adding, removing, and reordering shortcuts, with Android-resolved application names used consistently in selectors and running-app controls.
+- Kept shortcut setup permanently accessible through a compact SVG plus icon beside the fullscreen control while hiding the empty shortcut strip.
+- Made manual Android Copy and Ctrl+C deterministic even when the copied selection has not changed, while preserving native Android-to-PC clipboard synchronization.
+- Extended Ctrl+C handling beyond canvas focus without intercepting normal PC text copying, and retained the independent Ctrl+V paste path.
+- Pinned the patched scrcpy 4.1 server by checksum and added reproducible-build and regression coverage for the clipboard behavior.
+- Hardened browser asset freshness, authentication re-lock rendering, Windows background-process handling, package validation, and the protected release workflow.
+
 ## Unreleased
 
 - Made Android Copy/Ctrl+C deterministic for repeated unchanged selections while preserving native Android → PC clipboard autosync.
