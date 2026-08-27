@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-store, max-age=0">
   <title>DroidWebDisplay</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=0.11.2-quick-apps1">
   <script type="importmap">
   {
     "imports": {
@@ -87,7 +87,9 @@
           </button>
           <button id="fullscreen" class="secondary compact" type="button" aria-label="Fullscreen" title="Fullscreen" style="width:2.12rem;min-width:2.12rem;padding:0;display:grid;place-items:center" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M3 16v5h5"></path><path d="M21 16v5h-5"></path></svg></button>
         </div>
-        <nav id="quick-app-header" class="quick-app-header" aria-label="Quick Android applications" hidden></nav>
+        <nav id="quick-app-header" class="quick-app-header" aria-label="Quick Android applications">
+          <button id="quick-app-configure" class="quick-app-configure-button" type="button" aria-label="Add a quick Android application" title="Open Quick applications settings">Add app</button>
+        </nav>
         <div class="running-app-header" aria-label="Running Android applications">
           <button id="running-app-icon" class="running-app-header-icon" type="button" aria-label="Refresh running applications · 0 GUI task(s)" title="Refresh running applications · 0 GUI task(s)">
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>
@@ -406,7 +408,7 @@
         </section></div>
           <div class="gb-drawer-slot" data-slot="settings"><section class="help-card settings-card">
           <h2>Settings</h2>
-          <div class="quick-app-settings">
+          <div id="quick-app-settings" class="quick-app-settings">
             <div class="section-heading"><h3>Quick applications</h3><button id="quick-app-add" type="button" class="secondary compact" disabled>Add application</button></div>
             <p>Add, remove, or reorder Android applications. Their current Android names appear as buttons beside the phone controls.</p>
             <div id="quick-app-list" class="quick-app-list" aria-label="Configured quick applications"><p class="empty-state">Select an authorized Android device.</p></div>
@@ -432,7 +434,7 @@
         </div>
       </section></section>
   </main>
-  <script type="module" src="/assets/main.js?v=0.11.2-native2"></script>
+  <script type="module" src="/assets/main.js?v=0.11.2-native3"></script>
   <script defer src="./droidwebdisplay-main-drawer.js?v=0.11.2-native5"></script>
 </body>
 </html>

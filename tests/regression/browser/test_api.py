@@ -29,3 +29,7 @@ def test_phase4_api_and_static_client(tmp_path: Path) -> None:
         assert page.status_code == 200
         assert "DroidWebDisplay" in page.text
         assert "/assets/main.js" in page.text
+        assert page.headers["cache-control"] == "no-store"
+        assets = client.get("/assets/main.js")
+        assert assets.status_code == 200
+        assert assets.headers["cache-control"] == "no-store"

@@ -522,7 +522,15 @@ export class DroidWebDisplayController {
                     : `Connect the Android display to open ${label} · ${packageName}`;
             this.elements.quickAppHeader.append(button);
         }
-        this.elements.quickAppHeader.hidden = configured.length === 0 || !this.#launchableAppsLoaded;
+        const configure = document.createElement("button");
+        configure.id = "quick-app-configure";
+        configure.type = "button";
+        configure.className = "quick-app-configure-button";
+        configure.textContent = "Add app";
+        configure.title = "Open Quick applications settings";
+        configure.setAttribute("aria-label", "Add a quick Android application");
+        this.elements.quickAppHeader.append(configure);
+        this.elements.quickAppHeader.hidden = false;
         this.elements.quickAppList.replaceChildren();
         if (!serial) {
             this.elements.quickAppList.append(this.quickAppEmptyState("Select an authorized Android device."));
@@ -669,12 +677,21 @@ export class DroidWebDisplayController {
         const target = event.target;
         if (!(target instanceof Element))
             return;
+        const configure = target.closest("#quick-app-configure");
+        if (configure && this.elements.quickAppHeader.contains(configure)) {
+            this.openQuickAppSettings();
+            return;
+        }
         const button = target.closest("button[data-quick-app-package]");
         if (!button || !this.elements.quickAppHeader.contains(button))
             return;
         const packageName = button.dataset.quickAppPackage;
         if (packageName)
             await this.launchQuickApp(packageName);
+    }
+    openQuickAppSettings() {
+        document.querySelector('#gb-single-drawer-root [data-group="settings"]')?.click();
+        window.requestAnimationFrame(() => document.querySelector("#quick-app-settings")?.scrollIntoView({ block: "start" }));
     }
     async launchQuickApp(packageName) {
         if (this.#quickAppLaunching)

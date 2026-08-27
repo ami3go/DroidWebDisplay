@@ -476,6 +476,11 @@ def create_app(
         )
         if path.startswith("/api/v1/auth"):
             response.headers["Cache-Control"] = "no-store"
+        elif request.method in {"GET", "HEAD"} and not path.startswith(("/api/", "/ws/")):
+            # The local web UI is updated in-place across source/package
+            # upgrades. Never let a previous main.js or stylesheet hide new
+            # controls after the service has been restarted on the same URL.
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.exception_handler(BridgeError)

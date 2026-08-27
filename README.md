@@ -102,7 +102,7 @@ Additional server options such as `--port 9000` are forwarded by the desktop hos
 3. Start DroidWebDisplay. The packaged application includes its required desktop runtime components and launches the local web UI.
 4. Create a 4–12 digit DroidWebDisplay PIN and choose the browser trust duration.
 5. Use the browser UI to open the physical display or create a virtual display.
-6. Optional: open **Settings → Quick applications** to add, remove, and reorder installed apps in the header. Each Android device keeps its own shortcut list.
+6. Optional: select **Add app** in the header to open **Settings → Quick applications**, then add, remove, or reorder installed apps. Each Android device keeps its own shortcut list.
 
 The default service listens only on the local PC at `http://127.0.0.1:8765/`.
 

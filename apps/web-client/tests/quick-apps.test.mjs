@@ -53,11 +53,22 @@ test("quick applications sit beside Android controls and are configurable in Set
   const header = html.slice(headerStart, headerEnd);
   assert.ok(header.indexOf('class="android-control-row"') < header.indexOf('id="quick-app-header"'));
   assert.ok(header.indexOf('id="quick-app-header"') < header.indexOf('class="running-app-header"'));
+  assert.match(header, /id="quick-app-configure"[\s\S]*>Add app<\/button>/);
   for (const id of ["quick-app-add", "quick-app-list", "quick-app-settings-status"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(source, /quickApps: \{ byDevice: this\.#quickAppsByDevice \}/);
   assert.match(source, /normalizeQuickAppsByDevice\(quickApps\?\.byDevice\)/);
+});
+
+test("an empty quick-app header offers Add app and opens its Settings editor", () => {
+  assert.match(html, /id="quick-app-settings" class="quick-app-settings"/);
+  assert.match(source, /configure\.textContent = "Add app"/);
+  assert.match(source, /this\.elements\.quickAppHeader\.hidden = false/);
+  assert.match(source, /data-group="settings"/);
+  assert.match(source, /#quick-app-settings"\)\?\.scrollIntoView/);
+  assert.match(html, /styles\.css\?v=0\.11\.2-quick-apps1/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native3/);
 });
 
 test("quick applications move running virtual tasks and use StartApp as the launch path", () => {

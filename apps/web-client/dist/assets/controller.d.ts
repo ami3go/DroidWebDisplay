@@ -87,6 +87,7 @@ export declare class DroidWebDisplayController {
     private handleQuickAppSelection;
     private handleQuickAppAction;
     private handleQuickAppHeaderClick;
+    private openQuickAppSettings;
     private launchQuickApp;
     private startFlexResize;
     private stopFlexResize;

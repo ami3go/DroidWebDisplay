@@ -603,7 +603,15 @@ export class DroidWebDisplayController {
           : `Connect the Android display to open ${label} · ${packageName}`;
       this.elements.quickAppHeader.append(button);
     }
-    this.elements.quickAppHeader.hidden = configured.length === 0 || !this.#launchableAppsLoaded;
+    const configure = document.createElement("button");
+    configure.id = "quick-app-configure";
+    configure.type = "button";
+    configure.className = "quick-app-configure-button";
+    configure.textContent = "Add app";
+    configure.title = "Open Quick applications settings";
+    configure.setAttribute("aria-label", "Add a quick Android application");
+    this.elements.quickAppHeader.append(configure);
+    this.elements.quickAppHeader.hidden = false;
 
     this.elements.quickAppList.replaceChildren();
     if (!serial) {
@@ -758,10 +766,20 @@ export class DroidWebDisplayController {
   private async handleQuickAppHeaderClick(event: Event): Promise<void> {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    const configure = target.closest<HTMLButtonElement>("#quick-app-configure");
+    if (configure && this.elements.quickAppHeader.contains(configure)) {
+      this.openQuickAppSettings();
+      return;
+    }
     const button = target.closest<HTMLButtonElement>("button[data-quick-app-package]");
     if (!button || !this.elements.quickAppHeader.contains(button)) return;
     const packageName = button.dataset.quickAppPackage;
     if (packageName) await this.launchQuickApp(packageName);
+  }
+
+  private openQuickAppSettings(): void {
+    document.querySelector<HTMLButtonElement>('#gb-single-drawer-root [data-group="settings"]')?.click();
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>("#quick-app-settings")?.scrollIntoView({ block: "start" }));
   }
 
   private async launchQuickApp(packageName: string): Promise<void> {
