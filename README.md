@@ -1,6 +1,6 @@
 # DroidWebDisplay
 
-Browser control of an Android phone with physical and virtual displays, structured file transfer, two-way watched-folder transfer, running-app relocation, and PIN-protected trusted browser sessions, with optional authenticated private-LAN HTTPS access.
+Browser control of an Android phone with physical and virtual displays, configurable header shortcuts for Android applications, structured file transfer, two-way watched-folder transfer, running-app relocation, and PIN-protected trusted browser sessions, with optional authenticated private-LAN HTTPS access.
 
 ## Current baseline
 
@@ -102,6 +102,7 @@ Additional server options such as `--port 9000` are forwarded by the desktop hos
 3. Start DroidWebDisplay. The packaged application includes its required desktop runtime components and launches the local web UI.
 4. Create a 4–12 digit DroidWebDisplay PIN and choose the browser trust duration.
 5. Use the browser UI to open the physical display or create a virtual display.
+6. Optional: open **Settings → Quick applications** to add, remove, and reorder installed apps in the header. Each Android device keeps its own shortcut list.
 
 The default service listens only on the local PC at `http://127.0.0.1:8765/`.
 

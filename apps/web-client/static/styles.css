@@ -29,6 +29,10 @@ select { min-width: 0; max-width: 100%; color: #f3f6fb; background: #151a24; bor
 .connection-row select { min-width: 12rem; padding-block: 0.48rem; }
 .android-control-row { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
 .android-control-row button { background: #202838; }
+.quick-app-header { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
+.quick-app-header[hidden] { display: none; }
+.connection-row .quick-app-button { max-width: 9rem; height: 2.12rem; min-height: 2.12rem; padding: 0.42rem 0.68rem; overflow: hidden; border: 1px solid #405272; background: #1a2941; color: #dfe9ff; text-overflow: ellipsis; font-size: 0.74rem; }
+.connection-row .quick-app-button[data-launching="true"] { border-color: #6689d8; color: #9db8ff; }
 .android-control-row .screen-power-button { position: relative; width: 2.12rem; min-width: 2.12rem; height: 2.12rem; min-height: 2.12rem; padding: 0; display: grid; place-items: center; color: #aeb7c8; }
 .screen-power-button svg { width: 1.22rem; height: 1.22rem; overflow: visible; }
 .screen-power-phone, .screen-power-home { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
@@ -337,6 +341,15 @@ button.compact { padding: 0.45rem 0.65rem; border-radius: 8px; font-size: 0.78re
 #screen { cursor: default; }
 .uniform-buttons > button { min-height: 2.55rem; height: 2.55rem; padding-block: 0.45rem; }
 .phase9-session-card, .settings-card { display: grid; gap: 0.6rem; }
+.quick-app-settings { display: grid; gap: 0.6rem; padding-bottom: 0.72rem; border-bottom: 1px solid #30394b; }
+.quick-app-settings h3 { margin: 0; color: #e4eaf5; font-size: 0.88rem; }
+.quick-app-settings .section-heading { align-items: center; }
+.quick-app-list { display: grid; gap: 0.42rem; }
+.quick-app-row { min-width: 0; display: grid; grid-template-columns: 1.35rem minmax(0, 1fr) auto; align-items: center; gap: 0.38rem; }
+.quick-app-order { color: #8f9bb0; font-size: 0.72rem; font-variant-numeric: tabular-nums; text-align: center; }
+.quick-app-row select { width: 100%; min-width: 0; padding: 0.56rem 1.8rem 0.56rem 0.62rem; font-size: 0.76rem; }
+.quick-app-row-actions { display: flex; gap: 0.28rem; }
+.quick-app-row-actions button { width: 2rem; min-width: 2rem; height: 2rem; min-height: 2rem; padding: 0; display: grid; place-items: center; }
 .phase9-session-card > label, .settings-card > label, .clipboard-card > label {
   min-width: 0; display: grid; gap: 0.35rem; color: #aeb7c8; font-size: 0.82rem;
 }

@@ -4,6 +4,7 @@ import { CLIPBOARD_STATUS } from "./clipboard-status.js";
 import { ManualCopyDuplicateGuard } from "./clipboard-events.js";
 import { alignedFlexSize, buildSessionRequest, validateDisplayForm, VIRTUAL_DISPLAY_PROFILES, } from "./display-config.js";
 import { androidClipboardCopyMessage, androidKeyPress, clipboardMessage, clipboardShortcut, isEditableTarget, keyboardMessages, mapClientPoint, textInjectionMessages } from "./input.js";
+import { MAX_QUICK_APP_BUTTONS, moveQuickApp, nextQuickAppPackage, normalizeQuickAppPackages, normalizeQuickAppsByDevice, } from "./quick-apps.js";
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
@@ -48,6 +49,11 @@ export class DroidWebDisplayController {
     #deviceMessageTask = null;
     #capabilities = null;
     #capabilityRequestGeneration = 0;
+    #launchableApps = [];
+    #launchableAppsLoaded = false;
+    #launchableAppsError = null;
+    #quickAppsByDevice = {};
+    #quickAppLaunching = null;
     #deviceListRefreshedAt = 0;
     #resizeObserver = null;
     #resizeTimer = null;
@@ -67,6 +73,7 @@ export class DroidWebDisplayController {
         this.applyProfile(localStorage.getItem("droidwebdisplay-virtual-profile-v1") ?? "chatgpt-desktop");
         this.restoreBrowserSettings();
         this.updateClipboardUi();
+        this.renderQuickApps();
         await this.refreshDevices();
         await this.refreshVirtualCapabilities();
         this.updateDisplayUi();
@@ -196,7 +203,13 @@ export class DroidWebDisplayController {
     bindEvents() {
         this.elements.device.addEventListener("pointerdown", () => void this.runUiAction(() => this.refreshDevicesIfStale()));
         this.elements.device.addEventListener("focus", () => void this.runUiAction(() => this.refreshDevicesIfStale()));
-        this.elements.device.addEventListener("change", () => void this.runUiAction(() => this.refreshVirtualCapabilities()));
+        this.elements.device.addEventListener("change", () => {
+            this.#launchableApps = [];
+            this.#launchableAppsLoaded = false;
+            this.#launchableAppsError = null;
+            this.renderQuickApps();
+            void this.runUiAction(() => this.refreshVirtualCapabilities());
+        });
         this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.#serverSession ? this.disconnect() : this.connect()));
         this.elements.displayMode.addEventListener("change", () => this.updateDisplayUi());
         this.elements.displayProfile.addEventListener("change", () => {
@@ -243,6 +256,10 @@ export class DroidWebDisplayController {
         this.elements.settingsExport.addEventListener("click", () => this.exportSettings());
         this.elements.settingsImport.addEventListener("click", () => this.elements.settingsFile.click());
         this.elements.settingsFile.addEventListener("change", () => void this.runUiAction(() => this.importSettings()));
+        this.elements.quickAppAdd.addEventListener("click", () => this.addQuickApp());
+        this.elements.quickAppHeader.addEventListener("click", (event) => void this.runUiAction(() => this.handleQuickAppHeaderClick(event)));
+        this.elements.quickAppList.addEventListener("change", (event) => this.handleQuickAppSelection(event));
+        this.elements.quickAppList.addEventListener("click", (event) => this.handleQuickAppAction(event));
         this.elements.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
         this.elements.canvas.addEventListener("pointerdown", (event) => void this.pointer(event, 0));
         this.elements.canvas.addEventListener("pointermove", (event) => {
@@ -400,30 +417,30 @@ export class DroidWebDisplayController {
         const serial = this.elements.device.value;
         if (!serial) {
             this.#capabilities = null;
+            this.#launchableApps = [];
+            this.#launchableAppsLoaded = false;
+            this.#launchableAppsError = null;
             this.elements.capability.textContent = "Select an authorized device to probe virtual-display support.";
+            this.renderQuickApps();
             return;
         }
-        try {
-            const [capabilities, apps] = await Promise.all([
-                this.#api.virtualDisplayCapabilities(serial, this.elements.manualApp.value.trim() || "com.openai.chatgpt"),
-                this.#api.launchableApps(serial),
-            ]);
-            if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial)
-                return;
-            this.#capabilities = capabilities;
-            const localImeOption = [...this.elements.imePolicy.options].find((option) => option.value === "local");
-            if (localImeOption)
-                localImeOption.disabled = !capabilities.localImePolicySupported;
-            if (!capabilities.localImePolicySupported && this.elements.imePolicy.value === "local") {
-                this.elements.imePolicy.value = "default";
-            }
+        const [capabilityResult, appsResult] = await Promise.allSettled([
+            this.#api.virtualDisplayCapabilities(serial, this.elements.manualApp.value.trim() || "com.openai.chatgpt"),
+            this.#api.launchableApps(serial),
+        ]);
+        if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial)
+            return;
+        this.#launchableAppsLoaded = true;
+        if (appsResult.status === "fulfilled") {
+            this.#launchableApps = appsResult.value.apps;
+            this.#launchableAppsError = null;
             const previous = this.elements.virtualApp.value;
             this.elements.virtualApp.replaceChildren();
             const empty = document.createElement("option");
             empty.value = "";
             empty.textContent = "Manual package / no app";
             this.elements.virtualApp.append(empty);
-            for (const app of apps.apps) {
+            for (const app of this.#launchableApps) {
                 const option = document.createElement("option");
                 option.value = app.packageName;
                 option.textContent = `${app.label} · ${app.packageName}`;
@@ -432,20 +449,281 @@ export class DroidWebDisplayController {
             const desired = previous || this.elements.manualApp.value;
             if ([...this.elements.virtualApp.options].some((option) => option.value === desired))
                 this.elements.virtualApp.value = desired;
+        }
+        else {
+            this.#launchableApps = [];
+            this.#launchableAppsError = errorMessage(appsResult.reason);
+        }
+        this.renderQuickApps();
+        if (capabilityResult.status === "fulfilled") {
+            const capabilities = capabilityResult.value;
+            this.#capabilities = capabilities;
+            const localImeOption = [...this.elements.imePolicy.options].find((option) => option.value === "local");
+            if (localImeOption)
+                localImeOption.disabled = !capabilities.localImePolicySupported;
+            if (!capabilities.localImePolicySupported && this.elements.imePolicy.value === "local") {
+                this.elements.imePolicy.value = "default";
+            }
             const warningText = capabilities.warnings.length ? ` · ${capabilities.warnings.join(" ")}` : "";
             this.elements.capability.textContent = capabilities.virtualDisplaySupported
                 ? `Supported · API ${capabilities.deviceApi} · codecs ${capabilities.supportedCodecs.join(", ")} · secondary-display input available${warningText}`
                 : capabilities.warnings.join(" ");
             this.elements.capability.classList.toggle("error-text", !capabilities.virtualDisplaySupported);
         }
-        catch (error) {
-            if (generation !== this.#capabilityRequestGeneration || this.elements.device.value !== serial)
-                return;
+        else {
             this.#capabilities = null;
-            this.elements.capability.textContent = `Capability probe failed: ${errorMessage(error)}. Physical Screen mode remains available.`;
+            this.elements.capability.textContent = `Capability probe failed: ${errorMessage(capabilityResult.reason)}. Physical Screen mode remains available.`;
             this.elements.capability.classList.add("error-text");
         }
         this.updateConnectAvailability();
+    }
+    currentQuickAppPackages() {
+        const serial = this.elements.device.value;
+        return serial ? this.#quickAppsByDevice[serial] ?? [] : [];
+    }
+    setCurrentQuickAppPackages(value) {
+        const serial = this.elements.device.value;
+        if (!serial)
+            return;
+        const packages = normalizeQuickAppPackages(value);
+        const byDevice = { ...this.#quickAppsByDevice };
+        if (packages.length)
+            byDevice[serial] = packages;
+        else
+            delete byDevice[serial];
+        this.#quickAppsByDevice = byDevice;
+        this.saveBrowserSettings();
+        this.renderQuickApps();
+    }
+    launchableApp(packageName) {
+        return this.#launchableApps.find((app) => app.packageName === packageName) ?? null;
+    }
+    renderQuickApps() {
+        const serial = this.elements.device.value;
+        const configured = this.currentQuickAppPackages();
+        const configuredSet = new Set(configured);
+        const connected = this.#protocolSession !== null && this.#serverSession !== null;
+        this.elements.quickAppHeader.replaceChildren();
+        for (const packageName of this.#launchableAppsLoaded ? configured : []) {
+            const app = this.launchableApp(packageName);
+            const label = app?.label ?? packageName;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "quick-app-button";
+            button.dataset.quickAppPackage = packageName;
+            button.dataset.launching = String(this.#quickAppLaunching === packageName);
+            button.textContent = label;
+            button.disabled = !connected || app === null || this.#quickAppLaunching !== null;
+            button.setAttribute("aria-label", `Open or bring ${label} to the active Android display`);
+            button.title = app === null
+                ? `${packageName} is not currently installed on this Android device.`
+                : connected
+                    ? `Open or bring ${label} to the active Android display · ${packageName}`
+                    : `Connect the Android display to open ${label} · ${packageName}`;
+            this.elements.quickAppHeader.append(button);
+        }
+        this.elements.quickAppHeader.hidden = configured.length === 0 || !this.#launchableAppsLoaded;
+        this.elements.quickAppList.replaceChildren();
+        if (!serial) {
+            this.elements.quickAppList.append(this.quickAppEmptyState("Select an authorized Android device."));
+        }
+        else if (configured.length === 0) {
+            const message = !this.#launchableAppsLoaded
+                ? "Reading installed Android applications…"
+                : this.#launchableAppsError
+                    ? "Installed applications could not be read."
+                    : this.#launchableApps.length
+                        ? "No quick applications configured."
+                        : "No launchable Android applications found.";
+            this.elements.quickAppList.append(this.quickAppEmptyState(message));
+        }
+        else {
+            configured.forEach((packageName, index) => {
+                const app = this.launchableApp(packageName);
+                const label = app?.label ?? packageName;
+                const row = document.createElement("div");
+                row.className = "quick-app-row";
+                const order = document.createElement("span");
+                order.className = "quick-app-order";
+                order.textContent = String(index + 1);
+                const select = document.createElement("select");
+                select.dataset.quickAppIndex = String(index);
+                select.setAttribute("aria-label", `Application for quick button ${index + 1}`);
+                if (app === null) {
+                    const unavailable = document.createElement("option");
+                    unavailable.value = packageName;
+                    unavailable.textContent = `Not installed · ${packageName}`;
+                    select.append(unavailable);
+                }
+                for (const catalogApp of this.#launchableApps) {
+                    if (catalogApp.packageName !== packageName && configuredSet.has(catalogApp.packageName))
+                        continue;
+                    const option = document.createElement("option");
+                    option.value = catalogApp.packageName;
+                    option.textContent = `${catalogApp.label} · ${catalogApp.packageName}`;
+                    select.append(option);
+                }
+                select.value = packageName;
+                select.disabled = !this.#launchableAppsLoaded || this.#launchableAppsError !== null || this.#launchableApps.length === 0;
+                const actions = document.createElement("div");
+                actions.className = "quick-app-row-actions";
+                actions.append(this.quickAppActionButton("up", index, "↑", `Move ${label} earlier`, index === 0), this.quickAppActionButton("down", index, "↓", `Move ${label} later`, index === configured.length - 1), this.quickAppActionButton("remove", index, "×", `Remove ${label}`, false));
+                row.append(order, select, actions);
+                this.elements.quickAppList.append(row);
+            });
+        }
+        const nextPackage = nextQuickAppPackage(configured, this.#launchableApps);
+        this.elements.quickAppAdd.disabled = !serial
+            || !this.#launchableAppsLoaded
+            || this.#launchableAppsError !== null
+            || configured.length >= MAX_QUICK_APP_BUTTONS
+            || nextPackage === null;
+        if (!serial) {
+            this.elements.quickAppSettingsStatus.textContent = "Quick applications are stored separately for each Android device.";
+        }
+        else if (!this.#launchableAppsLoaded) {
+            this.elements.quickAppSettingsStatus.textContent = "Reading installed Android applications…";
+        }
+        else if (this.#launchableAppsError) {
+            this.elements.quickAppSettingsStatus.textContent = `Installed-app query failed: ${this.#launchableAppsError}`;
+        }
+        else {
+            this.elements.quickAppSettingsStatus.textContent = `${configured.length} of ${MAX_QUICK_APP_BUTTONS} quick application button(s) configured for this device.`;
+        }
+    }
+    quickAppEmptyState(message) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = message;
+        return empty;
+    }
+    quickAppActionButton(action, index, text, label, disabled) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary compact";
+        button.dataset.quickAppAction = action;
+        button.dataset.quickAppIndex = String(index);
+        button.textContent = text;
+        button.title = label;
+        button.setAttribute("aria-label", label);
+        button.disabled = disabled;
+        return button;
+    }
+    addQuickApp() {
+        const configured = this.currentQuickAppPackages();
+        const packageName = nextQuickAppPackage(configured, this.#launchableApps);
+        if (!packageName || configured.length >= MAX_QUICK_APP_BUTTONS)
+            return;
+        const app = this.launchableApp(packageName);
+        this.setCurrentQuickAppPackages([...configured, packageName]);
+        this.elements.quickAppSettingsStatus.textContent = `${app?.label ?? packageName} was added to the header.`;
+    }
+    handleQuickAppSelection(event) {
+        const select = event.target;
+        if (!(select instanceof HTMLSelectElement) || !select.dataset.quickAppIndex)
+            return;
+        const index = Number(select.dataset.quickAppIndex);
+        const packageName = select.value;
+        const configured = [...this.currentQuickAppPackages()];
+        if (!Number.isInteger(index)
+            || index < 0
+            || index >= configured.length
+            || this.launchableApp(packageName) === null
+            || configured.some((candidate, candidateIndex) => candidateIndex !== index && candidate === packageName)) {
+            this.renderQuickApps();
+            return;
+        }
+        configured[index] = packageName;
+        const app = this.launchableApp(packageName);
+        this.setCurrentQuickAppPackages(configured);
+        this.elements.quickAppSettingsStatus.textContent = `Quick button ${index + 1} now opens ${app?.label ?? packageName}.`;
+    }
+    handleQuickAppAction(event) {
+        const target = event.target;
+        if (!(target instanceof Element))
+            return;
+        const button = target.closest("button[data-quick-app-action]");
+        if (!button || !this.elements.quickAppList.contains(button))
+            return;
+        const index = Number(button.dataset.quickAppIndex);
+        const action = button.dataset.quickAppAction;
+        const configured = [...this.currentQuickAppPackages()];
+        if (!Number.isInteger(index) || index < 0 || index >= configured.length)
+            return;
+        const packageName = configured[index];
+        if (action === "remove")
+            configured.splice(index, 1);
+        else if (action === "up" || action === "down") {
+            const reordered = moveQuickApp(configured, index, action === "up" ? -1 : 1);
+            configured.splice(0, configured.length, ...reordered);
+        }
+        else
+            return;
+        this.setCurrentQuickAppPackages(configured);
+        const label = this.launchableApp(packageName)?.label ?? packageName;
+        this.elements.quickAppSettingsStatus.textContent = action === "remove"
+            ? `${label} was removed from the header.`
+            : `${label} was reordered.`;
+    }
+    async handleQuickAppHeaderClick(event) {
+        const target = event.target;
+        if (!(target instanceof Element))
+            return;
+        const button = target.closest("button[data-quick-app-package]");
+        if (!button || !this.elements.quickAppHeader.contains(button))
+            return;
+        const packageName = button.dataset.quickAppPackage;
+        if (packageName)
+            await this.launchQuickApp(packageName);
+    }
+    async launchQuickApp(packageName) {
+        if (this.#quickAppLaunching)
+            return;
+        const app = this.launchableApp(packageName);
+        const server = this.#serverSession;
+        if (!app)
+            throw new Error(`${packageName} is not installed on the selected Android device`);
+        if (!server || !this.#protocolSession)
+            throw new Error("Connect the Android display before opening a quick application");
+        const display = server.displayMode === "virtual"
+            ? `virtual display ${server.virtualDisplay.displayId ?? "pending"}`
+            : "the phone screen (display 0)";
+        this.#quickAppLaunching = packageName;
+        this.renderQuickApps();
+        this.setStatus("Opening application", `Requesting ${app.label} on ${display}…`);
+        try {
+            if (server.displayMode === "virtual" && server.virtualDisplay.displayId !== null) {
+                try {
+                    const running = await this.#api.runningApps(server.serial);
+                    const task = [...running.apps]
+                        .filter((candidate) => candidate.packageName === packageName)
+                        .sort((left, right) => Number(right.resumed) - Number(left.resumed) || Number(right.visible) - Number(left.visible))[0];
+                    if (task) {
+                        const result = await this.#api.moveRunningApp({
+                            sessionId: server.sessionId,
+                            taskId: task.taskId,
+                            componentName: task.componentName,
+                        });
+                        this.setStatus(result.verified ? "Application ready" : "Application requested", result.verified
+                            ? `${app.label} is on ${display}.`
+                            : `Android was asked to bring ${app.label} to ${display}; relocation is not confirmed yet.`);
+                        return;
+                    }
+                }
+                catch (error) {
+                    // A stale task snapshot or OEM-specific task parser must not make the
+                    // shortcut unusable. StartApp below is the authoritative launch path
+                    // and still targets this scrcpy session's physical/virtual display.
+                    console.warn("Running quick application could not be relocated; falling back to StartApp", error);
+                }
+            }
+            await this.sendMessages([{ type: ControlMessageType.StartApp, name: packageName }]);
+            this.setStatus("Application requested", `Android was asked to open or bring ${app.label} to ${display}.`);
+        }
+        finally {
+            this.#quickAppLaunching = null;
+            this.renderQuickApps();
+        }
     }
     startFlexResize(values) {
         this.stopFlexResize();
@@ -775,6 +1053,7 @@ export class DroidWebDisplayController {
         this.elements.displayProfile.disabled = connected;
         for (const input of this.displayInputs())
             input.disabled = connected;
+        this.renderQuickApps();
         if (!connected)
             this.updateDisplayUi();
     }
@@ -1022,6 +1301,7 @@ export class DroidWebDisplayController {
             audio: { enabled: this.elements.audioEnabled.checked, muted: this.elements.audioMute.textContent === "Unmute", volume: Number(this.elements.audioVolume.value) },
             clipboard: { automatic: this.elements.clipboardAutoSync.checked, maximumKiB: Number(this.elements.clipboardMaxKib.value) },
             reconnect: { enabled: this.elements.autoReconnect.checked, attempts: Number(this.elements.reconnectAttempts.value) },
+            quickApps: { byDevice: this.#quickAppsByDevice },
         };
     }
     saveBrowserSettings() {
@@ -1043,6 +1323,7 @@ export class DroidWebDisplayController {
         const audio = value.audio;
         const clipboard = value.clipboard;
         const reconnect = value.reconnect;
+        const quickApps = value.quickApps;
         if (display) {
             const mode = display.displayMode === "virtual" ? "virtual" : "physical";
             this.elements.displayMode.value = mode;
@@ -1071,6 +1352,8 @@ export class DroidWebDisplayController {
         this.elements.clipboardMaxKib.value = String(Math.max(1, Math.min(256, Number(clipboard?.maximumKiB ?? 256))));
         this.elements.autoReconnect.checked = reconnect?.enabled !== false;
         this.elements.reconnectAttempts.value = String([3, 5, 10].includes(Number(reconnect?.attempts)) ? Number(reconnect?.attempts) : 5);
+        this.#quickAppsByDevice = normalizeQuickAppsByDevice(quickApps?.byDevice);
+        this.renderQuickApps();
     }
     exportSettings() {
         this.downloadJson("droidwebdisplay-settings.json", this.browserSettings());
@@ -1085,7 +1368,7 @@ export class DroidWebDisplayController {
             throw new Error("Unsupported settings file version");
         this.applyImportedSettings(parsed);
         this.saveBrowserSettings();
-        this.elements.settingsStatus.textContent = "Settings imported. Reconnect to apply session options.";
+        this.elements.settingsStatus.textContent = "Settings imported. Quick application buttons are updated; reconnect to apply session options.";
         this.elements.settingsFile.value = "";
     }
     downloadJson(filename, value) {

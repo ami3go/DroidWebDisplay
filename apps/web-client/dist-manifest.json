@@ -110,18 +110,18 @@
     },
     {
       "path": "assets/controller.d.ts",
-      "bytes": 4369,
-      "sha256": "303466ecbc627f3a8fcccfb5f35cfdba6c83eefbd598bd059985f91a4afb2aa2"
+      "bytes": 4908,
+      "sha256": "ecbe356211eba9fa5f9fda963ea8e02b02180d85e126d16cc2959f94d99f08d1"
     },
     {
       "path": "assets/controller.js",
-      "bytes": 57592,
-      "sha256": "66474ecaf355eb6ffbea19aa63ec6dbf5eea0fad81f274d62fa2441e572388d0"
+      "bytes": 72352,
+      "sha256": "1811665ba6303cb0240c76a2a447b2f33f7883beca1c099c29abbd902a94f117"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 51629,
-      "sha256": "822703b1395c85e487eaf1bd40bc2167f8caff766390c705adfdaf53a95295bc"
+      "bytes": 64210,
+      "sha256": "5b70bf4fd09afb4ce0ed478924c64002c22a8e15488dbc55a3464b96aef49c79"
     },
     {
       "path": "assets/display-config.d.ts",
@@ -160,13 +160,13 @@
     },
     {
       "path": "assets/main.js",
-      "bytes": 21324,
-      "sha256": "199ea725e2e4136a05a01a354809a08712013b46233cf011e5600f0c054ae173"
+      "bytes": 21567,
+      "sha256": "3e825cdc79825ce98388f631c67ec843b50b7c3ca9f34ec3448e6ac8ddee0eff"
     },
     {
       "path": "assets/main.js.map",
-      "bytes": 15296,
-      "sha256": "0622d5b0418dbf53b86dd5bf6e382def39c44518c95a9e2fd0e52b5bbb2252ad"
+      "bytes": 15451,
+      "sha256": "2592eef1a5c6a5994b8679d96d0375e3a1e6f6e283893ea3d012e5a1a463727f"
     },
     {
       "path": "assets/network-controller.d.ts",
@@ -182,6 +182,21 @@
       "path": "assets/network-controller.js.map",
       "bytes": 8582,
       "sha256": "713bd634c35efb9acd3b64488f6b16b35e384d5c942e8ed39ba8d1a1547e13df"
+    },
+    {
+      "path": "assets/quick-apps.d.ts",
+      "bytes": 599,
+      "sha256": "c6a13bda2816e88452159f6350ba31f273b07fb2f7f7cb3135cb686a1518d564"
+    },
+    {
+      "path": "assets/quick-apps.js",
+      "bytes": 1959,
+      "sha256": "b90aad4d0a7138dada14e84bb047b53137c2c11909cc993e14e58ffac1cbbb4e"
+    },
+    {
+      "path": "assets/quick-apps.js.map",
+      "bytes": 2097,
+      "sha256": "e0c0866d1a2db38503b19091143f18703f7341d604c2e227093f8130db149db2"
     },
     {
       "path": "assets/running-app-controller.d.ts",
@@ -280,13 +295,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 33369,
-      "sha256": "85c8f605fbf64f302ba09c02d3476a133516b07e30b19f7decc4268fb3dde53e"
+      "bytes": 34191,
+      "sha256": "5403490faaa668213199fab52c46eedce40b5576298ed7a3df3203f48ad00d6f"
     },
     {
       "path": "styles.css",
-      "bytes": 31432,
-      "sha256": "0bc546956b467f8d5d072409732a5e86154dd67f7a5d441e229a6967cabfd701"
+      "bytes": 32768,
+      "sha256": "46eec688fa21944b3026adf696f35815f565506a2ce552cae4bc087391efdd84"
     },
     {
       "path": "vendor/scrcpy-protocol/src/common/async-byte-reader.d.ts",

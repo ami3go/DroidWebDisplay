@@ -32,6 +32,10 @@ interface Elements {
     readonly settingsImport: HTMLButtonElement;
     readonly settingsFile: HTMLInputElement;
     readonly settingsStatus: HTMLElement;
+    readonly quickAppHeader: HTMLElement;
+    readonly quickAppAdd: HTMLButtonElement;
+    readonly quickAppList: HTMLElement;
+    readonly quickAppSettingsStatus: HTMLElement;
     readonly displayMode: HTMLSelectElement;
     readonly displayProfile: HTMLSelectElement;
     readonly virtualSettings: HTMLElement;
@@ -73,6 +77,17 @@ export declare class DroidWebDisplayController {
     private updateConnectAvailability;
     private refreshDevicesIfStale;
     private refreshVirtualCapabilities;
+    private currentQuickAppPackages;
+    private setCurrentQuickAppPackages;
+    private launchableApp;
+    private renderQuickApps;
+    private quickAppEmptyState;
+    private quickAppActionButton;
+    private addQuickApp;
+    private handleQuickAppSelection;
+    private handleQuickAppAction;
+    private handleQuickAppHeaderClick;
+    private launchQuickApp;
     private startFlexResize;
     private stopFlexResize;
     private applyFlexResize;
