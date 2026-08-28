@@ -17,6 +17,7 @@ from droid_web_display.process_utils import subprocess_creation_kwargs
 
 from .app_labels import fallback_app_label, parse_scrcpy_app_list
 from .devices import parse_adb_devices
+from .media_store import AndroidMediaFile, parse_media_store_images
 from .running_apps import RunningGuiApp, parse_running_gui_apps, validate_component_name
 from .storage_metrics import collect_storage_metadata
 from .storage_volumes import storage_roots_from_mount_dump
@@ -285,6 +286,41 @@ class AdbClient:
             if check.returncode == 0:
                 roots.append({"id": f"sd-card-{volume.lower()}", "label": f"SD card · {volume}", "path": path})
         return roots
+
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50) -> list[AndroidMediaFile]:
+        """Return recent Android image metadata without reading image contents."""
+
+        if not 1 <= limit <= 50:
+            raise ValueError("recent picture limit must be in range 1..50")
+        # Overscan because TransferManager applies the stricter Explorer path
+        # policy after this query. The MediaStore URI limit keeps phones with a
+        # large photo library from returning unbounded command output.
+        query_limit = min(200, limit * 4)
+        uri = f"content://media/external/images/media?limit={query_limit}"
+        result = await self.shell(
+            serial,
+            "content",
+            "query",
+            "--uri",
+            uri,
+            "--projection",
+            "_data:_size:date_modified",
+            "--sort",
+            "date_modified DESC",
+            check=False,
+            timeout=30.0,
+        )
+        if result.returncode != 0 or "Error while accessing provider" in result.stdout:
+            raise AdbCommandError(
+                "unable to read recent Android pictures",
+                details={
+                    "serial": serial,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout[-2000:],
+                    "stderr": result.stderr[-2000:],
+                },
+            )
+        return parse_media_store_images(result.stdout, limit=query_limit)
 
     async def package_installed(self, serial: str, package_name: str) -> bool:
         result = await self.shell(serial, "pm", "path", package_name, check=False, timeout=20.0)

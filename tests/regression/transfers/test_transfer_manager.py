@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from droid_web_display.adb.media_store import AndroidMediaFile
 from droid_web_display.errors import TransferNotFoundError, TransferValidationError
 from droid_web_display.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
 from droid_web_display.transfers.manager import TransferManager
@@ -77,6 +78,16 @@ class DeleteAdb(FakeAdb):
         for path in list(self.sync.entries):
             if path == remote_path or (recursive and path.startswith(f"{remote_path}/")):
                 del self.sync.entries[path]
+
+
+class RecentPicturesAdb(FakeAdb):
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50):
+        return [
+            AndroidMediaFile("/storage/emulated/0/Pictures/older.png", 10, 100),
+            AndroidMediaFile("/storage/emulated/0/DCIM/Camera/newer.jpg", 20, 300),
+            AndroidMediaFile("/sdcard/Android/media/private-looking.jpg", 30, 400),
+            AndroidMediaFile("/storage/emulated/0/DCIM/Camera/newer.jpg", 20, 300),
+        ]
 
 
 async def wait_final(manager: TransferManager, transfer_id: str):
@@ -180,3 +191,20 @@ async def test_delete_android_file_and_folder_protects_storage_roots(tmp_path: P
         await manager.delete_android("PHONE", "/sdcard/Download/../../data")
     with pytest.raises(TransferNotFoundError, match="was not found"):
         await manager.delete_android("PHONE", "/sdcard/Download/missing.txt")
+
+
+@pytest.mark.asyncio
+async def test_recent_pictures_are_normalized_filtered_and_sorted(tmp_path: Path) -> None:
+    manager = TransferManager(
+        RecentPicturesAdb(),
+        FakeSync(),
+        data_directory=tmp_path / "data",
+        destination_profiles={"default-downloads": tmp_path / "downloads"},
+    )  # type: ignore[arg-type]
+
+    entries = await manager.list_recent_pictures("PHONE", limit=50)
+
+    assert [(entry.name, entry.path, entry.size, entry.modified_at) for entry in entries] == [
+        ("newer.jpg", "/sdcard/DCIM/Camera/newer.jpg", 20, 300),
+        ("older.png", "/sdcard/Pictures/older.png", 10, 100),
+    ]

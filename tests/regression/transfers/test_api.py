@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from droid_web_display.adb.media_store import AndroidMediaFile
 from droid_web_display.api.app import create_app
 from droid_web_display.config import BridgeConfig
 from droid_web_display.models import AndroidDevice
@@ -32,6 +33,11 @@ class FakeAdb:
             for path in list(self.sync.remote):
                 if path == remote_path or (recursive and path.startswith(f"{remote_path}/")):
                     del self.sync.remote[path]
+
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50):
+        return [
+            AndroidMediaFile("/storage/emulated/0/DCIM/Camera/latest.jpg", 1234, 1_700_000_000),
+        ][:limit]
 
 
 class FakeSessionManager:
@@ -95,6 +101,24 @@ def test_phase5_storage_and_transfer_endpoints(tmp_path: Path) -> None:
         storage = client.get("/api/v1/storage/android", params={"serial": "PHONE", "path": "/sdcard/Download"})
         assert storage.status_code == 200
         assert storage.json()["entries"][0]["name"] == "result.txt"
+        recent = client.get(
+            "/api/v1/storage/android/recent-pictures",
+            params={"serial": "PHONE", "limit": 50},
+        )
+        assert recent.status_code == 200
+        assert recent.json() == {
+            "limit": 50,
+            "entries": [
+                {
+                    "name": "latest.jpg",
+                    "path": "/sdcard/DCIM/Camera/latest.jpg",
+                    "mode": 0o100664,
+                    "size": 1234,
+                    "modifiedAt": 1_700_000_000,
+                    "isDirectory": False,
+                }
+            ],
+        }
         profiles = client.get("/api/v1/destination-profiles").json()
         assert profiles["profiles"][0]["id"] == "default-downloads"
 

@@ -2305,6 +2305,65 @@
         "summary": "Android Storage Roots"
       }
     },
+    "/api/v1/storage/android/recent-pictures": {
+      "get": {
+        "operationId": "android_recent_pictures_api_v1_storage_android_recent_pictures_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Serial",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Android Recent Pictures Api V1 Storage Android Recent Pictures Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Android Recent Pictures"
+      }
+    },
     "/api/v1/transfers": {
       "get": {
         "operationId": "transfer_list_api_v1_transfers_get",

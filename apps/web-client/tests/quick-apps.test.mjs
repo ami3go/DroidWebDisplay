@@ -74,7 +74,7 @@ test("the square plus icon stays beside fullscreen and opens the Settings editor
   assert.match(source, /#quick-app-settings"\)\?\.scrollIntoView/);
   assert.match(styles, /\.android-control-row \.quick-app-configure-button \{[^}]*width: 2\.12rem;[^}]*height: 2\.12rem;/);
   assert.match(html, /styles\.css\?v=0\.11\.2-quick-apps2/);
-  assert.match(html, /main\.js\?v=0\.11\.2-native4/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native6/);
 });
 
 test("quick applications move running virtual tasks and use StartApp as the launch path", () => {

@@ -16,7 +16,7 @@
   }
   </script>
   <!-- DroidWebDisplay Main Single Drawer UI v1.2.0 -->
-  <link rel="stylesheet" href="./droidwebdisplay-main-drawer.css?v=0.11.2-native5" data-gb-main-drawer="css">
+  <link rel="stylesheet" href="./droidwebdisplay-main-drawer.css?v=0.11.2-native6" data-gb-main-drawer="css">
 </head>
 <body>
   <section id="auth-gate" class="auth-gate" aria-label="DroidWebDisplay authentication">
@@ -134,16 +134,26 @@
             </div>
             <div class="two-button-row uniform-buttons"><button id="download-selected" class="secondary" disabled>Download</button><button id="open-pc-folder" class="secondary">Open PC folder</button></div>
           </div>
-          <label>Storage location
-            <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
-          </label>
-          <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
-          <div class="explorer-toolbar">
-            <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
-            <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
-            <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
+          <div class="explorer-tabs" role="tablist" aria-label="File Explorer views">
+            <button id="file-browser-tab" class="explorer-tab active" type="button" role="tab" aria-selected="true" aria-controls="file-browser-controls">Files</button>
+            <button id="recent-pictures-tab" class="explorer-tab" type="button" role="tab" aria-selected="false" aria-controls="recent-pictures-controls" tabindex="-1">Recent pictures</button>
           </div>
-          <div class="explorer-frame" role="table" aria-label="Android files">
+          <div id="file-browser-controls" class="explorer-view-controls" role="tabpanel" aria-labelledby="file-browser-tab">
+            <label>Storage location
+              <select id="storage-root"><option value="/sdcard/Download">Internal storage · Download</option></select>
+            </label>
+            <input id="storage-path" class="storage-address" value="/sdcard/Download" aria-label="Android folder path" spellcheck="false">
+            <div class="explorer-toolbar">
+              <button id="storage-up" class="secondary compact explorer-icon-button" title="Parent folder" aria-label="Parent folder">↑</button>
+              <nav id="storage-breadcrumbs" class="storage-breadcrumbs" aria-label="Android folder breadcrumbs"></nav>
+              <button id="storage-refresh" class="secondary compact explorer-icon-button" title="Refresh" aria-label="Refresh">↻</button>
+            </div>
+          </div>
+          <div id="recent-pictures-controls" class="recent-pictures-controls" role="tabpanel" aria-labelledby="recent-pictures-tab" hidden>
+            <span>Up to 50 newest pictures from accessible Android storage.</span>
+            <button id="recent-pictures-refresh" class="secondary compact explorer-icon-button" type="button" title="Refresh recent pictures" aria-label="Refresh recent pictures">↻</button>
+          </div>
+          <div id="explorer-frame" class="explorer-frame" role="table" aria-label="Android files">
             <div class="explorer-header" role="row">
               <div class="explorer-cell select-cell"><input id="storage-select-all" type="checkbox" aria-label="Select all files"></div>
               <button type="button" class="explorer-header-button name-cell" data-storage-sort="name" data-label="Name" aria-sort="ascending"><span class="explorer-header-text">Name ▲</span></button>
@@ -163,7 +173,7 @@
               </select>
             </label>
           </details>
-          <p class="explorer-help">Drag PC files onto a folder to upload there, or onto empty Explorer space to upload to the current folder. Right-click remains available for all actions.</p></div>
+          <p id="explorer-help" class="explorer-help">Drag PC files onto a folder to upload there, or onto empty Explorer space to upload to the current folder. Right-click remains available for all actions.</p></div>
 </details>
 <div id="storage-context-menu" class="context-menu" role="menu" tabindex="-1" hidden>
           <button id="context-open" type="button" role="menuitem">Open folder</button>
@@ -435,7 +445,7 @@
         </div>
       </section></section>
   </main>
-  <script type="module" src="/assets/main.js?v=0.11.2-native4"></script>
-  <script defer src="./droidwebdisplay-main-drawer.js?v=0.11.2-native5"></script>
+  <script type="module" src="/assets/main.js?v=0.11.2-native6"></script>
+  <script defer src="./droidwebdisplay-main-drawer.js?v=0.11.2-native6"></script>
 </body>
 </html>

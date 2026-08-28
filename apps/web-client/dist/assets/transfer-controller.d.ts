@@ -5,6 +5,11 @@ interface TransferElements {
     readonly customDestinationRow: HTMLElement;
     readonly customDestinationPath: HTMLInputElement;
     readonly duplicatePolicy: HTMLSelectElement;
+    readonly fileBrowserTab: HTMLButtonElement;
+    readonly recentPicturesTab: HTMLButtonElement;
+    readonly fileBrowserControls: HTMLElement;
+    readonly recentPicturesControls: HTMLElement;
+    readonly recentPicturesRefresh: HTMLButtonElement;
     readonly storageRoot: HTMLSelectElement;
     readonly storagePath: HTMLInputElement;
     readonly storageBreadcrumbs: HTMLElement;
@@ -12,6 +17,8 @@ interface TransferElements {
     readonly storageRefresh: HTMLButtonElement;
     readonly storageSelectAll: HTMLInputElement;
     readonly storageBody: HTMLElement;
+    readonly explorerFrame: HTMLElement;
+    readonly explorerHelp: HTMLElement;
     readonly contextMenu: HTMLElement;
     readonly contextOpen: HTMLButtonElement;
     readonly contextDownload: HTMLButtonElement;
@@ -41,9 +48,14 @@ export declare class TransferController {
     initialize(): Promise<void>;
     close(): void;
     private bindEvents;
+    private activeSort;
+    private switchExplorerView;
+    private updateExplorerViewUi;
+    private refreshActiveView;
     private refreshStorageRoots;
     private refreshExplorerIfStale;
     private browse;
+    private loadRecentPictures;
     private renderBreadcrumbs;
     private renderStorage;
     private entryForRow;
@@ -79,6 +91,7 @@ export declare class TransferController {
     private updateDestinationUi;
     private downloadDestination;
     private download;
+    private enqueueDownload;
     private downloadSelected;
     private filesDrawerVisible;
     private transferRefreshDelay;

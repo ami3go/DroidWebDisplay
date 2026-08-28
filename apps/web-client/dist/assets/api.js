@@ -125,6 +125,10 @@ export class BridgeApi {
         const query = new URLSearchParams({ serial, path });
         return this.request(`/api/v1/storage/android?${query.toString()}`);
     }
+    async androidRecentPictures(serial, limit = 50) {
+        const query = new URLSearchParams({ serial, limit: String(limit) });
+        return this.request(`/api/v1/storage/android/recent-pictures?${query.toString()}`);
+    }
     async deleteAndroidStorage(serial, path) {
         const query = new URLSearchParams({ serial, path });
         return this.request(`/api/v1/storage/android?${query.toString()}`, { method: "DELETE" });

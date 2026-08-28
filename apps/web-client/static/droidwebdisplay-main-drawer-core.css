@@ -279,12 +279,62 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
   min-width: 0;
 }
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .gb-accordion-content > label,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-view-controls > label,
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-options label {
   display: grid;
   gap: .28rem;
   min-width: 0;
   color: #9fb0c2;
   font-size: .76rem;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .25rem;
+  padding: .2rem;
+  border: 1px solid var(--dwd-border);
+  border-radius: 8px;
+  background: #09111d;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-tab {
+  min-width: 0;
+  min-height: 1.9rem;
+  padding: .35rem .42rem !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: #8fa2b6 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: .72rem;
+  font-weight: 700;
+  transform: none !important;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-tab:hover:not(:disabled),
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-tab.active {
+  color: #e4effa !important;
+  background: #17263b !important;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-tab:focus-visible {
+  outline: 2px solid var(--dwd-cyan);
+  outline-offset: -2px;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-view-controls {
+  display: grid;
+  gap: .52rem;
+  min-width: 0;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .recent-pictures-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .4rem;
+  min-width: 0;
+  color: #8fa2b6;
+  font-size: .7rem;
+}
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .explorer-view-controls[hidden],
+#gb-single-drawer-root .gb-drawer-slot[data-slot="files"] .recent-pictures-controls[hidden] {
+  display: none !important;
 }
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] select,
 #gb-single-drawer-root .gb-drawer-slot[data-slot="files"] input:not([type="checkbox"]):not([type="file"]) {

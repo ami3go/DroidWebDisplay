@@ -150,6 +150,11 @@ export interface AndroidStorageResponse {
   readonly entries: readonly AndroidStorageEntryDto[];
 }
 
+export interface AndroidRecentPicturesResponse {
+  readonly limit: number;
+  readonly entries: readonly AndroidStorageEntryDto[];
+}
+
 export type TransferState = "queued" | "preparing" | "transferring" | "verifying" | "completed" | "cancelled" | "failed" | "interrupted";
 export type TransferDirection = "upload" | "download";
 export type DuplicatePolicy = "rename" | "overwrite" | "fail";

@@ -184,6 +184,35 @@ class TransferManager:
             for entry in sorted(entries, key=lambda item: (not item.is_directory, item.name.casefold()))
         ]
 
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50) -> list[AndroidEntry]:
+        if not 1 <= limit <= 50:
+            raise TransferValidationError("recent picture limit must be in range 1..50", details={"limit": limit})
+        await self._require_ready_device(serial)
+        media_files = await self.adb.list_recent_pictures(serial, limit=limit)
+        entries: list[AndroidEntry] = []
+        seen: set[str] = set()
+        for media_file in media_files:
+            try:
+                path = normalize_android_path(media_file.path)
+            except TransferValidationError:
+                # MediaStore can index app-private or other shared folders that
+                # the Explorer intentionally does not expose for downloading.
+                continue
+            if path in seen:
+                continue
+            seen.add(path)
+            entries.append(
+                AndroidEntry(
+                    name=PurePosixPath(path).name,
+                    path=path,
+                    mode=0o100664,
+                    size=media_file.size,
+                    modified_at=media_file.modified_at,
+                    is_directory=False,
+                )
+            )
+        return sorted(entries, key=lambda item: (-item.modified_at, item.name.casefold()))[:limit]
+
     async def delete_android(self, serial: str, path: str) -> dict[str, object]:
         normalized = normalize_android_path(path)
         if is_android_storage_root(normalized):

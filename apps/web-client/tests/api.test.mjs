@@ -75,6 +75,21 @@ test("Android Explorer delete uses an authenticated versioned request", async ()
   assert.equal(calls[0].init.method, "DELETE");
 });
 
+test("recent pictures API requests at most 50 Android image records", async () => {
+  const calls = [];
+  const api = new BridgeApi("", async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ limit: 50, entries: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+
+  assert.deepEqual(await api.androidRecentPictures("PHONE 1", 50), { limit: 50, entries: [] });
+  assert.equal(calls[0].url, "/api/v1/storage/android/recent-pictures?serial=PHONE+1&limit=50");
+  assert.equal(calls[0].init.method, undefined);
+});
+
 test("automatic download API uses persistent versioned endpoints", async () => {
   const calls = [];
   const api = new BridgeApi("", async (url, init) => {

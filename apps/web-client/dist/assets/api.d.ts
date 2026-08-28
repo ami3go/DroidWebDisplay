@@ -1,4 +1,4 @@
-import type { AndroidStorageResponse, AndroidStorageRootsResponse, AutoDownloadConfigDto, AutoDownloadSnapshotDto, BrowserSupportResponse, DestinationProfileResponse, DeviceListResponse, DuplicatePolicy, LaunchableAppsResponse, MoveRunningAppResponse, RunningAppsResponse, SessionDto, SessionListResponse, TransferDto, TransferListResponse, VirtualDisplayCapabilities, VirtualDisplayProfilesResponse } from "./types.js";
+import type { AndroidStorageResponse, AndroidRecentPicturesResponse, AndroidStorageRootsResponse, AutoDownloadConfigDto, AutoDownloadSnapshotDto, BrowserSupportResponse, DestinationProfileResponse, DeviceListResponse, DuplicatePolicy, LaunchableAppsResponse, MoveRunningAppResponse, RunningAppsResponse, SessionDto, SessionListResponse, TransferDto, TransferListResponse, VirtualDisplayCapabilities, VirtualDisplayProfilesResponse } from "./types.js";
 export interface AuthSessionDto {
     readonly sessionId: string;
     readonly createdAt: number;
@@ -101,6 +101,7 @@ export declare class BridgeApi {
     sessions(): Promise<SessionListResponse>;
     startSession(request: StartSessionRequest): Promise<SessionDto>;
     androidStorage(serial: string, path: string): Promise<AndroidStorageResponse>;
+    androidRecentPictures(serial: string, limit?: number): Promise<AndroidRecentPicturesResponse>;
     deleteAndroidStorage(serial: string, path: string): Promise<{
         deleted: boolean;
         path: string;

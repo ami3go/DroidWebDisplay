@@ -1,5 +1,6 @@
 import type {
   AndroidStorageResponse,
+  AndroidRecentPicturesResponse,
   AndroidStorageRootsResponse,
   AutoDownloadConfigDto,
   AutoDownloadSnapshotDto,
@@ -205,6 +206,11 @@ export class BridgeApi {
   public async androidStorage(serial: string, path: string): Promise<AndroidStorageResponse> {
     const query = new URLSearchParams({ serial, path });
     return this.request<AndroidStorageResponse>(`/api/v1/storage/android?${query.toString()}`);
+  }
+
+  public async androidRecentPictures(serial: string, limit = 50): Promise<AndroidRecentPicturesResponse> {
+    const query = new URLSearchParams({ serial, limit: String(limit) });
+    return this.request<AndroidRecentPicturesResponse>(`/api/v1/storage/android/recent-pictures?${query.toString()}`);
   }
 
   public async deleteAndroidStorage(serial: string, path: string): Promise<{ deleted: boolean; path: string; isDirectory: boolean }> {

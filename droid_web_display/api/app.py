@@ -910,6 +910,15 @@ def create_app(
         entries = await container.transfers.list_android(serial, path)
         return {"path": path, "entries": [entry.to_dict() for entry in entries]}
 
+    @app.get("/api/v1/storage/android/recent-pictures")
+    async def android_recent_pictures(
+        container: Annotated[ServiceContainer, Depends(get_container)],
+        serial: str = Query(..., min_length=1),
+        limit: int = Query(default=50, ge=1, le=50),
+    ) -> dict:
+        entries = await container.transfers.list_recent_pictures(serial, limit=limit)
+        return {"limit": limit, "entries": [entry.to_dict() for entry in entries]}
+
     @app.delete("/api/v1/storage/android")
     async def android_storage_delete(
         container: Annotated[ServiceContainer, Depends(get_container)],

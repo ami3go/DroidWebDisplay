@@ -7,6 +7,11 @@ interface TransferElements {
   readonly customDestinationRow: HTMLElement;
   readonly customDestinationPath: HTMLInputElement;
   readonly duplicatePolicy: HTMLSelectElement;
+  readonly fileBrowserTab: HTMLButtonElement;
+  readonly recentPicturesTab: HTMLButtonElement;
+  readonly fileBrowserControls: HTMLElement;
+  readonly recentPicturesControls: HTMLElement;
+  readonly recentPicturesRefresh: HTMLButtonElement;
   readonly storageRoot: HTMLSelectElement;
   readonly storagePath: HTMLInputElement;
   readonly storageBreadcrumbs: HTMLElement;
@@ -14,6 +19,8 @@ interface TransferElements {
   readonly storageRefresh: HTMLButtonElement;
   readonly storageSelectAll: HTMLInputElement;
   readonly storageBody: HTMLElement;
+  readonly explorerFrame: HTMLElement;
+  readonly explorerHelp: HTMLElement;
   readonly contextMenu: HTMLElement;
   readonly contextOpen: HTMLButtonElement;
   readonly contextDownload: HTMLButtonElement;
@@ -31,6 +38,12 @@ interface TransferElements {
 
 type StorageSortKey = "name" | "size" | "modified";
 type SortDirection = "ascending" | "descending";
+type ExplorerView = "files" | "recent-pictures";
+
+interface StorageSortState {
+  key: StorageSortKey;
+  direction: SortDirection;
+}
 
 const ACTIVE_STATES = new Set(["queued", "preparing", "transferring", "verifying"]);
 const FINAL_STATES = new Set(["completed", "cancelled", "failed", "interrupted"]);
@@ -82,10 +95,14 @@ export class TransferController {
   readonly #selectedDownloads = new Set<string>();
   #contextTarget: AndroidStorageEntryDto | null = null;
   #contextUploadDestination = "/sdcard/Download";
-  #sortKey: StorageSortKey = "name";
-  #sortDirection: SortDirection = "ascending";
+  #activeView: ExplorerView = "files";
+  readonly #sortStates: Record<ExplorerView, StorageSortState> = {
+    files: { key: "name", direction: "ascending" },
+    "recent-pictures": { key: "modified", direction: "descending" },
+  };
   #lastSelectedIndex: number | null = null;
   #lastBrowseAt = 0;
+  #lastRecentPicturesAt = 0;
   #browseGeneration = 0;
   #refreshTransfersBusy = false;
   readonly #uploadRefreshes = new UploadExplorerRefreshTracker();
@@ -99,6 +116,7 @@ export class TransferController {
   }
 
   public async initialize(): Promise<void> {
+    this.updateExplorerViewUi();
     const [profiles, roots] = await Promise.all([this.#api.destinationProfiles(), this.#api.androidStorageRoots(this.elements.device.value || undefined)]);
     this.elements.destinationProfile.replaceChildren();
     for (const profile of profiles.profiles) {
@@ -138,12 +156,28 @@ export class TransferController {
   }
 
   private bindEvents(): void {
-    this.elements.device.addEventListener("change", () => void this.runAction(async () => { await this.refreshStorageRoots(); await this.browse(); }));
+    this.elements.device.addEventListener("change", () => void this.runAction(async () => {
+      await this.refreshStorageRoots();
+      await this.refreshActiveView();
+    }));
     this.elements.contextUploadFile.addEventListener("change", () => {
       if (!(this.elements.contextUploadFile.files?.length)) return;
       void this.runAction(() => this.uploadFiles(this.#contextUploadDestination, [...(this.elements.contextUploadFile.files ?? [])]));
     });
     this.elements.storageRefresh.addEventListener("click", () => void this.runAction(() => this.browse()));
+    this.elements.recentPicturesRefresh.addEventListener("click", () => void this.runAction(() => this.loadRecentPictures()));
+    this.elements.fileBrowserTab.addEventListener("click", () => void this.runAction(() => this.switchExplorerView("files")));
+    this.elements.recentPicturesTab.addEventListener("click", () => void this.runAction(() => this.switchExplorerView("recent-pictures")));
+    for (const tab of [this.elements.fileBrowserTab, this.elements.recentPicturesTab]) {
+      tab.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        event.preventDefault();
+        const view = tab === this.elements.fileBrowserTab ? "recent-pictures" : "files";
+        const next = view === "files" ? this.elements.fileBrowserTab : this.elements.recentPicturesTab;
+        next.focus();
+        void this.runAction(() => this.switchExplorerView(view));
+      });
+    }
     document.querySelector<HTMLButtonElement>('[data-group="files"]')?.addEventListener("click", () => {
       void this.runAction(() => this.refreshExplorerIfStale());
       this.scheduleTransferRefresh(0);
@@ -180,6 +214,7 @@ export class TransferController {
     });
     this.bindStageDropZone();
     this.elements.storageBody.addEventListener("dragover", (event) => {
+      if (this.#activeView !== "files") return;
       if (!event.dataTransfer?.types.includes("Files")) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
@@ -188,9 +223,11 @@ export class TransferController {
       (row ?? this.elements.storageBody).classList.add("drop-target");
     });
     this.elements.storageBody.addEventListener("dragleave", (event) => {
+      if (this.#activeView !== "files") return;
       if (!this.elements.storageBody.contains(event.relatedTarget as Node | null)) this.clearDropTarget();
     });
     this.elements.storageBody.addEventListener("drop", (event) => {
+      if (this.#activeView !== "files") return;
       if (!event.dataTransfer?.files.length) return;
       event.preventDefault();
       const row = (event.target as Element | null)?.closest<HTMLElement>('.explorer-row[data-kind="folder"]');
@@ -267,10 +304,11 @@ export class TransferController {
       button.addEventListener("click", () => {
         const key = button.dataset.storageSort as StorageSortKey | undefined;
         if (!key) return;
-        if (this.#sortKey === key) this.#sortDirection = this.#sortDirection === "ascending" ? "descending" : "ascending";
+        const sort = this.activeSort();
+        if (sort.key === key) sort.direction = sort.direction === "ascending" ? "descending" : "ascending";
         else {
-          this.#sortKey = key;
-          this.#sortDirection = "ascending";
+          sort.key = key;
+          sort.direction = "ascending";
         }
         // The anchor indexes into the rendered order, which is about to
         // change; keeping it would make the next shift-click select rows the
@@ -289,6 +327,7 @@ export class TransferController {
       await this.downloadSelected();
     }));
     this.elements.contextUpload.addEventListener("click", () => {
+      if (this.#activeView !== "files") return;
       const target = this.#contextTarget;
       const destination = target?.isDirectory ? target.path : this.elements.storagePath.value;
       this.hideContextMenu();
@@ -303,12 +342,12 @@ export class TransferController {
       if (!window.confirm(`Delete ${kind} “${target.name}”${contents} from Android? This cannot be undone.`)) return;
       await this.#api.deleteAndroidStorage(this.requireSerial(), target.path);
       this.#selectedDownloads.delete(target.path);
-      await this.browse();
+      await this.refreshActiveView();
       this.setStatus(`Deleted ${kind}: ${target.name}`);
     }));
     this.elements.contextRefresh.addEventListener("click", () => void this.runAction(async () => {
       this.hideContextMenu();
-      await this.browse();
+      await this.refreshActiveView();
     }));
     document.addEventListener("pointerdown", (event) => {
       if (!this.elements.contextMenu.hidden && !this.elements.contextMenu.contains(event.target as Node)) this.hideContextMenu();
@@ -318,6 +357,41 @@ export class TransferController {
     });
     window.addEventListener("resize", () => this.hideContextMenu());
     window.addEventListener("scroll", () => this.hideContextMenu(), true);
+  }
+
+  private activeSort(): StorageSortState {
+    return this.#sortStates[this.#activeView];
+  }
+
+  private async switchExplorerView(view: ExplorerView): Promise<void> {
+    this.#activeView = view;
+    this.#browseGeneration += 1;
+    this.#selectedDownloads.clear();
+    this.#lastSelectedIndex = null;
+    this.hideContextMenu();
+    this.updateExplorerViewUi();
+    await this.refreshActiveView();
+  }
+
+  private updateExplorerViewUi(): void {
+    const filesActive = this.#activeView === "files";
+    this.elements.fileBrowserTab.classList.toggle("active", filesActive);
+    this.elements.fileBrowserTab.setAttribute("aria-selected", String(filesActive));
+    this.elements.fileBrowserTab.tabIndex = filesActive ? 0 : -1;
+    this.elements.recentPicturesTab.classList.toggle("active", !filesActive);
+    this.elements.recentPicturesTab.setAttribute("aria-selected", String(!filesActive));
+    this.elements.recentPicturesTab.tabIndex = filesActive ? -1 : 0;
+    this.elements.fileBrowserControls.hidden = !filesActive;
+    this.elements.recentPicturesControls.hidden = filesActive;
+    this.elements.explorerFrame.setAttribute("aria-label", filesActive ? "Android files" : "Recent Android pictures");
+    this.elements.explorerHelp.textContent = filesActive
+      ? "Drag PC files onto a folder to upload there, or onto empty Explorer space to upload to the current folder. Right-click remains available for all actions."
+      : "Select one or more pictures, then choose Download. Double-click downloads one picture.";
+  }
+
+  private async refreshActiveView(): Promise<void> {
+    if (this.#activeView === "recent-pictures") await this.loadRecentPictures();
+    else await this.browse();
   }
 
   private async refreshStorageRoots(): Promise<void> {
@@ -336,8 +410,9 @@ export class TransferController {
 
   private async refreshExplorerIfStale(): Promise<void> {
     if (!this.elements.device.value) return;
-    if (Date.now() - this.#lastBrowseAt < EXPLORER_REFRESH_STALE_MS) return;
-    await this.browse();
+    const lastRefresh = this.#activeView === "files" ? this.#lastBrowseAt : this.#lastRecentPicturesAt;
+    if (Date.now() - lastRefresh < EXPLORER_REFRESH_STALE_MS) return;
+    await this.refreshActiveView();
   }
 
   private async browse(path = this.elements.storagePath.value || "/sdcard/Download"): Promise<void> {
@@ -363,6 +438,25 @@ export class TransferController {
     this.setStatus(`${result.entries.length} item(s) in ${result.path}`);
   }
 
+  private async loadRecentPictures(): Promise<void> {
+    const generation = ++this.#browseGeneration;
+    const serial = this.elements.device.value;
+    if (!serial) {
+      this.elements.storageBody.textContent = "Select an authorized Android device.";
+      return;
+    }
+    this.hideContextMenu();
+    this.setStatus("Reading recent Android pictures…");
+    const result = await this.#api.androidRecentPictures(serial, 50);
+    if (generation !== this.#browseGeneration || this.elements.device.value !== serial || this.#activeView !== "recent-pictures") return;
+    this.#currentEntries = result.entries;
+    this.#selectedDownloads.clear();
+    this.#lastSelectedIndex = null;
+    this.renderStorage(result.entries);
+    this.#lastRecentPicturesAt = Date.now();
+    this.setStatus(`${result.entries.length} recent picture(s) · newest ${result.limit} maximum`);
+  }
+
   private renderBreadcrumbs(path: string): void {
     this.elements.storageBreadcrumbs.replaceChildren();
     for (const crumb of androidBreadcrumbs(path)) {
@@ -384,13 +478,18 @@ export class TransferController {
 
   private renderStorage(entries: readonly AndroidStorageEntryDto[]): void {
     this.elements.storageBody.replaceChildren();
-    const sorted = sortStorageEntries(entries, this.#sortKey, this.#sortDirection);
+    const sort = this.activeSort();
+    const sorted = sortStorageEntries(entries, sort.key, sort.direction);
     this.updateSortHeaders();
     this.updateSelectionControls();
     if (!sorted.length) {
       const empty = document.createElement("div");
       empty.className = "explorer-empty";
-      empty.innerHTML = "<strong>This folder is empty.</strong><span>Right-click here to upload files.</span>";
+      if (this.#activeView === "recent-pictures") {
+        empty.innerHTML = "<strong>No recent pictures found.</strong><span>Refresh after Android finishes indexing new pictures.</span>";
+      } else {
+        empty.innerHTML = "<strong>This folder is empty.</strong><span>Right-click here to upload files.</span>";
+      }
       this.elements.storageBody.append(empty);
       return;
     }
@@ -424,7 +523,7 @@ export class TransferController {
       const name = document.createElement("span");
       name.className = "file-name";
       name.textContent = entry.name;
-      name.title = entry.name;
+      name.title = this.#activeView === "recent-pictures" ? entry.path : entry.name;
       nameCell.append(icon, name);
 
       const sizeCell = document.createElement("div");
@@ -461,7 +560,8 @@ export class TransferController {
       return;
     }
     if (event.shiftKey && this.#lastSelectedIndex !== null) {
-      const sorted = sortStorageEntries(this.#currentEntries, this.#sortKey, this.#sortDirection);
+      const sort = this.activeSort();
+      const sorted = sortStorageEntries(this.#currentEntries, sort.key, sort.direction);
       const start = Math.min(this.#lastSelectedIndex, index);
       const end = Math.max(this.#lastSelectedIndex, index);
       if (!event.ctrlKey && !event.metaKey) this.#selectedDownloads.clear();
@@ -522,13 +622,14 @@ export class TransferController {
   }
 
   private updateSortHeaders(): void {
+    const sort = this.activeSort();
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-storage-sort]")) {
-      const active = button.dataset.storageSort === this.#sortKey;
+      const active = button.dataset.storageSort === sort.key;
       button.classList.toggle("active", active);
-      button.setAttribute("aria-sort", active ? this.#sortDirection : "none");
+      button.setAttribute("aria-sort", active ? sort.direction : "none");
       const label = button.dataset.label ?? button.textContent?.replace(/[▲▼]/g, "").trim() ?? "";
       button.dataset.label = label;
-      this.setSortHeaderLabel(button, active ? `${label} ${this.#sortDirection === "ascending" ? "▲" : "▼"}` : label);
+      this.setSortHeaderLabel(button, active ? `${label} ${sort.direction === "ascending" ? "▲" : "▼"}` : label);
     }
   }
 
@@ -545,6 +646,7 @@ export class TransferController {
     const selectedCount = this.#selectedDownloads.size;
     this.elements.contextDownload.hidden = target?.isDirectory === true || selectedCount === 0;
     this.elements.contextDownload.textContent = selectedCount > 1 ? `Download ${selectedCount} selected` : "Download";
+    this.elements.contextUpload.hidden = this.#activeView !== "files";
     this.elements.contextUpload.textContent = target?.isDirectory ? `Upload into “${target.name}”` : "Upload to current folder";
     this.elements.contextDelete.hidden = !target;
     this.elements.contextDelete.textContent = target ? `Delete “${target.name}”` : "Delete";
@@ -662,6 +764,12 @@ export class TransferController {
   }
 
   private async download(sourcePath: string): Promise<void> {
+    await this.enqueueDownload(sourcePath);
+    await this.refreshTransfers();
+    this.setStatus(`Queued download: ${sourcePath.split("/").at(-1) ?? sourcePath}`);
+  }
+
+  private async enqueueDownload(sourcePath: string): Promise<void> {
     const serial = this.requireSerial();
     const destination = this.downloadDestination();
     await this.#api.downloadFile({
@@ -670,14 +778,13 @@ export class TransferController {
       ...destination,
       duplicatePolicy: this.duplicatePolicy(),
     });
-    await this.refreshTransfers();
-    this.setStatus(`Queued download: ${sourcePath.split("/").at(-1) ?? sourcePath}`);
   }
 
   private async downloadSelected(): Promise<void> {
     if (!this.#selectedDownloads.size) throw new Error("Select one or more Android files");
     const selected = [...this.#selectedDownloads];
-    for (const path of selected) await this.download(path);
+    for (const path of selected) await this.enqueueDownload(path);
+    await this.refreshTransfers();
     this.#selectedDownloads.clear();
     this.#lastSelectedIndex = null;
     this.updateSelectionUi();
@@ -713,7 +820,7 @@ export class TransferController {
       this.#lastTransfers = response.transfers;
       this.renderTransfers(response.transfers);
       if (this.#uploadRefreshes.consumeCompleted(response.transfers, this.elements.device.value, this.elements.storagePath.value)) {
-        await this.browse();
+        await this.refreshActiveView();
       }
     } catch (error) {
       this.setStatus(errorMessage(error), true);
