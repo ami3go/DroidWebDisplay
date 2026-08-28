@@ -364,6 +364,7 @@ async function bootstrap() {
             contextOpen: required("#context-open"),
             contextDownload: required("#context-download"),
             contextUpload: required("#context-upload"),
+            contextDelete: required("#context-delete"),
             contextRefresh: required("#context-refresh"),
             destinationProfile: required("#destination-profile"),
             downloadSelected: required("#download-selected"),

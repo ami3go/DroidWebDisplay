@@ -1,8 +1,37 @@
 import { BridgeApi } from "./api.js";
 const ACTIVE_STATES = new Set(["queued", "preparing", "transferring", "verifying"]);
+const FINAL_STATES = new Set(["completed", "cancelled", "failed", "interrupted"]);
 const EXPLORER_REFRESH_STALE_MS = 3000;
 const RETRY_STATES = new Set(["cancelled", "failed", "interrupted"]);
 let ANDROID_ROOTS = ["/sdcard/Download", "/sdcard/Documents", "/sdcard/Pictures", "/sdcard/DCIM", "/sdcard/Movies"];
+/** Tracks uploads until Android has verified them, then refreshes affected Explorer views. */
+export class UploadExplorerRefreshTracker {
+    #pending = new Map();
+    track(record) {
+        if (record.direction !== "upload")
+            return;
+        this.#pending.set(record.transferId, {
+            serial: record.serial,
+            destinationDirectory: androidParentPath(record.destinationPath),
+        });
+    }
+    consumeCompleted(transfers, currentSerial, currentPath) {
+        const byId = new Map(transfers.map((transfer) => [transfer.transferId, transfer]));
+        let refresh = false;
+        for (const [transferId, pending] of this.#pending) {
+            const transfer = byId.get(transferId);
+            if (!transfer || !FINAL_STATES.has(transfer.state))
+                continue;
+            this.#pending.delete(transferId);
+            if (transfer.state === "completed"
+                && pending.serial === currentSerial
+                && explorerPathAffected(currentPath, pending.destinationDirectory)) {
+                refresh = true;
+            }
+        }
+        return refresh;
+    }
+}
 export class TransferController {
     elements;
     #api = new BridgeApi();
@@ -18,6 +47,7 @@ export class TransferController {
     #lastBrowseAt = 0;
     #browseGeneration = 0;
     #refreshTransfersBusy = false;
+    #uploadRefreshes = new UploadExplorerRefreshTracker();
     // dragenter/dragleave fire for every child element under the pointer, so the
     // overlay is driven by a depth counter rather than by relatedTarget guesses.
     #stageDragDepth = 0;
@@ -251,6 +281,20 @@ export class TransferController {
             this.hideContextMenu();
             this.chooseUploadFiles(destination);
         });
+        this.elements.contextDelete.addEventListener("click", () => void this.runAction(async () => {
+            const target = this.#contextTarget;
+            this.hideContextMenu();
+            if (!target)
+                return;
+            const kind = target.isDirectory ? "folder" : "file";
+            const contents = target.isDirectory ? " and all of its contents" : "";
+            if (!window.confirm(`Delete ${kind} “${target.name}”${contents} from Android? This cannot be undone.`))
+                return;
+            await this.#api.deleteAndroidStorage(this.requireSerial(), target.path);
+            this.#selectedDownloads.delete(target.path);
+            await this.browse();
+            this.setStatus(`Deleted ${kind}: ${target.name}`);
+        }));
         this.elements.contextRefresh.addEventListener("click", () => void this.runAction(async () => {
             this.hideContextMenu();
             await this.browse();
@@ -488,6 +532,8 @@ export class TransferController {
         this.elements.contextDownload.hidden = target?.isDirectory === true || selectedCount === 0;
         this.elements.contextDownload.textContent = selectedCount > 1 ? `Download ${selectedCount} selected` : "Download";
         this.elements.contextUpload.textContent = target?.isDirectory ? `Upload into “${target.name}”` : "Upload to current folder";
+        this.elements.contextDelete.hidden = !target;
+        this.elements.contextDelete.textContent = target ? `Delete “${target.name}”` : "Delete";
         this.elements.contextMenu.hidden = false;
         this.elements.contextMenu.style.left = "0px";
         this.elements.contextMenu.style.top = "0px";
@@ -579,6 +625,7 @@ export class TransferController {
                 destinationPath,
                 duplicatePolicy: this.duplicatePolicy(),
             });
+            this.#uploadRefreshes.track(record);
             // When the server picked the destination, report what it actually chose
             // rather than a path the client guessed.
             queuedTo ??= androidParentPath(record.destinationPath);
@@ -653,6 +700,9 @@ export class TransferController {
             const response = await this.#api.transfers();
             this.#lastTransfers = response.transfers;
             this.renderTransfers(response.transfers);
+            if (this.#uploadRefreshes.consumeCompleted(response.transfers, this.elements.device.value, this.elements.storagePath.value)) {
+                await this.browse();
+            }
         }
         catch (error) {
             this.setStatus(errorMessage(error), true);
@@ -764,6 +814,11 @@ function hasFiles(data) {
 function androidParentPath(path) {
     const parent = path.replace(/\/+$/, "").split("/").slice(0, -1).join("/");
     return parent || "/";
+}
+function explorerPathAffected(currentPath, changedDirectory) {
+    const current = currentPath.replace(/\/+$/, "") || "/";
+    const changed = changedDirectory.replace(/\/+$/, "") || "/";
+    return changed === current || changed.startsWith(`${current}/`);
 }
 export function parentAndroidPath(path) {
     const root = androidRootForPath(path);

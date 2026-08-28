@@ -207,6 +207,11 @@ export class BridgeApi {
     return this.request<AndroidStorageResponse>(`/api/v1/storage/android?${query.toString()}`);
   }
 
+  public async deleteAndroidStorage(serial: string, path: string): Promise<{ deleted: boolean; path: string; isDirectory: boolean }> {
+    const query = new URLSearchParams({ serial, path });
+    return this.request(`/api/v1/storage/android?${query.toString()}`, { method: "DELETE" });
+  }
+
   public async androidStorageRoots(serial?: string): Promise<AndroidStorageRootsResponse> {
     const query = serial ? `?${new URLSearchParams({ serial }).toString()}` : "";
     return this.request<AndroidStorageRootsResponse>(`/api/v1/storage/android-roots${query}`);

@@ -1,4 +1,4 @@
-import type { AndroidStorageEntryDto } from "./types.js";
+import type { AndroidStorageEntryDto, TransferDto } from "./types.js";
 interface TransferElements {
     readonly device: HTMLSelectElement;
     readonly contextUploadFile: HTMLInputElement;
@@ -16,6 +16,7 @@ interface TransferElements {
     readonly contextOpen: HTMLButtonElement;
     readonly contextDownload: HTMLButtonElement;
     readonly contextUpload: HTMLButtonElement;
+    readonly contextDelete: HTMLButtonElement;
     readonly contextRefresh: HTMLButtonElement;
     readonly destinationProfile: HTMLSelectElement;
     readonly downloadSelected: HTMLButtonElement;
@@ -27,6 +28,12 @@ interface TransferElements {
 }
 type StorageSortKey = "name" | "size" | "modified";
 type SortDirection = "ascending" | "descending";
+/** Tracks uploads until Android has verified them, then refreshes affected Explorer views. */
+export declare class UploadExplorerRefreshTracker {
+    #private;
+    track(record: TransferDto): void;
+    consumeCompleted(transfers: readonly TransferDto[], currentSerial: string, currentPath: string): boolean;
+}
 export declare class TransferController {
     #private;
     private readonly elements;

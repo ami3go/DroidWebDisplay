@@ -2141,6 +2141,61 @@
       }
     },
     "/api/v1/storage/android": {
+      "delete": {
+        "operationId": "android_storage_delete_api_v1_storage_android_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "serial",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Serial",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Android Storage Delete Api V1 Storage Android Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "pcLocalSession": []
+          }
+        ],
+        "summary": "Android Storage Delete"
+      },
       "get": {
         "operationId": "android_storage_api_v1_storage_android_get",
         "parameters": [

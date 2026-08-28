@@ -863,13 +863,24 @@ def create_app(
             ready = [item for item in devices if item.ready]
             if len(ready) == 1:
                 selected_serial = ready[0].serial
-        discover = getattr(container.adb, "external_storage_roots", None)
-        if selected_serial and callable(discover):
+        classified = getattr(container.adb, "storage_roots", None)
+        used_classified_roots = False
+        if selected_serial and callable(classified):
             try:
-                roots.extend(await discover(selected_serial))
+                discovered_roots = await classified(selected_serial)
+                if discovered_roots:
+                    roots = discovered_roots
+                    used_classified_roots = True
             except BridgeError:
                 pass
-        return {"roots": roots, "defaultPath": "/sdcard/Download"}
+        discover_external = getattr(container.adb, "external_storage_roots", None)
+        if selected_serial and not used_classified_roots and callable(discover_external):
+            try:
+                roots.extend(await discover_external(selected_serial))
+            except BridgeError:
+                pass
+        default_path = roots[0]["path"] if roots else "/sdcard/Download"
+        return {"roots": roots, "defaultPath": default_path}
 
     @app.get("/api/v1/auto-download")
     async def auto_download_get(container: Annotated[ServiceContainer, Depends(get_container)]) -> dict:
@@ -898,6 +909,14 @@ def create_app(
     ) -> dict:
         entries = await container.transfers.list_android(serial, path)
         return {"path": path, "entries": [entry.to_dict() for entry in entries]}
+
+    @app.delete("/api/v1/storage/android")
+    async def android_storage_delete(
+        container: Annotated[ServiceContainer, Depends(get_container)],
+        serial: str = Query(..., min_length=1),
+        path: str = Query(..., min_length=1),
+    ) -> dict:
+        return await container.transfers.delete_android(serial, path)
 
     @app.get("/api/v1/destination-profiles")
     async def destination_profiles(container: Annotated[ServiceContainer, Depends(get_container)]) -> dict:

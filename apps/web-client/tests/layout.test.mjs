@@ -161,6 +161,9 @@ test("mirrored screen is a drop target that uploads to the Android inbox", () =>
   // The server owns the default upload directory; the client must not restate it.
   assert.match(transferSource, /uploadFiles\(undefined, files\)/);
   assert.doesNotMatch(transferSource, /DroidWebDisplayInbox/);
+  // Refresh happens from the verified transfer state, not immediately after enqueue.
+  assert.match(transferSource, /#uploadRefreshes\.track\(record\)/);
+  assert.match(transferSource, /consumeCompleted[\s\S]*?await this\.browse\(\)/);
 });
 
 test("Android File Explorer accepts PC file drag and drop", () => {

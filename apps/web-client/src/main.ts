@@ -362,6 +362,7 @@ async function bootstrap(): Promise<void> {
       contextOpen: required<HTMLButtonElement>("#context-open"),
       contextDownload: required<HTMLButtonElement>("#context-download"),
       contextUpload: required<HTMLButtonElement>("#context-upload"),
+      contextDelete: required<HTMLButtonElement>("#context-delete"),
       contextRefresh: required<HTMLButtonElement>("#context-refresh"),
       destinationProfile: required<HTMLSelectElement>("#destination-profile"),
       downloadSelected: required<HTMLButtonElement>("#download-selected"),

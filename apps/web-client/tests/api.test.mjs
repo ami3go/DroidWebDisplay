@@ -61,6 +61,20 @@ test("file transfer API uses structured versioned endpoints", async () => {
   assert.ok(calls[0].init.body instanceof FormData);
 });
 
+test("Android Explorer delete uses an authenticated versioned request", async () => {
+  const calls = [];
+  const api = new BridgeApi("", async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ deleted: true, path: "/sdcard/Download/report 1.txt", isDirectory: false }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  await api.deleteAndroidStorage("PHONE", "/sdcard/Download/report 1.txt");
+  assert.equal(calls[0].url, "/api/v1/storage/android?serial=PHONE&path=%2Fsdcard%2FDownload%2Freport+1.txt");
+  assert.equal(calls[0].init.method, "DELETE");
+});
+
 test("automatic download API uses persistent versioned endpoints", async () => {
   const calls = [];
   const api = new BridgeApi("", async (url, init) => {

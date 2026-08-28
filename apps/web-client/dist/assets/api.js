@@ -125,6 +125,10 @@ export class BridgeApi {
         const query = new URLSearchParams({ serial, path });
         return this.request(`/api/v1/storage/android?${query.toString()}`);
     }
+    async deleteAndroidStorage(serial, path) {
+        const query = new URLSearchParams({ serial, path });
+        return this.request(`/api/v1/storage/android?${query.toString()}`, { method: "DELETE" });
+    }
     async androidStorageRoots(serial) {
         const query = serial ? `?${new URLSearchParams({ serial }).toString()}` : "";
         return this.request(`/api/v1/storage/android-roots${query}`);

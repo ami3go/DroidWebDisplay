@@ -13,6 +13,10 @@ from droid_web_display.transfers.manager import TransferManager
 
 
 class FakeAdb:
+    def __init__(self, sync=None):
+        self.sync = sync
+        self.removed = []
+
     async def version(self):
         return "Android Debug Bridge version test"
 
@@ -21,6 +25,13 @@ class FakeAdb:
 
     async def mkdir(self, serial: str, remote_directory: str):
         return None
+
+    async def remove_path(self, serial: str, remote_path: str, *, recursive: bool = False):
+        self.removed.append((serial, remote_path, recursive))
+        if self.sync is not None:
+            for path in list(self.sync.remote):
+                if path == remote_path or (recursive and path.startswith(f"{remote_path}/")):
+                    del self.sync.remote[path]
 
 
 class FakeSessionManager:
@@ -70,8 +81,9 @@ def wait_completed(client: TestClient, transfer_id: str) -> dict:
 
 
 def test_phase5_storage_and_transfer_endpoints(tmp_path: Path) -> None:
-    adb = FakeAdb()
-    transfers = TransferManager(adb, FakeSync(), data_directory=tmp_path / "data", destination_profiles={"default-downloads": tmp_path / "downloads"})  # type: ignore[arg-type]
+    sync = FakeSync()
+    adb = FakeAdb(sync)
+    transfers = TransferManager(adb, sync, data_directory=tmp_path / "data", destination_profiles={"default-downloads": tmp_path / "downloads"})  # type: ignore[arg-type]
     app = create_app(
         config=BridgeConfig(repo_root=Path(__file__).resolve().parents[3], transfer_data_directory=tmp_path / "data", default_download_directory=tmp_path / "downloads", authentication_required=False),
         manager=FakeSessionManager(),  # type: ignore[arg-type]
@@ -114,6 +126,22 @@ def test_phase5_storage_and_transfer_endpoints(tmp_path: Path) -> None:
         assert custom_completed["state"] == "completed"
         assert custom_completed["destinationProfile"] == "custom"
         assert (custom_dir / "result.txt").read_bytes() == b"result"
+
+        deleted = client.delete(
+            "/api/v1/storage/android",
+            params={"serial": "PHONE", "path": "/sdcard/Download/result.txt"},
+        )
+        assert deleted.status_code == 200
+        assert deleted.json() == {"deleted": True, "path": "/sdcard/Download/result.txt", "isDirectory": False}
+        assert "/sdcard/Download/result.txt" not in sync.remote
+        assert adb.removed == [("PHONE", "/sdcard/Download/result.txt", False)]
+
+        protected_root = client.delete(
+            "/api/v1/storage/android",
+            params={"serial": "PHONE", "path": "/sdcard/Download"},
+        )
+        assert protected_root.status_code == 422
+        assert protected_root.json()["error"]["code"] == "transfer_validation"
 
         diagnostics = client.get("/api/v1/diagnostics").json()
         assert diagnostics["transferEngine"] == "direct-adb-sync-v1"

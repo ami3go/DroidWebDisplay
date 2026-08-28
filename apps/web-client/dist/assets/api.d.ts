@@ -101,6 +101,11 @@ export declare class BridgeApi {
     sessions(): Promise<SessionListResponse>;
     startSession(request: StartSessionRequest): Promise<SessionDto>;
     androidStorage(serial: string, path: string): Promise<AndroidStorageResponse>;
+    deleteAndroidStorage(serial: string, path: string): Promise<{
+        deleted: boolean;
+        path: string;
+        isDirectory: boolean;
+    }>;
     androidStorageRoots(serial?: string): Promise<AndroidStorageRootsResponse>;
     autoDownload(): Promise<AutoDownloadSnapshotDto>;
     configureAutoDownload(config: AutoDownloadConfigDto): Promise<AutoDownloadSnapshotDto>;

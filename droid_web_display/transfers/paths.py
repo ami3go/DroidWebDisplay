@@ -73,6 +73,21 @@ def normalize_android_path(path: str, *, require_allowed: bool = True) -> str:
     return str(normalized)
 
 
+def is_android_storage_root(path: str) -> bool:
+    """Return whether *path* is a protected Explorer storage root.
+
+    Explorer operations may work below the configured shared-storage roots,
+    but deleting a root such as ``/sdcard/Download`` or an adopted-storage
+    volume would be far broader than deleting a selected row.
+    """
+    normalized = PurePosixPath(normalize_android_path(path))
+    if normalized in ANDROID_ALLOWED_ROOTS:
+        return True
+    return normalized.parent == PurePosixPath("/storage") and bool(
+        re.fullmatch(r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}", normalized.name)
+    )
+
+
 def storage_root_list() -> list[dict[str, str]]:
     return [dict(item) for item in ANDROID_STORAGE_ROOTS]
 

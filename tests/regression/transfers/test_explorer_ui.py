@@ -14,6 +14,7 @@ def test_explorer_file_browser_and_context_menu_are_bundled() -> None:
         'id="context-open"',
         'id="context-download"',
         'id="context-upload"',
+        'id="context-delete"',
         'id="context-refresh"',
         'id="context-upload-file"',
     ):

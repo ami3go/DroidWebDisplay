@@ -206,6 +206,8 @@ button.compact { padding: 0.45rem 0.65rem; border-radius: 8px; font-size: 0.78re
 .context-menu[hidden] { display: none; }
 .context-menu button { width: 100%; display: block; padding: 0.52rem 0.65rem; border-radius: 6px; background: transparent; color: #e7ebf3; text-align: left; font-weight: 600; font-size: 0.76rem; }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: #2b3547; outline: none; }
+.context-menu button.danger { background: transparent; color: #ff9aaa; }
+.context-menu button.danger:hover:not(:disabled), .context-menu button.danger:focus-visible { background: #552330; color: #ffd7de; }
 .context-menu button:disabled { color: #647087; }
 .context-separator { height: 1px; margin: 0.25rem 0.35rem; background: #333d50; }
 
