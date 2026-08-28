@@ -1,7 +1,7 @@
 /* Versioned to match the ?v= on the entry sheet in index.html. Without it the
    531 lines of drawer layout below sit outside cache-busting, and a stale
    copy after an upgrade renders every drawer group stacked and visible. */
-@import url("./droidwebdisplay-main-drawer-core.css?v=0.11.2-native6");
+@import url("./droidwebdisplay-main-drawer-core.css?v=0.11.2-native7");
 
 /* Header brand/status lockup v2.
    Keep the brand on one header row, remove the legacy rail-style pseudo logo,

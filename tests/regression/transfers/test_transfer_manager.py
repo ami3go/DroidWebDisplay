@@ -72,12 +72,16 @@ class DeleteAdb(FakeAdb):
     def __init__(self, sync: DeleteSync) -> None:
         self.sync = sync
         self.removed: list[tuple[str, str, bool]] = []
+        self.scanned: list[tuple[str, str]] = []
 
     async def remove_path(self, serial: str, remote_path: str, *, recursive: bool = False) -> None:
         self.removed.append((serial, remote_path, recursive))
         for path in list(self.sync.entries):
             if path == remote_path or (recursive and path.startswith(f"{remote_path}/")):
                 del self.sync.entries[path]
+
+    async def media_scan(self, serial: str, remote_path: str) -> None:
+        self.scanned.append((serial, remote_path))
 
 
 class RecentPicturesAdb(FakeAdb):
@@ -177,10 +181,12 @@ async def test_delete_android_file_and_folder_protects_storage_roots(tmp_path: P
     deleted_file = await manager.delete_android("PHONE", "/sdcard/Download/delete-me.txt")
     assert deleted_file == {"deleted": True, "path": "/sdcard/Download/delete-me.txt", "isDirectory": False}
     assert adb.removed[-1] == ("PHONE", "/sdcard/Download/delete-me.txt", False)
+    assert adb.scanned[-1] == ("PHONE", "/sdcard/Download/delete-me.txt")
 
     deleted_folder = await manager.delete_android("PHONE", "/sdcard/Download/folder")
     assert deleted_folder["isDirectory"] is True
     assert adb.removed[-1] == ("PHONE", "/sdcard/Download/folder", True)
+    assert adb.scanned[-1] == ("PHONE", "/sdcard/Download/folder")
     assert not any(path.startswith("/sdcard/Download/folder") for path in sync.entries)
 
     with pytest.raises(TransferValidationError, match="roots cannot be deleted"):

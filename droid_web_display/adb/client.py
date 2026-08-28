@@ -4,6 +4,7 @@ import asyncio
 import os
 import re
 import secrets
+import shlex
 import shutil
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -557,18 +558,31 @@ class AdbClient:
         await self.run("-s", serial, "shell", "mkdir", "-p", remote_directory, timeout=30.0)
 
     async def media_scan(self, serial: str, remote_path: str) -> None:
-        await self.run(
-            "-s", serial, "shell", "am", "broadcast",
-            "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
-            "-d", f"file://{remote_path}", check=False, timeout=30.0,
+        # ``adb shell`` joins every argument after ``shell`` into one remote
+        # command without escaping it. Build and quote that command explicitly
+        # so spaces or shell metacharacters in a legitimate Android filename
+        # cannot split the URI or execute another command.
+        command = shlex.join(
+            (
+                "am",
+                "broadcast",
+                "-a",
+                "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                "-d",
+                f"file://{remote_path}",
+            )
         )
+        await self.run("-s", serial, "shell", command, check=False, timeout=30.0)
 
     async def remove_path(self, serial: str, remote_path: str, *, recursive: bool = False) -> None:
-        # Arguments are passed directly to adb; no shell command string is built.
+        # ADB joins arguments after ``shell`` with spaces and does not escape
+        # them. Quote the complete remote command ourselves so names containing
+        # spaces, quotes, or shell metacharacters are deleted as one exact path.
         # ``--`` also prevents a legitimate filename beginning with '-' from
         # being interpreted as another rm option.
         option = "-rf" if recursive else "-f"
-        result = await self.run("-s", serial, "shell", "rm", option, "--", remote_path, check=False, timeout=30.0)
+        command = shlex.join(("rm", option, "--", remote_path))
+        result = await self.run("-s", serial, "shell", command, check=False, timeout=30.0)
         if result.returncode != 0:
             raise AdbCommandError(
                 "unable to delete Android path",

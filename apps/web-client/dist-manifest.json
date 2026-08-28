@@ -215,18 +215,18 @@
     },
     {
       "path": "assets/transfer-controller.d.ts",
-      "bytes": 4387,
-      "sha256": "d0cbd574d4ed29dbaf252678d5bac2709019f8e1c1c1b350692437a366df1622"
+      "bytes": 4678,
+      "sha256": "1b24021755eee99642d03abd29fc90903215e138f9a6781bef94f6ffa258bfad"
     },
     {
       "path": "assets/transfer-controller.js",
-      "bytes": 47292,
-      "sha256": "4f016ba4f73eacdb935422b9e9fb44ae1b1198d4a0a84dec60d61d711f97690e"
+      "bytes": 48399,
+      "sha256": "cd68c9303398b1115f51327621a977aa24693787a726ca75e0526b0eb1372645"
     },
     {
       "path": "assets/transfer-controller.js.map",
-      "bytes": 46016,
-      "sha256": "ff7ba19fa96a13b43042d1730f235d82707ee17b0a14d115235a633afc8107c0"
+      "bytes": 47232,
+      "sha256": "1679a95d4545635a5ab72d5dd696607989e3928d770456235b3b4d5b47a4998d"
     },
     {
       "path": "assets/types.d.ts",
@@ -281,7 +281,7 @@
     {
       "path": "droidwebdisplay-main-drawer.css",
       "bytes": 5917,
-      "sha256": "b81a8b51a22fe8aa638e903ae20596c60737bbe1562b36cd51fbab0362424fa4"
+      "sha256": "393d7cb09f9baf3a4d8fb8910db958c9cff27471a760b93b72e9c1f6e642224b"
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
@@ -296,7 +296,7 @@
     {
       "path": "index.html",
       "bytes": 35919,
-      "sha256": "02cfd07cf19d070e68b6e5cc6c586d48e3ebfb92b709607c930a2fb12d38aab0"
+      "sha256": "0cd00e110b951ba1afd7ba3f37c936c5fe67414fe0ec06e428bf9e17af319266"
     },
     {
       "path": "styles.css",

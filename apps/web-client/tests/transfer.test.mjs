@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { androidBreadcrumbs, formatBytes, parentAndroidPath, sortStorageEntries, UploadExplorerRefreshTracker } from "../dist/assets/transfer-controller.js";
+import { androidBreadcrumbs, DeletedAndroidPathTracker, formatBytes, parentAndroidPath, sortStorageEntries, UploadExplorerRefreshTracker } from "../dist/assets/transfer-controller.js";
 
 test("formats transfer sizes deterministically", () => {
   assert.equal(formatBytes(0), "0 B");
@@ -56,4 +56,27 @@ test("Explorer refresh waits for a verified drop upload and only refreshes an af
 
   tracker.track(transfer("T3", "queued", "/sdcard/Pictures/image.png"));
   assert.equal(tracker.consumeCompleted([transfer("T3", "completed", "/sdcard/Pictures/image.png")], "PHONE", "/sdcard/Download"), false);
+});
+
+test("Recent pictures hide deleted MediaStore rows until Android drops the stale index entry", () => {
+  const entry = (path) => ({
+    name: path.split("/").at(-1),
+    path,
+    mode: 0,
+    size: 1,
+    modifiedAt: 1,
+    isDirectory: false,
+  });
+  const deletedFile = entry("/sdcard/DCIM/deleted photo.jpg");
+  const deletedChild = entry("/sdcard/Pictures/old album/child.jpg");
+  const kept = entry("/sdcard/DCIM/kept.jpg");
+  const tracker = new DeletedAndroidPathTracker();
+
+  tracker.track(deletedFile.path, false);
+  tracker.track("/sdcard/Pictures/old album", true);
+  assert.deepEqual(tracker.filter([deletedFile, deletedChild, kept]), [kept]);
+  assert.deepEqual(tracker.filter([kept]), [kept]);
+  // Once MediaStore has omitted the tombstones, a genuinely recreated path is
+  // visible again instead of being hidden for the rest of the browser session.
+  assert.deepEqual(tracker.filter([deletedFile, kept]), [deletedFile, kept]);
 });

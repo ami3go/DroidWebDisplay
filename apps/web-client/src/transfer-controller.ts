@@ -87,6 +87,28 @@ export class UploadExplorerRefreshTracker {
   }
 }
 
+interface DeletedAndroidPath {
+  readonly path: string;
+  readonly isDirectory: boolean;
+}
+
+/** Hides MediaStore rows until Android has removed their stale index entries. */
+export class DeletedAndroidPathTracker {
+  readonly #pending = new Map<string, DeletedAndroidPath>();
+
+  public track(path: string, isDirectory: boolean): void {
+    this.#pending.set(path, { path, isDirectory });
+  }
+
+  public filter(entries: readonly AndroidStorageEntryDto[]): readonly AndroidStorageEntryDto[] {
+    const pending = [...this.#pending.values()];
+    for (const deleted of pending) {
+      if (!entries.some((entry) => deletedPathMatches(entry.path, deleted))) this.#pending.delete(deleted.path);
+    }
+    return entries.filter((entry) => !pending.some((deleted) => deletedPathMatches(entry.path, deleted)));
+  }
+}
+
 export class TransferController {
   readonly #api = new BridgeApi();
   #pollTimer: number | null = null;
@@ -106,6 +128,7 @@ export class TransferController {
   #browseGeneration = 0;
   #refreshTransfersBusy = false;
   readonly #uploadRefreshes = new UploadExplorerRefreshTracker();
+  readonly #deletedPaths = new DeletedAndroidPathTracker();
   // dragenter/dragleave fire for every child element under the pointer, so the
   // overlay is driven by a depth counter rather than by relatedTarget guesses.
   #stageDragDepth = 0;
@@ -341,7 +364,10 @@ export class TransferController {
       const contents = target.isDirectory ? " and all of its contents" : "";
       if (!window.confirm(`Delete ${kind} “${target.name}”${contents} from Android? This cannot be undone.`)) return;
       await this.#api.deleteAndroidStorage(this.requireSerial(), target.path);
+      this.#deletedPaths.track(target.path, target.isDirectory);
       this.#selectedDownloads.delete(target.path);
+      this.#currentEntries = this.#currentEntries.filter((entry) => !deletedPathMatches(entry.path, target));
+      this.renderStorage(this.#currentEntries);
       await this.refreshActiveView();
       this.setStatus(`Deleted ${kind}: ${target.name}`);
     }));
@@ -449,12 +475,13 @@ export class TransferController {
     this.setStatus("Reading recent Android pictures…");
     const result = await this.#api.androidRecentPictures(serial, 50);
     if (generation !== this.#browseGeneration || this.elements.device.value !== serial || this.#activeView !== "recent-pictures") return;
-    this.#currentEntries = result.entries;
+    const entries = this.#deletedPaths.filter(result.entries);
+    this.#currentEntries = entries;
     this.#selectedDownloads.clear();
     this.#lastSelectedIndex = null;
-    this.renderStorage(result.entries);
+    this.renderStorage(entries);
     this.#lastRecentPicturesAt = Date.now();
-    this.setStatus(`${result.entries.length} recent picture(s) · newest ${result.limit} maximum`);
+    this.setStatus(`${entries.length} recent picture(s) · newest ${result.limit} maximum`);
   }
 
   private renderBreadcrumbs(path: string): void {
@@ -940,6 +967,10 @@ function explorerPathAffected(currentPath: string, changedDirectory: string): bo
   const current = currentPath.replace(/\/+$/, "") || "/";
   const changed = changedDirectory.replace(/\/+$/, "") || "/";
   return changed === current || changed.startsWith(`${current}/`);
+}
+
+function deletedPathMatches(path: string, deleted: DeletedAndroidPath): boolean {
+  return path === deleted.path || (deleted.isDirectory && path.startsWith(`${deleted.path}/`));
 }
 
 export function parentAndroidPath(path: string): string {

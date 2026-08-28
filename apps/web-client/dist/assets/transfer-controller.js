@@ -32,6 +32,21 @@ export class UploadExplorerRefreshTracker {
         return refresh;
     }
 }
+/** Hides MediaStore rows until Android has removed their stale index entries. */
+export class DeletedAndroidPathTracker {
+    #pending = new Map();
+    track(path, isDirectory) {
+        this.#pending.set(path, { path, isDirectory });
+    }
+    filter(entries) {
+        const pending = [...this.#pending.values()];
+        for (const deleted of pending) {
+            if (!entries.some((entry) => deletedPathMatches(entry.path, deleted)))
+                this.#pending.delete(deleted.path);
+        }
+        return entries.filter((entry) => !pending.some((deleted) => deletedPathMatches(entry.path, deleted)));
+    }
+}
 export class TransferController {
     elements;
     #api = new BridgeApi();
@@ -52,6 +67,7 @@ export class TransferController {
     #browseGeneration = 0;
     #refreshTransfersBusy = false;
     #uploadRefreshes = new UploadExplorerRefreshTracker();
+    #deletedPaths = new DeletedAndroidPathTracker();
     // dragenter/dragleave fire for every child element under the pointer, so the
     // overlay is driven by a depth counter rather than by relatedTarget guesses.
     #stageDragDepth = 0;
@@ -322,7 +338,10 @@ export class TransferController {
             if (!window.confirm(`Delete ${kind} “${target.name}”${contents} from Android? This cannot be undone.`))
                 return;
             await this.#api.deleteAndroidStorage(this.requireSerial(), target.path);
+            this.#deletedPaths.track(target.path, target.isDirectory);
             this.#selectedDownloads.delete(target.path);
+            this.#currentEntries = this.#currentEntries.filter((entry) => !deletedPathMatches(entry.path, target));
+            this.renderStorage(this.#currentEntries);
             await this.refreshActiveView();
             this.setStatus(`Deleted ${kind}: ${target.name}`);
         }));
@@ -431,12 +450,13 @@ export class TransferController {
         const result = await this.#api.androidRecentPictures(serial, 50);
         if (generation !== this.#browseGeneration || this.elements.device.value !== serial || this.#activeView !== "recent-pictures")
             return;
-        this.#currentEntries = result.entries;
+        const entries = this.#deletedPaths.filter(result.entries);
+        this.#currentEntries = entries;
         this.#selectedDownloads.clear();
         this.#lastSelectedIndex = null;
-        this.renderStorage(result.entries);
+        this.renderStorage(entries);
         this.#lastRecentPicturesAt = Date.now();
-        this.setStatus(`${result.entries.length} recent picture(s) · newest ${result.limit} maximum`);
+        this.setStatus(`${entries.length} recent picture(s) · newest ${result.limit} maximum`);
     }
     renderBreadcrumbs(path) {
         this.elements.storageBreadcrumbs.replaceChildren();
@@ -916,6 +936,9 @@ function explorerPathAffected(currentPath, changedDirectory) {
     const current = currentPath.replace(/\/+$/, "") || "/";
     const changed = changedDirectory.replace(/\/+$/, "") || "/";
     return changed === current || changed.startsWith(`${current}/`);
+}
+function deletedPathMatches(path, deleted) {
+    return path === deleted.path || (deleted.isDirectory && path.startsWith(`${deleted.path}/`));
 }
 export function parentAndroidPath(path) {
     const root = androidRootForPath(path);

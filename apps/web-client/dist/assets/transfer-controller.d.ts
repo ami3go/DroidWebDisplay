@@ -41,6 +41,12 @@ export declare class UploadExplorerRefreshTracker {
     track(record: TransferDto): void;
     consumeCompleted(transfers: readonly TransferDto[], currentSerial: string, currentPath: string): boolean;
 }
+/** Hides MediaStore rows until Android has removed their stale index entries. */
+export declare class DeletedAndroidPathTracker {
+    #private;
+    track(path: string, isDirectory: boolean): void;
+    filter(entries: readonly AndroidStorageEntryDto[]): readonly AndroidStorageEntryDto[];
+}
 export declare class TransferController {
     #private;
     private readonly elements;

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
 import json
-from pathlib import Path, PurePosixPath
+import logging
 import secrets
 import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from droid_web_display.adb.client import AdbClient
 from droid_web_display.errors import (
-    AdbSyncError,
+    BridgeError,
     TransferCancelledError,
     TransferConflictError,
     TransferError,
@@ -21,7 +21,13 @@ from droid_web_display.errors import (
     TransferValidationError,
 )
 from droid_web_display.transfers.adb_sync import AdbSyncClient
-from droid_web_display.transfers.models import AndroidEntry, DuplicatePolicy, TransferDirection, TransferRecord, TransferState
+from droid_web_display.transfers.models import (
+    AndroidEntry,
+    DuplicatePolicy,
+    TransferDirection,
+    TransferRecord,
+    TransferState,
+)
 from droid_web_display.transfers.paths import (
     is_android_storage_root,
     join_android_path,
@@ -30,9 +36,9 @@ from droid_web_display.transfers.paths import (
     sanitize_filename,
 )
 
-
 _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
+_LOGGER = logging.getLogger(__name__)
 
 # Directories the OS runs code from on login/boot. A file pulled off the phone
 # must never land in one of these.
@@ -234,6 +240,16 @@ class TransferManager:
                 "Android file or folder still exists after deletion",
                 details={"path": normalized, "isDirectory": stat.is_directory},
             )
+        # MediaStore is a separate index. Without notifying it, a successfully
+        # removed image may continue to appear in Recent pictures until Android
+        # performs a later background scan. The file deletion is already
+        # verified, so an indexing failure must not turn success into failure.
+        media_scan = getattr(self.adb, "media_scan", None)
+        if callable(media_scan):
+            try:
+                await media_scan(serial, normalized)
+            except BridgeError:
+                _LOGGER.debug("Unable to refresh Android MediaStore after deleting %s", normalized, exc_info=True)
         return {"deleted": True, "path": normalized, "isDirectory": stat.is_directory}
 
     async def spool_upload(self, filename: str, chunks: Any) -> tuple[Path, int, str]:
