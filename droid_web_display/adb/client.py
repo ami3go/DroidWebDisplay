@@ -28,10 +28,6 @@ ScrcpyArtifactLoader = Callable[[], "ScrcpyArtifact"]
 _REMOTE_SCRCPY_SERVER = "/data/local/tmp/scrcpy-server.jar"
 _APP_LABEL_RETRY_SECONDS = 30.0
 _APP_LABEL_REFRESH_SECONDS = 300.0
-# Label caches are keyed by serial and a long-lived bridge sees every device the
-# user ever attaches. Bound them so the per-serial label maps cannot accumulate
-# for the process lifetime; the limit is far above any realistic attach count.
-_APP_LABEL_CACHE_LIMIT = 16
 
 
 class SpawnedAdbProcess(Protocol):
@@ -277,28 +273,6 @@ class AdbClient:
     def _app_label_lock(self, serial: str) -> asyncio.Lock:
         return self._app_label_locks.setdefault(serial, asyncio.Lock())
 
-    def _store_app_label_cache(self, serial: str, entry: _AppLabelCache) -> None:
-        """Record a serial's labels, dropping the least recently refreshed extras.
-
-        Only unlocked locks are released. ``Lock.acquire`` on a free lock never
-        yields, so a lock observed unlocked here has no in-flight acquirer that
-        could end up with a stale object once a replacement is created.
-        """
-
-        self._app_label_cache[serial] = entry
-        while len(self._app_label_cache) > _APP_LABEL_CACHE_LIMIT:
-            oldest = min(
-                (candidate for candidate in self._app_label_cache if candidate != serial),
-                key=lambda candidate: self._app_label_cache[candidate].refreshed_at,
-                default=None,
-            )
-            if oldest is None:
-                break
-            del self._app_label_cache[oldest]
-            lock = self._app_label_locks.get(oldest)
-            if lock is not None and not lock.locked():
-                del self._app_label_locks[oldest]
-
     async def _scrcpy_application_labels(self, serial: str) -> dict[str, str]:
         if self.scrcpy_artifact_loader is None:
             raise AdbCommandError("Android application-label resolver is unavailable")
@@ -403,13 +377,10 @@ class AdbClient:
                     )
                 ]
 
-            self._store_app_label_cache(
-                serial,
-                _AppLabelCache(
-                    labels={item["packageName"]: item["label"] for item in apps},
-                    refreshed_at=time.monotonic(),
-                    android_resolved=android_resolved,
-                ),
+            self._app_label_cache[serial] = _AppLabelCache(
+                labels={item["packageName"]: item["label"] for item in apps},
+                refreshed_at=time.monotonic(),
+                android_resolved=android_resolved,
             )
             return apps
 
