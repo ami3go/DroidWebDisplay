@@ -1183,6 +1183,12 @@ export class DroidWebDisplayController {
   }
 
   private beginAndroidCopyRequest(source: string): void {
+    // A new user-initiated copy makes the next Clipboard message that request's
+    // own response, never the autosync echo of the previous one. Without this
+    // reset, copying the same Android text twice inside the guard window has the
+    // second response swallowed as a duplicate and reported "not confirmed" --
+    // the exact symptom the deterministic-clipboard server patch removes.
+    this.#manualCopyDuplicate.reset();
     if (this.#copyShortcutTimer !== null) window.clearTimeout(this.#copyShortcutTimer);
     this.#copyShortcutPending = true;
     this.#copyShortcutTimer = window.setTimeout(() => {

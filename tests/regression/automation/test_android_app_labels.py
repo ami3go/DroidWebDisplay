@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from droid_web_display.adb.app_labels import parse_scrcpy_app_list
-from droid_web_display.adb.client import AdbClient, AdbCommandResult
+from droid_web_display.adb.client import _APP_LABEL_CACHE_LIMIT, AdbClient, AdbCommandResult
 from droid_web_display.scrcpy.artifact import ScrcpyArtifact
 
 SCRCPY_APP_LIST = (
@@ -91,6 +91,20 @@ class _PackageFallbackAdb(AdbClient):
         )
 
 
+class _AnyDeviceFallbackAdb(AdbClient):
+    """Package-only discovery that answers for whichever serial is queried."""
+
+    async def shell(
+        self,
+        serial: str,
+        *args: str,
+        check: bool = True,
+        timeout: float | None = None,
+    ) -> AdbCommandResult:
+        assert args[:3] == ("cmd", "package", "query-activities")
+        return AdbCommandResult(args, 0, f"com.example.{serial.lower()}/.Main\n", "")
+
+
 def test_scrcpy_app_list_parser_preserves_android_application_names() -> None:
     labels = parse_scrcpy_app_list(SCRCPY_APP_LIST)
 
@@ -129,3 +143,19 @@ async def test_installed_and_running_dropdowns_share_android_labels(tmp_path: Pa
     assert "list_apps=true" in adb.server_arguments[0][1]
     assert "cleanup=false" in adb.server_arguments[0][1]
     assert adb.pushes == [("PHONE", artifact.path, "/data/local/tmp/scrcpy-server.jar")]
+
+
+async def test_app_label_cache_does_not_grow_with_every_attached_device() -> None:
+    adb = _AnyDeviceFallbackAdb("adb")
+    serials = [f"DEVICE{index:03d}" for index in range(_APP_LABEL_CACHE_LIMIT + 8)]
+
+    for serial in serials:
+        await adb.list_launchable_apps(serial)
+
+    assert len(adb._app_label_cache) == _APP_LABEL_CACHE_LIMIT
+    assert len(adb._app_label_locks) == _APP_LABEL_CACHE_LIMIT
+    # The most recently refreshed devices are the ones worth keeping.
+    assert set(adb._app_label_cache) == set(serials[-_APP_LABEL_CACHE_LIMIT:])
+    # Evicting a serial must not lose its labels permanently; re-querying works.
+    revived = await adb.list_launchable_apps(serials[0])
+    assert revived == [{"label": "Device000", "packageName": "com.example.device000"}]
