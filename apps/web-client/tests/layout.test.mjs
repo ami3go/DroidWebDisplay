@@ -191,9 +191,9 @@ test("polling controllers stop cleanly and static asset versions advance", () =>
   assert.match(transferSource, /if \(this\.#closed\) return/);
   assert.match(autoDownloadSource, /public close\(\): void/);
   assert.match(mainSource, /transferController\.close\(\); autoDownloadController\.close\(\)/);
-  assert.match(html, /main\.js\?v=0\.11\.2-native7/);
-  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native7/);
-  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native7/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native8/);
+  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native8/);
+  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native8/);
   assert.doesNotMatch(drawerCssSource, /data-group="apps"/);
 });
 
@@ -256,6 +256,7 @@ test("compact header keeps Android controls while connection controls live direc
   const display = html.slice(displayStart, audioStart);
   assert.match(display, /id="device"/);
   assert.match(display, /id="connect"/);
+  assert.match(display, /id="auto-reconnect"/);
   assert.match(header, /class="topbar-brand"/);
   assert.match(header, /class="android-control-row"/);
   assert.match(css, /\.topbar \{ display: flex; align-items: center;/);
@@ -264,6 +265,8 @@ test("compact header keeps Android controls while connection controls live direc
   assert.equal(html.includes('id="refresh"'), false);
   assert.equal(html.includes('id="disconnect"'), false);
   assert.match(controllerSource, /connect\.textContent = connected \? "Disconnect" : "Connect"/);
+  assert.match(controllerSource, /scheduleUsbAutoConnect\(0\)/);
+  assert.match(controllerSource, /Waiting for USB device/);
 });
 
 test("single drawer ships final structure without legacy runtime migration", () => {

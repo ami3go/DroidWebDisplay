@@ -23,21 +23,25 @@ test("Display is the first drawer group and owns connection controls", () => {
   const display = html.slice(displayStart, audioStart);
   assert.ok(displayStart >= 0);
   assert.match(display, /class="help-card connect-card"/);
-  for (const id of ["device", "connect"]) {
+  for (const id of ["device", "connect", "auto-reconnect", "reconnect-attempts", "reconnect"]) {
     assert.match(display, new RegExp(`id="${id}"`));
   }
+  const audio = html.slice(audioStart, html.indexOf('data-slot="access"', audioStart));
+  assert.doesNotMatch(audio, /id="auto-reconnect"|id="reconnect-attempts"|id="reconnect"/);
   assert.doesNotMatch(drawerSource, /ensureDisplayConnectionUi|actions\.append\(connect\)|displaySlot\.insertBefore/);
   assert.doesNotMatch(html, /id=\"refresh\"/);
 });
 
-test("Display connection controls use one compact stateful action", () => {
+test("Display connection controls keep auto-reconnect beside the compact stateful action", () => {
   assert.doesNotMatch(drawerSource, /droidwebdisplay-connect-drawer\.css/);
   assert.match(drawerCss, /data-slot=\"display\"/);
   assert.doesNotMatch(drawerCss, /data-slot=\"connect\"/);
-  assert.match(drawerCss, /grid-template-columns: minmax\(0, 1fr\) !important/);
+  assert.match(drawerCss, /grid-template-columns: minmax\(0, 1fr\) auto !important/);
   assert.match(drawerCss, /grid-column: auto !important/);
   assert.match(drawerCss, /min-height: 2rem !important/);
   assert.match(drawerCss, /#device[\s\S]*height: 2rem/);
+  assert.match(drawerCss, /\.auto-reconnect-toggle \{[\s\S]*height: 2rem/);
+  assert.match(html, /id="connect"[\s\S]*class="auto-reconnect-toggle"[\s\S]*id="auto-reconnect"/);
 });
 
 test("readiness indicator stays in header and Connect rail item is absent", () => {

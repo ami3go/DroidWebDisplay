@@ -76,6 +76,7 @@ export declare class DroidWebDisplayController {
     private readDisplayValues;
     private updateDisplayUi;
     private updateConnectAvailability;
+    private selectedReadySerial;
     private refreshDevicesIfStale;
     private refreshVirtualCapabilities;
     private currentQuickAppPackages;
@@ -125,6 +126,13 @@ export declare class DroidWebDisplayController {
     private stopClipboardPolling;
     private pollPcClipboard;
     private synchronizePcClipboard;
+    private handleConnectButton;
+    private connectByUser;
+    private handleAutoReconnectChange;
+    private autoConnectDecision;
+    private scheduleUsbAutoConnect;
+    private runUsbAutoConnectCycle;
+    private recordAutoConnectFailure;
     private scheduleReconnect;
     private cancelReconnect;
     private reconnectNow;

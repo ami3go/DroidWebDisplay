@@ -46,6 +46,11 @@ def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled
     assert "Audio experimental" not in html
     assert "Experimental:" not in html
     assert "Browser audio may have interruptions or delay" in html
+    display = html[html.index('data-slot="display"'):html.index('data-slot="audio"')]
+    audio = html[html.index('data-slot="audio"'):html.index('data-slot="access"')]
+    assert display.index('id="connect"') < display.index('id="auto-reconnect"')
+    assert 'id="auto-reconnect"' not in audio
+    assert "Auto-reconnect" in display
     assert 'id="auto-upload-enabled"' in html
     assert 'id="auto-upload-duplicate"' in html
     assert 'id="auto-upload-existing"' in html
