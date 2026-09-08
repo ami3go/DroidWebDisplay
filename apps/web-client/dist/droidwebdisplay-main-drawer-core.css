@@ -541,8 +541,9 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
   width: 100%;
   min-width: 0;
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
   gap: .3rem !important;
+  align-items: stretch;
 }
 
 #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button,
@@ -562,6 +563,73 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
   text-overflow: ellipsis;
 }
 
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .auto-reconnect-toggle {
+  min-width: 0;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .34rem;
+  margin: 0;
+  padding: .22rem .5rem;
+  border: 1px solid var(--dwd-border-strong);
+  border-radius: 7px;
+  background: var(--dwd-panel-2);
+  color: #d8e5f2;
+  font-size: .64rem;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .auto-reconnect-toggle:focus-within {
+  border-color: var(--dwd-cyan);
+  box-shadow: var(--gb-focus-ring);
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .auto-reconnect-toggle input {
+  width: .86rem !important;
+  height: .86rem;
+  margin: 0;
+  accent-color: var(--dwd-cyan);
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .auto-reconnect-toggle:has(input:disabled) {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .3rem;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options > label {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 3.2rem;
+  align-items: center;
+  gap: .35rem;
+  color: #9fb0c2;
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options select,
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options button {
+  min-height: 1.8rem;
+  height: 1.8rem;
+  padding-block: .18rem !important;
+  font-size: .62rem !important;
+}
+
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options button {
+  padding-inline: .48rem !important;
+  white-space: nowrap;
+}
+
 
 @media (max-width: 380px) {
   :root { --gb-drawer-w: calc(100vw - var(--gb-rail-w)); }
@@ -577,5 +645,11 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
   #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .connect-actions > button {
     padding-inline: .16rem !important;
     font-size: .6rem !important;
+  }
+
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .auto-reconnect-toggle {
+    gap: .22rem;
+    padding-inline: .32rem;
+    font-size: .59rem;
   }
 }
