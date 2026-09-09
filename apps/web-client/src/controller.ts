@@ -74,7 +74,6 @@ interface Elements {
   readonly audioStatus: HTMLElement;
   readonly autoReconnect: HTMLInputElement;
   readonly reconnectAttempts: HTMLSelectElement;
-  readonly reconnect: HTMLButtonElement;
   readonly sessionChannels: HTMLElement;
   readonly clipboardAutoSync: HTMLInputElement;
   readonly clipboardMaxKib: HTMLInputElement;
@@ -371,7 +370,6 @@ export class DroidWebDisplayController {
         this.scheduleUsbAutoConnect(0);
       }
     });
-    this.elements.reconnect.addEventListener("click", () => void this.runUiAction(() => this.reconnectNow()));
     this.elements.clipboardAutoSync.addEventListener("change", () => void this.runUiAction(async () => {
       this.saveBrowserSettings();
       this.updateClipboardUi();
@@ -524,14 +522,12 @@ export class DroidWebDisplayController {
   private updateConnectAvailability(): void {
     if (this.#serverSession) {
       this.elements.connect.disabled = false;
-      this.elements.reconnect.disabled = true;
       return;
     }
     const hasDevice = this.selectedReadySerial() !== null;
     const errors = validateDisplayForm(this.readDisplayValues());
     const unsupported = this.elements.displayMode.value === "virtual" && this.#capabilities?.virtualDisplaySupported === false;
     this.elements.connect.disabled = this.#connecting || !hasDevice || errors.length > 0 || unsupported;
-    this.elements.reconnect.disabled = this.#connecting || !hasDevice;
   }
 
   private selectedReadySerial(): string | null {
@@ -1177,7 +1173,6 @@ export class DroidWebDisplayController {
     this.elements.audioMute.disabled = !connected || !this.elements.audioEnabled.checked;
     this.elements.audioVolume.disabled = !connected || !this.elements.audioEnabled.checked;
     this.elements.audioEnabled.disabled = connected;
-    this.elements.reconnect.disabled = connected || this.#connecting || this.selectedReadySerial() === null;
     this.elements.displayMode.disabled = connected;
     this.elements.displayProfile.disabled = connected;
     for (const input of this.displayInputs()) input.disabled = connected;
@@ -1189,7 +1184,6 @@ export class DroidWebDisplayController {
     this.elements.autoReconnect.disabled = busy;
     if (busy) {
       this.elements.connect.disabled = true;
-      this.elements.reconnect.disabled = true;
       return;
     }
     this.updateConnectAvailability();
@@ -1401,7 +1395,7 @@ export class DroidWebDisplayController {
       await this.disconnect();
       return;
     }
-    await this.connectByUser();
+    await this.reconnectNow();
   }
 
   private async connectByUser(): Promise<void> {
@@ -1429,12 +1423,12 @@ export class DroidWebDisplayController {
     this.#reconnectSerial = null;
     this.#autoConnectBlockedSerial = null;
     if (!this.elements.autoReconnect.checked) {
-      if (!this.#serverSession) this.setStatus("Manual connection", "Auto-reconnect is off. Select a ready Android device and press Connect.");
+      if (!this.#serverSession) this.setStatus("Manual connection", "Reconnect is off. Select a ready Android device and press Connect.");
       return;
     }
     this.#manualDisconnectSerial = null;
     if (!this.#serverSession) {
-      this.setStatus("Auto-reconnect enabled", "A ready selected USB device will connect automatically.");
+      this.setStatus("Reconnect enabled", "A ready selected USB device will connect automatically.");
       this.scheduleUsbAutoConnect(0);
     }
   }
@@ -1469,7 +1463,7 @@ export class DroidWebDisplayController {
       await this.refreshDevices();
       let decision = this.autoConnectDecision();
       if (decision === "waiting-for-device") {
-        this.setStatus("Waiting for USB device", "Auto-reconnect is on. A selected authorized Android device will connect when it becomes available.");
+        this.setStatus("Waiting for USB device", "Reconnect is on. A selected authorized Android device will connect when it becomes available.");
         this.scheduleUsbAutoConnect();
         return;
       }
@@ -1491,7 +1485,7 @@ export class DroidWebDisplayController {
       if (!this.elements.autoReconnect.checked || this.#closing) return;
       serial ??= this.selectedReadySerial();
       if (!serial) {
-        this.setStatus("Waiting for USB device", `Unable to refresh Android devices: ${errorMessage(error)}. Auto-reconnect will keep checking.`);
+        this.setStatus("Waiting for USB device", `Unable to refresh Android devices: ${errorMessage(error)}. Reconnect will keep checking.`);
         this.scheduleUsbAutoConnect();
         return;
       }
@@ -1515,7 +1509,7 @@ export class DroidWebDisplayController {
     if (this.#reconnectCount >= maximum) {
       this.#autoConnectBlockedSerial = this.#reconnectSerial ?? this.selectedReadySerial();
       const suffix = lastError ? ` Last error: ${lastError}` : "";
-      this.setStatus("Auto-reconnect paused", `Unable to connect after ${maximum} attempts.${suffix} Press Connect to retry now, or unplug and reconnect USB.`);
+      this.setStatus("Reconnect paused", `Unable to connect after ${maximum} attempts.${suffix} Press Connect to retry now, or unplug and reconnect USB.`);
       this.scheduleUsbAutoConnect();
       return;
     }

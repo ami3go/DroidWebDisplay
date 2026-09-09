@@ -541,7 +541,7 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
   width: 100%;
   min-width: 0;
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
   gap: .3rem !important;
   align-items: stretch;
 }
@@ -599,35 +599,27 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
   cursor: not-allowed;
 }
 
-#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: .3rem;
-}
-
-#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options > label {
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-attempts-control {
   min-width: 0;
-  display: grid;
-  grid-template-columns: auto 3.2rem;
+  height: 2rem;
+  display: inline-flex;
   align-items: center;
-  gap: .35rem;
+  gap: .3rem;
+  margin: 0;
   color: #9fb0c2;
   font-size: .64rem;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options select,
-#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options button {
-  min-height: 1.8rem;
-  height: 1.8rem;
+#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-attempts-control select {
+  width: 3rem;
+  min-width: 3rem;
+  min-height: 2rem;
+  height: 2rem;
   padding-block: .18rem !important;
   font-size: .62rem !important;
-}
-
-#gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-options button {
-  padding-inline: .48rem !important;
-  white-space: nowrap;
 }
 
 
@@ -651,5 +643,15 @@ html.gb-focus-only-layout [data-gb-removed-layout-mode="true"] { display: none !
     gap: .22rem;
     padding-inline: .32rem;
     font-size: .59rem;
+  }
+
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-attempts-control {
+    gap: .18rem;
+    font-size: .59rem;
+  }
+
+  #gb-single-drawer-root .gb-drawer-slot[data-slot="display"] .reconnect-attempts-control select {
+    width: 2.8rem;
+    min-width: 2.8rem;
   }
 }

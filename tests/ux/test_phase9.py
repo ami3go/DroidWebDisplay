@@ -30,7 +30,7 @@ def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled
     css = (ROOT / "apps/web-client/dist/styles.css").read_text(encoding="utf-8")
     for element_id in (
         'id="audio-enabled"', 'id="audio-mute"', 'id="audio-volume"',
-        'id="auto-reconnect"', 'id="reconnect"',
+        'id="auto-reconnect"', 'id="reconnect-attempts"',
         'id="clipboard-auto-sync"', 'id="clipboard-max-kib"',
         'id="clipboard-copy-android"', 'id="settings-export"', 'id="settings-import"',
         'id="gb-single-drawer-root"',
@@ -49,8 +49,12 @@ def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled
     display = html[html.index('data-slot="display"'):html.index('data-slot="audio"')]
     audio = html[html.index('data-slot="audio"'):html.index('data-slot="access"')]
     assert display.index('id="connect"') < display.index('id="auto-reconnect"')
+    assert display.index('id="auto-reconnect"') < display.index('id="reconnect-attempts"')
     assert 'id="auto-reconnect"' not in audio
-    assert "Auto-reconnect" in display
+    assert ">Reconnect<" in display
+    assert ">Retries<" in display
+    assert 'id="reconnect"' not in display
+    assert "Reconnect now" not in display
     assert 'id="auto-upload-enabled"' in html
     assert 'id="auto-upload-duplicate"' in html
     assert 'id="auto-upload-existing"' in html

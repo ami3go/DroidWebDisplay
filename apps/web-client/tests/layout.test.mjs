@@ -89,7 +89,8 @@ test("file controls use the accepted production labels", () => {
 });
 
 test("audio reconnect clipboard and settings controls are present without layout modes", () => {
-  for (const id of ["audio-enabled", "audio-mute", "audio-volume", "auto-reconnect", "reconnect", "clipboard-auto-sync", "clipboard-max-kib", "clipboard-copy-android", "settings-export", "settings-import"]) assert.match(html, new RegExp(`id=\"${id}\"`));
+  for (const id of ["audio-enabled", "audio-mute", "audio-volume", "auto-reconnect", "reconnect-attempts", "clipboard-auto-sync", "clipboard-max-kib", "clipboard-copy-android", "settings-export", "settings-import"]) assert.match(html, new RegExp(`id=\"${id}\"`));
+  assert.doesNotMatch(html, /id="reconnect"/);
   assert.equal(html.includes('id="workspace-layout"'), false);
   assert.equal(controllerSource.includes("workspaceLayout"), false);
   assert.match(css, /:focus-visible/);
@@ -191,9 +192,9 @@ test("polling controllers stop cleanly and static asset versions advance", () =>
   assert.match(transferSource, /if \(this\.#closed\) return/);
   assert.match(autoDownloadSource, /public close\(\): void/);
   assert.match(mainSource, /transferController\.close\(\); autoDownloadController\.close\(\)/);
-  assert.match(html, /main\.js\?v=0\.11\.2-native8/);
-  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native8/);
-  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native8/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native9/);
+  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native9/);
+  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native9/);
   assert.doesNotMatch(drawerCssSource, /data-group="apps"/);
 });
 

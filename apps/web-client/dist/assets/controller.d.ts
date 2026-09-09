@@ -23,7 +23,6 @@ interface Elements {
     readonly audioStatus: HTMLElement;
     readonly autoReconnect: HTMLInputElement;
     readonly reconnectAttempts: HTMLSelectElement;
-    readonly reconnect: HTMLButtonElement;
     readonly sessionChannels: HTMLElement;
     readonly clipboardAutoSync: HTMLInputElement;
     readonly clipboardMaxKib: HTMLInputElement;

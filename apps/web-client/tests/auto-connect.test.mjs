@@ -43,3 +43,9 @@ test("controller watches USB only when enabled and preserves deliberate Disconne
   assert.match(controllerSource, /this\.cancelReconnect\(\)/);
   assert.match(controllerSource, /USB_AUTO_CONNECT_POLL_MS = 2000/);
 });
+
+test("primary Connect button refreshes device state and performs manual retry", () => {
+  assert.match(controllerSource, /private async handleConnectButton\(\): Promise<void> \{[\s\S]*await this\.reconnectNow\(\);[\s\S]*\}/);
+  assert.match(controllerSource, /private async reconnectNow\(\): Promise<void> \{[\s\S]*await this\.refreshDevices\(\);[\s\S]*await this\.refreshVirtualCapabilities\(\);[\s\S]*await this\.connectByUser\(\);/);
+  assert.doesNotMatch(controllerSource, /elements\.reconnect\b/);
+});

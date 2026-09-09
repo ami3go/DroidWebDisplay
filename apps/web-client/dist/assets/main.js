@@ -302,7 +302,6 @@ async function bootstrap() {
             audioStatus,
             autoReconnect: required("#auto-reconnect"),
             reconnectAttempts: required("#reconnect-attempts"),
-            reconnect: required("#reconnect"),
             sessionChannels: required("#session-channels"),
             clipboardAutoSync: required("#clipboard-auto-sync"),
             clipboardMaxKib: required("#clipboard-max-kib"),

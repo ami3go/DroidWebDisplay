@@ -300,7 +300,6 @@ async function bootstrap(): Promise<void> {
       audioStatus,
       autoReconnect: required<HTMLInputElement>("#auto-reconnect"),
       reconnectAttempts: required<HTMLSelectElement>("#reconnect-attempts"),
-      reconnect: required<HTMLButtonElement>("#reconnect"),
       sessionChannels: required<HTMLElement>("#session-channels"),
       clipboardAutoSync: required<HTMLInputElement>("#clipboard-auto-sync"),
       clipboardMaxKib: required<HTMLInputElement>("#clipboard-max-kib"),

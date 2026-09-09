@@ -21,7 +21,7 @@ Clipboard text is not written to diagnostics.
 
 ## Reconnect
 
-When **Auto-reconnect** is checked, the browser watches for the selected authorized USB device, connects it when it becomes available, and retries unexpected session failures with bounded attempts and increasing delays. Unchecking it leaves connection startup entirely manual. A deliberate **Disconnect** pauses automatic connection for that phone until the user presses **Connect** or unplugs and reconnects USB.
+When **Reconnect** is checked, the browser watches for the selected authorized USB device, connects it when it becomes available, and retries unexpected session failures with bounded attempts and increasing delays. Unchecking it leaves connection startup entirely manual. A deliberate **Disconnect** pauses automatic connection for that phone until the user presses **Connect** or unplugs and reconnects USB. The retry limit is selected on the same row, and the primary **Connect** button also performs an immediate manual retry after refreshing the device and capability state.
 
 ## Layout and accessibility
 
