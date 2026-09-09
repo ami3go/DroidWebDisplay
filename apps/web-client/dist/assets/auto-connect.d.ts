@@ -7,6 +7,13 @@ export interface AutoConnectState {
     readonly manualDisconnectSerial: string | null;
     readonly blockedSerial: string | null;
 }
+export type ReconnectAttemptSelection = "10" | "100" | "infinite";
+/** Normalize current and legacy browser settings to a supported retry choice. */
+export declare function normalizeReconnectAttemptSelection(value: unknown): ReconnectAttemptSelection;
+/** Return null for an unlimited retry budget. */
+export declare function reconnectAttemptLimit(value: unknown): number | null;
+/** Progressive retry backoff, capped at one minute for responsive recovery. */
+export declare function reconnectDelayMilliseconds(failureCount: number): number;
 /**
  * Keep the USB auto-connect policy independent from browser and transport APIs.
  * A deliberate Disconnect must remain useful even while auto-reconnect is on,

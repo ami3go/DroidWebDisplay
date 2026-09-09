@@ -8,10 +8,9 @@ import { MAX_QUICK_APP_BUTTONS, moveQuickApp, nextQuickAppPackage, normalizeQuic
 import { WebCodecsVideoRenderer } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer } from "./audio-player.js";
-import { decideAutoConnect } from "./auto-connect.js";
+import { decideAutoConnect, normalizeReconnectAttemptSelection, reconnectAttemptLimit, reconnectDelayMilliseconds, } from "./auto-connect.js";
 const DEVICE_DROPDOWN_REFRESH_STALE_MS = 1500;
 const USB_AUTO_CONNECT_POLL_MS = 2000;
-const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 15000];
 // textInjectionMessages chunks at 300 UTF-8 bytes and sendMessages awaits every
 // chunk, so injection cost grows linearly with the text: ~875 sequential round
 // trips at the 256 KiB clipboard limit. Above this size the clipboard is still
@@ -1440,17 +1439,17 @@ export class DroidWebDisplayController {
         this.cancelReconnect();
         if (!this.elements.autoReconnect.checked)
             return;
-        const maximum = Number(this.elements.reconnectAttempts.value) || 5;
-        if (this.#reconnectCount >= maximum) {
+        const maximum = reconnectAttemptLimit(this.elements.reconnectAttempts.value);
+        if (maximum !== null && this.#reconnectCount >= maximum) {
             this.#autoConnectBlockedSerial = this.#reconnectSerial ?? this.selectedReadySerial();
             const suffix = lastError ? ` Last error: ${lastError}` : "";
             this.setStatus("Reconnect paused", `Unable to connect after ${maximum} attempts.${suffix} Press Connect to retry now, or unplug and reconnect USB.`);
             this.scheduleUsbAutoConnect();
             return;
         }
-        const delay = RECONNECT_DELAYS_MS[Math.min(this.#reconnectCount, RECONNECT_DELAYS_MS.length - 1)];
+        const delay = reconnectDelayMilliseconds(this.#reconnectCount);
         const suffix = lastError ? ` Last error: ${lastError}` : "";
-        this.setStatus("Reconnect scheduled", `Attempt ${this.#reconnectCount + 1} of ${maximum} in ${delay / 1000} seconds.${suffix}`);
+        this.setStatus("Reconnect scheduled", `Attempt ${this.#reconnectCount + 1} of ${maximum ?? "∞"} in ${delay / 1000} seconds.${suffix}`);
         this.scheduleUsbAutoConnect(delay);
     }
     cancelReconnect() {
@@ -1472,7 +1471,7 @@ export class DroidWebDisplayController {
             display: this.readDisplayValues(),
             audio: { enabled: this.elements.audioEnabled.checked, muted: this.elements.audioMute.textContent === "Unmute", volume: Number(this.elements.audioVolume.value) },
             clipboard: { automatic: this.elements.clipboardAutoSync.checked, maximumKiB: Number(this.elements.clipboardMaxKib.value) },
-            reconnect: { enabled: this.elements.autoReconnect.checked, attempts: Number(this.elements.reconnectAttempts.value) },
+            reconnect: { enabled: this.elements.autoReconnect.checked, attempts: normalizeReconnectAttemptSelection(this.elements.reconnectAttempts.value) },
             quickApps: { byDevice: this.#quickAppsByDevice },
         };
     }
@@ -1523,7 +1522,7 @@ export class DroidWebDisplayController {
         this.elements.clipboardAutoSync.checked = clipboard?.automatic === true;
         this.elements.clipboardMaxKib.value = String(Math.max(1, Math.min(256, Number(clipboard?.maximumKiB ?? 256))));
         this.elements.autoReconnect.checked = reconnect?.enabled !== false;
-        this.elements.reconnectAttempts.value = String([3, 5, 10].includes(Number(reconnect?.attempts)) ? Number(reconnect?.attempts) : 5);
+        this.elements.reconnectAttempts.value = normalizeReconnectAttemptSelection(reconnect?.attempts);
         this.#quickAppsByDevice = normalizeQuickAppsByDevice(quickApps?.byDevice);
         this.renderQuickApps();
     }

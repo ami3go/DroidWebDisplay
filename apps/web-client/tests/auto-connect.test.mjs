@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { decideAutoConnect } from "../dist/assets/auto-connect.js";
+import {
+  decideAutoConnect,
+  normalizeReconnectAttemptSelection,
+  reconnectAttemptLimit,
+  reconnectDelayMilliseconds,
+} from "../dist/assets/auto-connect.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const controllerSource = await readFile(resolve(root, "src/controller.ts"), "utf8");
@@ -33,6 +38,24 @@ test("manual Disconnect pauses the same phone but allows a newly selected phone"
 test("retry exhaustion pauses a failing phone until it disappears or is manually retried", () => {
   assert.equal(decideAutoConnect({ ...ready, blockedSerial: "phone-1" }), "paused-after-failures");
   assert.equal(decideAutoConnect({ ...ready, blockedSerial: "phone-2" }), "connect");
+});
+
+test("retry choices support 10, 100 and unlimited with legacy migration", () => {
+  assert.equal(normalizeReconnectAttemptSelection(10), "10");
+  assert.equal(normalizeReconnectAttemptSelection("100"), "100");
+  assert.equal(normalizeReconnectAttemptSelection("infinite"), "infinite");
+  assert.equal(normalizeReconnectAttemptSelection("∞"), "infinite");
+  assert.equal(normalizeReconnectAttemptSelection(5), "10");
+  assert.equal(reconnectAttemptLimit("10"), 10);
+  assert.equal(reconnectAttemptLimit("100"), 100);
+  assert.equal(reconnectAttemptLimit("infinite"), null);
+});
+
+test("retry timeout grows progressively and caps at one minute", () => {
+  assert.deepEqual(
+    [0, 1, 2, 3, 4, 5, 99].map(reconnectDelayMilliseconds),
+    [1_000, 2_000, 5_000, 10_000, 30_000, 60_000, 60_000],
+  );
 });
 
 test("controller watches USB only when enabled and preserves deliberate Disconnect", () => {

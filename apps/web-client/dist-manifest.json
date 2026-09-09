@@ -50,18 +50,18 @@
     },
     {
       "path": "assets/auto-connect.d.ts",
-      "bytes": 766,
-      "sha256": "383167b0f027796f53e0163a4204f8cc7481928121d41677a0cde1409366ffdd"
+      "bytes": 1308,
+      "sha256": "1459b5b3355e57d0ee4f23231f8a56a657b2b75a8096b1d1a0ed153fc7120231"
     },
     {
       "path": "assets/auto-connect.js",
-      "bytes": 761,
-      "sha256": "072568c44f469813d180d686b1d8b7668710b0288d71ca11e34fc1b964b283e6"
+      "bytes": 1751,
+      "sha256": "fe290036a1bb8adc812acb3f908dafcbc749ac225ec1ce5ce2629026b4c90b23"
     },
     {
       "path": "assets/auto-connect.js.map",
-      "bytes": 511,
-      "sha256": "0aea975d98a2c71ced1df6a3ffa175fd1a78c5dd112dcb40823f4a1b94b3ca69"
+      "bytes": 1376,
+      "sha256": "6ef81941d4408bffb236541e5b86ed703fcaa22ec51169ad61e2e40085107483"
     },
     {
       "path": "assets/auto-download-controller.d.ts",
@@ -130,13 +130,13 @@
     },
     {
       "path": "assets/controller.js",
-      "bytes": 79741,
-      "sha256": "560a188001266f225030d8bf2b10d556c5e2fd59cd691955bf59f2689f9998f1"
+      "bytes": 79764,
+      "sha256": "faab722b646bb0c7e1b19f468fed7386584e66b6555cd73de9d09998a6248581"
     },
     {
       "path": "assets/controller.js.map",
-      "bytes": 70180,
-      "sha256": "c1295f8d7d27f4724c696a454635b4dbf3aa6744d41879c95450cd7623836785"
+      "bytes": 69970,
+      "sha256": "cdf1b793605ffcd6b41c5965dbf0f94c36417a059fc9b78a9bb630520f4d4385"
     },
     {
       "path": "assets/display-config.d.ts",
@@ -295,8 +295,8 @@
     },
     {
       "path": "droidwebdisplay-main-drawer.css",
-      "bytes": 5917,
-      "sha256": "f248dc651fb64be8a821535cb38440922e38cc1e9235b89121efd1347493f0ef"
+      "bytes": 5918,
+      "sha256": "db0376449e17a7d87169902e8cf3268a0a03bffce1bff99eff58fc88444639b4"
     },
     {
       "path": "droidwebdisplay-main-drawer.js",
@@ -310,8 +310,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 36187,
-      "sha256": "fd4bf9ae3b89bf4934066644ae79a0e3edc11946a2f67953cec95a0ec0828438"
+      "bytes": 36203,
+      "sha256": "c9d50b7fa9213db697a1d10533d2d67e60285a2c82706f14e1f99b3c2cd6c720"
     },
     {
       "path": "styles.css",

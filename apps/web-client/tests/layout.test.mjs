@@ -192,9 +192,9 @@ test("polling controllers stop cleanly and static asset versions advance", () =>
   assert.match(transferSource, /if \(this\.#closed\) return/);
   assert.match(autoDownloadSource, /public close\(\): void/);
   assert.match(mainSource, /transferController\.close\(\); autoDownloadController\.close\(\)/);
-  assert.match(html, /main\.js\?v=0\.11\.2-native9/);
-  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native9/);
-  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native9/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native10/);
+  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native10/);
+  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native10/);
   assert.doesNotMatch(drawerCssSource, /data-group="apps"/);
 });
 

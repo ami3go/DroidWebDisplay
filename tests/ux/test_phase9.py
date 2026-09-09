@@ -53,6 +53,9 @@ def test_phase9_native_layout_audio_clipboard_and_reconnect_controls_are_bundled
     assert 'id="auto-reconnect"' not in audio
     assert ">Reconnect<" in display
     assert ">Retries<" in display
+    assert '<option value="10" selected>10</option>' in display
+    assert '<option value="100">100</option>' in display
+    assert '<option value="infinite">∞</option>' in display
     assert 'id="reconnect"' not in display
     assert "Reconnect now" not in display
     assert 'id="auto-upload-enabled"' in html

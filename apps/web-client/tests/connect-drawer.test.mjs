@@ -44,6 +44,7 @@ test("Display connection controls keep Reconnect and its retry count beside the 
   assert.match(drawerCss, /\.auto-reconnect-toggle \{[\s\S]*height: 2rem/);
   assert.match(drawerCss, /\.reconnect-attempts-control \{[\s\S]*height: 2rem/);
   assert.match(html, /id="connect"[\s\S]*class="auto-reconnect-toggle"[\s\S]*id="auto-reconnect"[\s\S]*>Reconnect<[\s\S]*class="reconnect-attempts-control"[\s\S]*>Retries<[\s\S]*id="reconnect-attempts"/);
+  assert.match(html, /id="reconnect-attempts"[\s\S]*value="10" selected>10<[\s\S]*value="100">100<[\s\S]*value="infinite">∞</);
   assert.doesNotMatch(html, /Reconnect now|id="reconnect"/);
   assert.doesNotMatch(html, /class="reconnect-options"/);
 });
