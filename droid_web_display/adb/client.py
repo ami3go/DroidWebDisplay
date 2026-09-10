@@ -4,6 +4,7 @@ import asyncio
 import os
 import re
 import secrets
+import shlex
 import shutil
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -17,8 +18,10 @@ from droid_web_display.process_utils import subprocess_creation_kwargs
 
 from .app_labels import fallback_app_label, parse_scrcpy_app_list
 from .devices import parse_adb_devices
+from .media_store import AndroidMediaFile, parse_media_store_images
 from .running_apps import RunningGuiApp, parse_running_gui_apps, validate_component_name
 from .storage_metrics import collect_storage_metadata
+from .storage_volumes import storage_roots_from_mount_dump
 
 if TYPE_CHECKING:
     from droid_web_display.scrcpy.artifact import ScrcpyArtifact
@@ -251,7 +254,26 @@ class AdbClient:
     async def shell(self, serial: str, *args: str, check: bool = True, timeout: float | None = None) -> AdbCommandResult:
         return await self.run("-s", serial, "shell", *args, check=check, timeout=timeout)
 
+    async def storage_roots(self, serial: str) -> list[dict[str, str]]:
+        """Return shared-storage roots classified by Android's volume service."""
+
+        result = await self.shell(serial, "dumpsys", "mount", check=False, timeout=20.0)
+        if result.returncode != 0:
+            return []
+        return storage_roots_from_mount_dump(result.stdout)
+
     async def external_storage_roots(self, serial: str) -> list[dict[str, str]]:
+        classified = [
+            root for root in await self.storage_roots(serial) if root["label"].startswith("SD card")
+        ]
+        if classified:
+            # An adopted SD card can expose several standard folders through
+            # /sdcard. One representative is enough for capacity telemetry.
+            if classified[0]["path"].startswith("/sdcard/"):
+                return [{"id": "sd-card-primary", "label": "SD card", "path": "/sdcard"}]
+            return classified[:1]
+
+        # Compatibility fallback for Android builds which restrict dumpsys.
         result = await self.shell(serial, "ls", "-1", "/storage", check=False, timeout=20.0)
         if result.returncode != 0:
             return []
@@ -265,6 +287,41 @@ class AdbClient:
             if check.returncode == 0:
                 roots.append({"id": f"sd-card-{volume.lower()}", "label": f"SD card · {volume}", "path": path})
         return roots
+
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50) -> list[AndroidMediaFile]:
+        """Return recent Android image metadata without reading image contents."""
+
+        if not 1 <= limit <= 50:
+            raise ValueError("recent picture limit must be in range 1..50")
+        # Overscan because TransferManager applies the stricter Explorer path
+        # policy after this query. The MediaStore URI limit keeps phones with a
+        # large photo library from returning unbounded command output.
+        query_limit = min(200, limit * 4)
+        uri = f"content://media/external/images/media?limit={query_limit}"
+        result = await self.shell(
+            serial,
+            "content",
+            "query",
+            "--uri",
+            uri,
+            "--projection",
+            "_data:_size:date_modified",
+            "--sort",
+            "date_modified DESC",
+            check=False,
+            timeout=30.0,
+        )
+        if result.returncode != 0 or "Error while accessing provider" in result.stdout:
+            raise AdbCommandError(
+                "unable to read recent Android pictures",
+                details={
+                    "serial": serial,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout[-2000:],
+                    "stderr": result.stderr[-2000:],
+                },
+            )
+        return parse_media_store_images(result.stdout, limit=query_limit)
 
     async def package_installed(self, serial: str, package_name: str) -> bool:
         result = await self.shell(serial, "pm", "path", package_name, check=False, timeout=20.0)
@@ -501,20 +558,39 @@ class AdbClient:
         await self.run("-s", serial, "shell", "mkdir", "-p", remote_directory, timeout=30.0)
 
     async def media_scan(self, serial: str, remote_path: str) -> None:
-        await self.run(
-            "-s", serial, "shell", "am", "broadcast",
-            "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
-            "-d", f"file://{remote_path}", check=False, timeout=30.0,
+        # ``adb shell`` joins every argument after ``shell`` into one remote
+        # command without escaping it. Build and quote that command explicitly
+        # so spaces or shell metacharacters in a legitimate Android filename
+        # cannot split the URI or execute another command.
+        command = shlex.join(
+            (
+                "am",
+                "broadcast",
+                "-a",
+                "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                "-d",
+                f"file://{remote_path}",
+            )
         )
+        await self.run("-s", serial, "shell", command, check=False, timeout=30.0)
 
-    async def remove_file(self, serial: str, remote_path: str) -> None:
-        # Arguments are passed directly to adb; no shell command string is built.
-        result = await self.run("-s", serial, "shell", "rm", "-f", remote_path, check=False, timeout=30.0)
+    async def remove_path(self, serial: str, remote_path: str, *, recursive: bool = False) -> None:
+        # ADB joins arguments after ``shell`` with spaces and does not escape
+        # them. Quote the complete remote command ourselves so names containing
+        # spaces, quotes, or shell metacharacters are deleted as one exact path.
+        # ``--`` also prevents a legitimate filename beginning with '-' from
+        # being interpreted as another rm option.
+        option = "-rf" if recursive else "-f"
+        command = shlex.join(("rm", option, "--", remote_path))
+        result = await self.run("-s", serial, "shell", command, check=False, timeout=30.0)
         if result.returncode != 0:
             raise AdbCommandError(
-                "unable to delete Android file",
+                "unable to delete Android path",
                 details={"serial": serial, "path": remote_path, "stderr": result.stderr.strip()},
             )
+
+    async def remove_file(self, serial: str, remote_path: str) -> None:
+        await self.remove_path(serial, remote_path)
 
     async def create_forward(self, serial: str, local_port: int, socket_name: str) -> None:
         await self.run(

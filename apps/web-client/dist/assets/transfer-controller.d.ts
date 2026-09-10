@@ -1,10 +1,15 @@
-import type { AndroidStorageEntryDto } from "./types.js";
+import type { AndroidStorageEntryDto, TransferDto } from "./types.js";
 interface TransferElements {
     readonly device: HTMLSelectElement;
     readonly contextUploadFile: HTMLInputElement;
     readonly customDestinationRow: HTMLElement;
     readonly customDestinationPath: HTMLInputElement;
     readonly duplicatePolicy: HTMLSelectElement;
+    readonly fileBrowserTab: HTMLButtonElement;
+    readonly recentPicturesTab: HTMLButtonElement;
+    readonly fileBrowserControls: HTMLElement;
+    readonly recentPicturesControls: HTMLElement;
+    readonly recentPicturesRefresh: HTMLButtonElement;
     readonly storageRoot: HTMLSelectElement;
     readonly storagePath: HTMLInputElement;
     readonly storageBreadcrumbs: HTMLElement;
@@ -12,10 +17,13 @@ interface TransferElements {
     readonly storageRefresh: HTMLButtonElement;
     readonly storageSelectAll: HTMLInputElement;
     readonly storageBody: HTMLElement;
+    readonly explorerFrame: HTMLElement;
+    readonly explorerHelp: HTMLElement;
     readonly contextMenu: HTMLElement;
     readonly contextOpen: HTMLButtonElement;
     readonly contextDownload: HTMLButtonElement;
     readonly contextUpload: HTMLButtonElement;
+    readonly contextDelete: HTMLButtonElement;
     readonly contextRefresh: HTMLButtonElement;
     readonly destinationProfile: HTMLSelectElement;
     readonly downloadSelected: HTMLButtonElement;
@@ -27,6 +35,18 @@ interface TransferElements {
 }
 type StorageSortKey = "name" | "size" | "modified";
 type SortDirection = "ascending" | "descending";
+/** Tracks uploads until Android has verified them, then refreshes affected Explorer views. */
+export declare class UploadExplorerRefreshTracker {
+    #private;
+    track(record: TransferDto): void;
+    consumeCompleted(transfers: readonly TransferDto[], currentSerial: string, currentPath: string): boolean;
+}
+/** Hides MediaStore rows until Android has removed their stale index entries. */
+export declare class DeletedAndroidPathTracker {
+    #private;
+    track(path: string, isDirectory: boolean): void;
+    filter(entries: readonly AndroidStorageEntryDto[]): readonly AndroidStorageEntryDto[];
+}
 export declare class TransferController {
     #private;
     private readonly elements;
@@ -34,9 +54,14 @@ export declare class TransferController {
     initialize(): Promise<void>;
     close(): void;
     private bindEvents;
+    private activeSort;
+    private switchExplorerView;
+    private updateExplorerViewUi;
+    private refreshActiveView;
     private refreshStorageRoots;
     private refreshExplorerIfStale;
     private browse;
+    private loadRecentPictures;
     private renderBreadcrumbs;
     private renderStorage;
     private entryForRow;
@@ -72,6 +97,7 @@ export declare class TransferController {
     private updateDestinationUi;
     private downloadDestination;
     private download;
+    private enqueueDownload;
     private downloadSelected;
     private filesDrawerVisible;
     private transferRefreshDelay;

@@ -10,6 +10,7 @@ const files = [
   resolve(root, "tests/api.test.mjs"),
   resolve(root, "tests/transfer.test.mjs"),
   resolve(root, "tests/display-config.test.mjs"),
+  resolve(root, "tests/auto-connect.test.mjs"),
   resolve(root, "tests/auth-controller.test.mjs"),
   resolve(root, "tests/layout.test.mjs"),
   resolve(root, "tests/connect-drawer.test.mjs"),

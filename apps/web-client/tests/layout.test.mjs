@@ -89,7 +89,8 @@ test("file controls use the accepted production labels", () => {
 });
 
 test("audio reconnect clipboard and settings controls are present without layout modes", () => {
-  for (const id of ["audio-enabled", "audio-mute", "audio-volume", "auto-reconnect", "reconnect", "clipboard-auto-sync", "clipboard-max-kib", "clipboard-copy-android", "settings-export", "settings-import"]) assert.match(html, new RegExp(`id=\"${id}\"`));
+  for (const id of ["audio-enabled", "audio-mute", "audio-volume", "auto-reconnect", "reconnect-attempts", "clipboard-auto-sync", "clipboard-max-kib", "clipboard-copy-android", "settings-export", "settings-import"]) assert.match(html, new RegExp(`id=\"${id}\"`));
+  assert.doesNotMatch(html, /id="reconnect"/);
   assert.equal(html.includes('id="workspace-layout"'), false);
   assert.equal(controllerSource.includes("workspaceLayout"), false);
   assert.match(css, /:focus-visible/);
@@ -161,6 +162,9 @@ test("mirrored screen is a drop target that uploads to the Android inbox", () =>
   // The server owns the default upload directory; the client must not restate it.
   assert.match(transferSource, /uploadFiles\(undefined, files\)/);
   assert.doesNotMatch(transferSource, /DroidWebDisplayInbox/);
+  // Refresh happens from the verified transfer state, not immediately after enqueue.
+  assert.match(transferSource, /#uploadRefreshes\.track\(record\)/);
+  assert.match(transferSource, /consumeCompleted[\s\S]*?await this\.browse\(\)/);
 });
 
 test("Android File Explorer accepts PC file drag and drop", () => {
@@ -188,9 +192,9 @@ test("polling controllers stop cleanly and static asset versions advance", () =>
   assert.match(transferSource, /if \(this\.#closed\) return/);
   assert.match(autoDownloadSource, /public close\(\): void/);
   assert.match(mainSource, /transferController\.close\(\); autoDownloadController\.close\(\)/);
-  assert.match(html, /main\.js\?v=0\.11\.2-native4/);
-  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native5/);
-  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native5/);
+  assert.match(html, /main\.js\?v=0\.11\.2-native10/);
+  assert.match(html, /droidwebdisplay-main-drawer\.css\?v=0\.11\.2-native10/);
+  assert.match(html, /droidwebdisplay-main-drawer\.js\?v=0\.11\.2-native10/);
   assert.doesNotMatch(drawerCssSource, /data-group="apps"/);
 });
 
@@ -253,6 +257,7 @@ test("compact header keeps Android controls while connection controls live direc
   const display = html.slice(displayStart, audioStart);
   assert.match(display, /id="device"/);
   assert.match(display, /id="connect"/);
+  assert.match(display, /id="auto-reconnect"/);
   assert.match(header, /class="topbar-brand"/);
   assert.match(header, /class="android-control-row"/);
   assert.match(css, /\.topbar \{ display: flex; align-items: center;/);
@@ -261,6 +266,8 @@ test("compact header keeps Android controls while connection controls live direc
   assert.equal(html.includes('id="refresh"'), false);
   assert.equal(html.includes('id="disconnect"'), false);
   assert.match(controllerSource, /connect\.textContent = connected \? "Disconnect" : "Connect"/);
+  assert.match(controllerSource, /scheduleUsbAutoConnect\(0\)/);
+  assert.match(controllerSource, /Waiting for USB device/);
 });
 
 test("single drawer ships final structure without legacy runtime migration", () => {

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
 import json
-from pathlib import Path, PurePosixPath
+import logging
 import secrets
 import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from droid_web_display.adb.client import AdbClient
 from droid_web_display.errors import (
-    AdbSyncError,
+    BridgeError,
     TransferCancelledError,
     TransferConflictError,
     TransferError,
@@ -21,12 +21,24 @@ from droid_web_display.errors import (
     TransferValidationError,
 )
 from droid_web_display.transfers.adb_sync import AdbSyncClient
-from droid_web_display.transfers.models import AndroidEntry, DuplicatePolicy, TransferDirection, TransferRecord, TransferState
-from droid_web_display.transfers.paths import join_android_path, normalize_android_path, resolve_duplicate, sanitize_filename
-
+from droid_web_display.transfers.models import (
+    AndroidEntry,
+    DuplicatePolicy,
+    TransferDirection,
+    TransferRecord,
+    TransferState,
+)
+from droid_web_display.transfers.paths import (
+    is_android_storage_root,
+    join_android_path,
+    normalize_android_path,
+    resolve_duplicate,
+    sanitize_filename,
+)
 
 _FINAL_STATES = {TransferState.COMPLETED, TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
 _RETRYABLE_STATES = {TransferState.CANCELLED, TransferState.FAILED, TransferState.INTERRUPTED}
+_LOGGER = logging.getLogger(__name__)
 
 # Directories the OS runs code from on login/boot. A file pulled off the phone
 # must never land in one of these.
@@ -177,6 +189,68 @@ class TransferManager:
             )
             for entry in sorted(entries, key=lambda item: (not item.is_directory, item.name.casefold()))
         ]
+
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50) -> list[AndroidEntry]:
+        if not 1 <= limit <= 50:
+            raise TransferValidationError("recent picture limit must be in range 1..50", details={"limit": limit})
+        await self._require_ready_device(serial)
+        media_files = await self.adb.list_recent_pictures(serial, limit=limit)
+        entries: list[AndroidEntry] = []
+        seen: set[str] = set()
+        for media_file in media_files:
+            try:
+                path = normalize_android_path(media_file.path)
+            except TransferValidationError:
+                # MediaStore can index app-private or other shared folders that
+                # the Explorer intentionally does not expose for downloading.
+                continue
+            if path in seen:
+                continue
+            seen.add(path)
+            entries.append(
+                AndroidEntry(
+                    name=PurePosixPath(path).name,
+                    path=path,
+                    mode=0o100664,
+                    size=media_file.size,
+                    modified_at=media_file.modified_at,
+                    is_directory=False,
+                )
+            )
+        return sorted(entries, key=lambda item: (-item.modified_at, item.name.casefold()))[:limit]
+
+    async def delete_android(self, serial: str, path: str) -> dict[str, object]:
+        normalized = normalize_android_path(path)
+        if is_android_storage_root(normalized):
+            raise TransferValidationError(
+                "Android storage roots cannot be deleted",
+                details={"path": normalized},
+            )
+        await self._require_ready_device(serial)
+        stat = await self.sync.stat(serial, normalized)
+        if not stat.exists:
+            raise TransferNotFoundError(
+                "Android file or folder was not found",
+                details={"path": normalized},
+            )
+        await self.adb.remove_path(serial, normalized, recursive=stat.is_directory)
+        remaining = await self.sync.stat(serial, normalized)
+        if remaining.exists:
+            raise TransferError(
+                "Android file or folder still exists after deletion",
+                details={"path": normalized, "isDirectory": stat.is_directory},
+            )
+        # MediaStore is a separate index. Without notifying it, a successfully
+        # removed image may continue to appear in Recent pictures until Android
+        # performs a later background scan. The file deletion is already
+        # verified, so an indexing failure must not turn success into failure.
+        media_scan = getattr(self.adb, "media_scan", None)
+        if callable(media_scan):
+            try:
+                await media_scan(serial, normalized)
+            except BridgeError:
+                _LOGGER.debug("Unable to refresh Android MediaStore after deleting %s", normalized, exc_info=True)
+        return {"deleted": True, "path": normalized, "isDirectory": stat.is_directory}
 
     async def spool_upload(self, filename: str, chunks: Any) -> tuple[Path, int, str]:
         safe_name = sanitize_filename(filename)

@@ -21,7 +21,7 @@ Clipboard text is not written to diagnostics.
 
 ## Reconnect
 
-Automatic reconnect uses bounded retry attempts and increasing delays. Manual reconnect is available when disconnected. A deliberate Disconnect cancels automatic reconnect.
+When **Reconnect** is checked, the browser watches for the selected authorized USB device, connects it when it becomes available, and retries unexpected session failures. The retry budget is selected on the same row: **10**, **100**, or **∞**. Retry delays progress through 1, 2, 5, 10, 30, and 60 seconds, then remain capped at 60 seconds. Unchecking Reconnect leaves connection startup entirely manual. A deliberate **Disconnect** pauses automatic connection for that phone until the user presses **Connect** or unplugs and reconnects USB. The primary **Connect** button also performs an immediate manual retry after refreshing the device and capability state.
 
 ## Layout and accessibility
 

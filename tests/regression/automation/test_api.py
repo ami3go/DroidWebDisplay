@@ -12,6 +12,9 @@ from droid_web_display.transfers.manager import TransferManager
 
 
 class FakeAdb:
+    def __init__(self) -> None:
+        self.legacy_storage_probe_called = False
+
     async def version(self):
         return "Android Debug Bridge version test"
 
@@ -24,7 +27,19 @@ class FakeAdb:
     async def remove_file(self, serial: str, remote_path: str):
         return None
 
+    async def storage_roots(self, serial: str):
+        assert serial == "PHONE"
+        return [
+            {
+                "id": "internal-downloads",
+                "label": "Internal storage · Download",
+                "path": "/storage/1A2B-3C4D/Download",
+            },
+            {"id": "sd-card-downloads", "label": "SD card · Download", "path": "/sdcard/Download"},
+        ]
+
     async def external_storage_roots(self, serial: str):
+        self.legacy_storage_probe_called = True
         return [{"id": "sd-card-abcd-1234", "label": "SD card · ABCD-1234", "path": "/storage/ABCD-1234"}]
 
 
@@ -70,8 +85,18 @@ def test_phase7_roots_and_monitor_configuration(tmp_path: Path) -> None:
         assert client.get("/api/v1/version").json()["phase"] == 9
         roots = client.get("/api/v1/storage/android-roots")
         assert roots.status_code == 200
-        assert roots.json()["roots"][0]["label"] == "Internal storage · Download"
-        assert {item["path"] for item in roots.json()["roots"]} >= {"/sdcard/Documents", "/storage/ABCD-1234"}
+        assert roots.json() == {
+            "roots": [
+                {
+                    "id": "internal-downloads",
+                    "label": "Internal storage · Download",
+                    "path": "/storage/1A2B-3C4D/Download",
+                },
+                {"id": "sd-card-downloads", "label": "SD card · Download", "path": "/sdcard/Download"},
+            ],
+            "defaultPath": "/storage/1A2B-3C4D/Download",
+        }
+        assert adb.legacy_storage_probe_called is False
 
         initial = client.get("/api/v1/auto-download").json()
         assert initial["config"]["enabled"] is False

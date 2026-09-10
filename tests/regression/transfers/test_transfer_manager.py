@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from droid_web_display.adb.media_store import AndroidMediaFile
+from droid_web_display.errors import TransferNotFoundError, TransferValidationError
 from droid_web_display.transfers.adb_sync import AdbSyncEntry, AdbSyncStat
 from droid_web_display.transfers.manager import TransferManager
 from droid_web_display.transfers.models import DuplicatePolicy, TransferState
@@ -51,6 +53,45 @@ class FakeSync:
         if progress:
             await progress(len(data), len(data))
         return len(data)
+
+
+class DeleteSync:
+    def __init__(self) -> None:
+        self.entries = {
+            "/sdcard/Download/delete-me.txt": (0o100664, 7),
+            "/sdcard/Download/folder": (0o040775, 0),
+            "/sdcard/Download/folder/child.txt": (0o100664, 5),
+        }
+
+    async def stat(self, serial: str, path: str) -> AdbSyncStat:
+        mode, size = self.entries.get(path, (0, 0))
+        return AdbSyncStat(mode, size, 1)
+
+
+class DeleteAdb(FakeAdb):
+    def __init__(self, sync: DeleteSync) -> None:
+        self.sync = sync
+        self.removed: list[tuple[str, str, bool]] = []
+        self.scanned: list[tuple[str, str]] = []
+
+    async def remove_path(self, serial: str, remote_path: str, *, recursive: bool = False) -> None:
+        self.removed.append((serial, remote_path, recursive))
+        for path in list(self.sync.entries):
+            if path == remote_path or (recursive and path.startswith(f"{remote_path}/")):
+                del self.sync.entries[path]
+
+    async def media_scan(self, serial: str, remote_path: str) -> None:
+        self.scanned.append((serial, remote_path))
+
+
+class RecentPicturesAdb(FakeAdb):
+    async def list_recent_pictures(self, serial: str, *, limit: int = 50):
+        return [
+            AndroidMediaFile("/storage/emulated/0/Pictures/older.png", 10, 100),
+            AndroidMediaFile("/storage/emulated/0/DCIM/Camera/newer.jpg", 20, 300),
+            AndroidMediaFile("/sdcard/Android/media/private-looking.jpg", 30, 400),
+            AndroidMediaFile("/storage/emulated/0/DCIM/Camera/newer.jpg", 20, 300),
+        ]
 
 
 async def wait_final(manager: TransferManager, transfer_id: str):
@@ -129,3 +170,47 @@ async def test_failed_upload_is_retryable_and_duplicate_is_renamed(tmp_path: Pat
         assert completed.destination_path == "/sdcard/Download/upload (1).bin"
     finally:
         await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_delete_android_file_and_folder_protects_storage_roots(tmp_path: Path) -> None:
+    sync = DeleteSync()
+    adb = DeleteAdb(sync)
+    manager = TransferManager(adb, sync, data_directory=tmp_path / "data", destination_profiles={"default-downloads": tmp_path / "downloads"})  # type: ignore[arg-type]
+
+    deleted_file = await manager.delete_android("PHONE", "/sdcard/Download/delete-me.txt")
+    assert deleted_file == {"deleted": True, "path": "/sdcard/Download/delete-me.txt", "isDirectory": False}
+    assert adb.removed[-1] == ("PHONE", "/sdcard/Download/delete-me.txt", False)
+    assert adb.scanned[-1] == ("PHONE", "/sdcard/Download/delete-me.txt")
+
+    deleted_folder = await manager.delete_android("PHONE", "/sdcard/Download/folder")
+    assert deleted_folder["isDirectory"] is True
+    assert adb.removed[-1] == ("PHONE", "/sdcard/Download/folder", True)
+    assert adb.scanned[-1] == ("PHONE", "/sdcard/Download/folder")
+    assert not any(path.startswith("/sdcard/Download/folder") for path in sync.entries)
+
+    with pytest.raises(TransferValidationError, match="roots cannot be deleted"):
+        await manager.delete_android("PHONE", "/sdcard/Download")
+    with pytest.raises(TransferValidationError, match="roots cannot be deleted"):
+        await manager.delete_android("PHONE", "/storage/1234-ABCD")
+    with pytest.raises(TransferValidationError, match="must not contain"):
+        await manager.delete_android("PHONE", "/sdcard/Download/../../data")
+    with pytest.raises(TransferNotFoundError, match="was not found"):
+        await manager.delete_android("PHONE", "/sdcard/Download/missing.txt")
+
+
+@pytest.mark.asyncio
+async def test_recent_pictures_are_normalized_filtered_and_sorted(tmp_path: Path) -> None:
+    manager = TransferManager(
+        RecentPicturesAdb(),
+        FakeSync(),
+        data_directory=tmp_path / "data",
+        destination_profiles={"default-downloads": tmp_path / "downloads"},
+    )  # type: ignore[arg-type]
+
+    entries = await manager.list_recent_pictures("PHONE", limit=50)
+
+    assert [(entry.name, entry.path, entry.size, entry.modified_at) for entry in entries] == [
+        ("newer.jpg", "/sdcard/DCIM/Camera/newer.jpg", 20, 300),
+        ("older.png", "/sdcard/Pictures/older.png", 10, 100),
+    ]

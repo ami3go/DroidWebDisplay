@@ -28,8 +28,16 @@ import type { AndroidDevice, LaunchableAppDto, SessionDto, VirtualDisplayCapabil
 import { WebCodecsVideoRenderer, type VideoStatistics } from "./video-renderer.js";
 import { WebSocketBridgeTransport } from "./websocket-transport.js";
 import { WebCodecsAudioPlayer, type AudioStatistics } from "./audio-player.js";
+import {
+  decideAutoConnect,
+  normalizeReconnectAttemptSelection,
+  reconnectAttemptLimit,
+  reconnectDelayMilliseconds,
+  type AutoConnectDecision,
+} from "./auto-connect.js";
 
 const DEVICE_DROPDOWN_REFRESH_STALE_MS = 1500;
+const USB_AUTO_CONNECT_POLL_MS = 2000;
 // textInjectionMessages chunks at 300 UTF-8 bytes and sendMessages awaits every
 // chunk, so injection cost grows linearly with the text: ~875 sequential round
 // trips at the 256 KiB clipboard limit. Above this size the clipboard is still
@@ -71,7 +79,6 @@ interface Elements {
   readonly audioStatus: HTMLElement;
   readonly autoReconnect: HTMLInputElement;
   readonly reconnectAttempts: HTMLSelectElement;
-  readonly reconnect: HTMLButtonElement;
   readonly sessionChannels: HTMLElement;
   readonly clipboardAutoSync: HTMLInputElement;
   readonly clipboardMaxKib: HTMLInputElement;
@@ -121,8 +128,12 @@ export class DroidWebDisplayController {
   #powerOn = true;
   #closing = false;
   #manualDisconnect = false;
+  #connecting = false;
   #reconnectTimer: number | null = null;
   #reconnectCount = 0;
+  #reconnectSerial: string | null = null;
+  #manualDisconnectSerial: string | null = null;
+  #autoConnectBlockedSerial: string | null = null;
   #lastConnectValues: DisplayFormValues | null = null;
   #lastAndroidClipboard = "";
   #lastSentClipboard = "";
@@ -166,11 +177,22 @@ export class DroidWebDisplayController {
     await this.refreshVirtualCapabilities();
     this.updateDisplayUi();
     this.setStatus("Ready", "Select an authorized Android device and connect.");
+    if (this.elements.autoReconnect.checked) this.scheduleUsbAutoConnect(0);
   }
 
   public async refreshDevices(): Promise<void> {
     const response = await this.#api.devices();
     const previous = this.elements.device.value;
+    const readySerials = new Set(response.devices.filter((device) => device.ready).map((device) => device.serial));
+    if (this.#manualDisconnectSerial && !readySerials.has(this.#manualDisconnectSerial)) this.#manualDisconnectSerial = null;
+    if (this.#reconnectSerial && !readySerials.has(this.#reconnectSerial)) {
+      this.#reconnectSerial = null;
+      this.#reconnectCount = 0;
+    }
+    if (this.#autoConnectBlockedSerial && !readySerials.has(this.#autoConnectBlockedSerial)) {
+      this.#autoConnectBlockedSerial = null;
+      this.#reconnectCount = 0;
+    }
     this.elements.device.replaceChildren();
     for (const device of response.devices) {
       const option = document.createElement("option");
@@ -188,7 +210,7 @@ export class DroidWebDisplayController {
   }
 
   public async connect(): Promise<void> {
-    if (this.#serverSession) return;
+    if (this.#serverSession || this.#connecting) return;
     const serial = this.elements.device.value;
     if (!serial) throw new Error("No authorized device is selected");
     const values = this.readDisplayValues();
@@ -199,6 +221,8 @@ export class DroidWebDisplayController {
       throw new Error(this.#capabilities?.warnings.join(" ") || "Virtual Display mode is not supported by this device.");
     }
 
+    this.#connecting = true;
+    this.cancelReconnect();
     this.setBusy(true);
     this.setStatus(
       "Starting",
@@ -239,6 +263,9 @@ export class DroidWebDisplayController {
       }
       void this.startClipboardPolling(false);
       this.#reconnectCount = 0;
+      this.#reconnectSerial = null;
+      this.#manualDisconnectSerial = null;
+      this.#autoConnectBlockedSerial = null;
 
       if (values.displayMode === "virtual") {
         if (values.startApp) {
@@ -262,12 +289,14 @@ export class DroidWebDisplayController {
       this.setConnectedControls(false);
       throw error;
     } finally {
+      this.#connecting = false;
       this.setBusy(false);
     }
   }
 
   public async disconnect(): Promise<void> {
     this.#manualDisconnect = true;
+    this.#manualDisconnectSerial = this.#serverSession?.serial ?? this.selectedReadySerial();
     this.cancelReconnect();
     this.#closing = true;
     try {
@@ -277,10 +306,13 @@ export class DroidWebDisplayController {
       this.#closing = false;
       this.setConnectedControls(false);
       this.#manualDisconnect = false;
+      if (this.elements.autoReconnect.checked) this.scheduleUsbAutoConnect();
     }
   }
 
   public stopOnUnload(): void {
+    this.#closing = true;
+    this.cancelReconnect();
     const sessionId = this.#serverSession?.sessionId;
     if (!sessionId) return;
     void this.#api.stopSession(sessionId, true);
@@ -294,9 +326,16 @@ export class DroidWebDisplayController {
       this.#launchableAppsLoaded = false;
       this.#launchableAppsError = null;
       this.renderQuickApps();
-      void this.runUiAction(() => this.refreshVirtualCapabilities());
+      this.#manualDisconnectSerial = null;
+      this.#autoConnectBlockedSerial = null;
+      this.#reconnectSerial = null;
+      this.#reconnectCount = 0;
+      void this.runUiAction(async () => {
+        await this.refreshVirtualCapabilities();
+        if (!this.#serverSession && this.elements.autoReconnect.checked) this.scheduleUsbAutoConnect(0);
+      });
     });
-    this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.#serverSession ? this.disconnect() : this.connect()));
+    this.elements.connect.addEventListener("click", () => void this.runUiAction(() => this.handleConnectButton()));
     this.elements.displayMode.addEventListener("change", () => this.updateDisplayUi());
     this.elements.displayProfile.addEventListener("change", () => {
       if (this.elements.displayProfile.value !== "custom") this.applyProfile(this.elements.displayProfile.value);
@@ -326,9 +365,16 @@ export class DroidWebDisplayController {
     this.elements.audioMute.addEventListener("click", () => this.toggleAudioMute());
     this.elements.audioVolume.addEventListener("input", () => this.setAudioVolume());
     this.elements.audioEnabled.addEventListener("change", () => this.saveBrowserSettings());
-    this.elements.autoReconnect.addEventListener("change", () => this.saveBrowserSettings());
-    this.elements.reconnectAttempts.addEventListener("change", () => this.saveBrowserSettings());
-    this.elements.reconnect.addEventListener("click", () => void this.runUiAction(() => this.reconnectNow()));
+    this.elements.autoReconnect.addEventListener("change", () => this.handleAutoReconnectChange());
+    this.elements.reconnectAttempts.addEventListener("change", () => {
+      this.saveBrowserSettings();
+      if (!this.#serverSession && this.elements.autoReconnect.checked) {
+        this.#autoConnectBlockedSerial = null;
+        this.#reconnectSerial = null;
+        this.#reconnectCount = 0;
+        this.scheduleUsbAutoConnect(0);
+      }
+    });
     this.elements.clipboardAutoSync.addEventListener("change", () => void this.runUiAction(async () => {
       this.saveBrowserSettings();
       this.updateClipboardUi();
@@ -483,10 +529,15 @@ export class DroidWebDisplayController {
       this.elements.connect.disabled = false;
       return;
     }
-    const hasDevice = [...this.elements.device.options].some((option) => !option.disabled);
+    const hasDevice = this.selectedReadySerial() !== null;
     const errors = validateDisplayForm(this.readDisplayValues());
     const unsupported = this.elements.displayMode.value === "virtual" && this.#capabilities?.virtualDisplaySupported === false;
-    this.elements.connect.disabled = !hasDevice || this.#serverSession !== null || errors.length > 0 || unsupported;
+    this.elements.connect.disabled = this.#connecting || !hasDevice || errors.length > 0 || unsupported;
+  }
+
+  private selectedReadySerial(): string | null {
+    const selected = this.elements.device.selectedOptions[0];
+    return selected && selected.value && !selected.disabled ? selected.value : null;
   }
 
   private async refreshDevicesIfStale(): Promise<void> {
@@ -1065,12 +1116,18 @@ export class DroidWebDisplayController {
   }
 
   private async handleStreamFailure(error: unknown): Promise<void> {
-    if (this.#closing) return;
+    if (this.#closing || this.#manualDisconnect || !this.#serverSession) return;
     const message = errorMessage(error);
+    const serial = this.#serverSession.serial;
     await this.cleanupSession();
     this.setConnectedControls(false);
     this.setStatus("Stream stopped", message);
-    if (!this.#manualDisconnect && this.elements.autoReconnect.checked) this.scheduleReconnect();
+    if (this.elements.autoReconnect.checked) {
+      this.#reconnectSerial = serial;
+      this.#reconnectCount = 0;
+      this.#autoConnectBlockedSerial = null;
+      this.scheduleReconnect(message);
+    }
   }
 
   private async cleanupSession(): Promise<void> {
@@ -1121,7 +1178,6 @@ export class DroidWebDisplayController {
     this.elements.audioMute.disabled = !connected || !this.elements.audioEnabled.checked;
     this.elements.audioVolume.disabled = !connected || !this.elements.audioEnabled.checked;
     this.elements.audioEnabled.disabled = connected;
-    this.elements.reconnect.disabled = connected || !this.elements.device.value;
     this.elements.displayMode.disabled = connected;
     this.elements.displayProfile.disabled = connected;
     for (const input of this.displayInputs()) input.disabled = connected;
@@ -1130,7 +1186,12 @@ export class DroidWebDisplayController {
   }
 
   private setBusy(busy: boolean): void {
-    if (busy) this.elements.connect.disabled = true;
+    this.elements.autoReconnect.disabled = busy;
+    if (busy) {
+      this.elements.connect.disabled = true;
+      return;
+    }
+    this.updateConnectAvailability();
   }
 
   private setStatus(title: string, details: string): void {
@@ -1334,26 +1395,133 @@ export class DroidWebDisplayController {
     }
   }
 
-  private scheduleReconnect(): void {
-    this.cancelReconnect();
-    const maximum = Number(this.elements.reconnectAttempts.value) || 5;
-    if (this.#reconnectCount >= maximum) {
-      this.setStatus("Reconnect stopped", `Unable to reconnect after ${maximum} attempts.`);
+  private async handleConnectButton(): Promise<void> {
+    if (this.#serverSession) {
+      await this.disconnect();
       return;
     }
-    const delays = [1000, 2000, 5000, 10000, 15000];
-    const delay = delays[Math.min(this.#reconnectCount, delays.length - 1)]!;
-    this.#reconnectCount += 1;
-    this.setStatus("Reconnect scheduled", `Attempt ${this.#reconnectCount} of ${maximum} in ${delay / 1000} seconds.`);
-    this.#reconnectTimer = window.setTimeout(() => void this.runUiAction(async () => {
-      try {
-        await this.refreshDevices();
-        await this.connect();
-      } catch (error) {
-        if (this.elements.autoReconnect.checked) this.scheduleReconnect();
-        throw error;
+    await this.reconnectNow();
+  }
+
+  private async connectByUser(): Promise<void> {
+    const serial = this.selectedReadySerial();
+    this.cancelReconnect();
+    this.#manualDisconnectSerial = null;
+    this.#autoConnectBlockedSerial = null;
+    this.#reconnectSerial = null;
+    this.#reconnectCount = 0;
+    try {
+      await this.connect();
+    } catch (error) {
+      if (serial && this.elements.autoReconnect.checked) {
+        this.recordAutoConnectFailure(serial, error);
+        return;
       }
-    }), delay);
+      throw error;
+    }
+  }
+
+  private handleAutoReconnectChange(): void {
+    this.saveBrowserSettings();
+    this.cancelReconnect();
+    this.#reconnectCount = 0;
+    this.#reconnectSerial = null;
+    this.#autoConnectBlockedSerial = null;
+    if (!this.elements.autoReconnect.checked) {
+      if (!this.#serverSession) this.setStatus("Manual connection", "Reconnect is off. Select a ready Android device and press Connect.");
+      return;
+    }
+    this.#manualDisconnectSerial = null;
+    if (!this.#serverSession) {
+      this.setStatus("Reconnect enabled", "A ready selected USB device will connect automatically.");
+      this.scheduleUsbAutoConnect(0);
+    }
+  }
+
+  private autoConnectDecision(): AutoConnectDecision {
+    return decideAutoConnect({
+      enabled: this.elements.autoReconnect.checked,
+      connected: this.#serverSession !== null,
+      connecting: this.#connecting,
+      selectedReadySerial: this.selectedReadySerial(),
+      manualDisconnectSerial: this.#manualDisconnectSerial,
+      blockedSerial: this.#autoConnectBlockedSerial,
+    });
+  }
+
+  private scheduleUsbAutoConnect(delay = USB_AUTO_CONNECT_POLL_MS): void {
+    this.cancelReconnect();
+    const decision = this.autoConnectDecision();
+    if (decision === "disabled" || decision === "busy") return;
+    this.#reconnectTimer = window.setTimeout(() => {
+      this.#reconnectTimer = null;
+      void this.runUsbAutoConnectCycle();
+    }, delay);
+  }
+
+  private async runUsbAutoConnectCycle(): Promise<void> {
+    const initialDecision = this.autoConnectDecision();
+    if (initialDecision === "disabled" || initialDecision === "busy") return;
+    let serial: string | null = null;
+    try {
+      const previousSerial = this.selectedReadySerial();
+      await this.refreshDevices();
+      let decision = this.autoConnectDecision();
+      if (decision === "waiting-for-device") {
+        this.setStatus("Waiting for USB device", "Reconnect is on. A selected authorized Android device will connect when it becomes available.");
+        this.scheduleUsbAutoConnect();
+        return;
+      }
+      if (decision === "paused-after-manual-disconnect" || decision === "paused-after-failures") {
+        this.scheduleUsbAutoConnect();
+        return;
+      }
+      if (decision !== "connect") return;
+
+      serial = this.selectedReadySerial();
+      if (serial !== previousSerial || !this.#capabilities) await this.refreshVirtualCapabilities();
+      decision = this.autoConnectDecision();
+      if (decision !== "connect") {
+        if (decision !== "disabled" && decision !== "busy") this.scheduleUsbAutoConnect();
+        return;
+      }
+      await this.connect();
+    } catch (error) {
+      if (!this.elements.autoReconnect.checked || this.#closing) return;
+      serial ??= this.selectedReadySerial();
+      if (!serial) {
+        this.setStatus("Waiting for USB device", `Unable to refresh Android devices: ${errorMessage(error)}. Reconnect will keep checking.`);
+        this.scheduleUsbAutoConnect();
+        return;
+      }
+      this.recordAutoConnectFailure(serial, error);
+    }
+  }
+
+  private recordAutoConnectFailure(serial: string, error: unknown): void {
+    if (this.#reconnectSerial === serial) this.#reconnectCount += 1;
+    else {
+      this.#reconnectSerial = serial;
+      this.#reconnectCount = 1;
+    }
+    this.scheduleReconnect(errorMessage(error));
+  }
+
+  private scheduleReconnect(lastError = ""): void {
+    this.cancelReconnect();
+    if (!this.elements.autoReconnect.checked) return;
+    const maximum = reconnectAttemptLimit(this.elements.reconnectAttempts.value);
+    if (maximum !== null && this.#reconnectCount >= maximum) {
+      this.#autoConnectBlockedSerial = this.#reconnectSerial ?? this.selectedReadySerial();
+      const suffix = lastError ? ` Last error: ${lastError}` : "";
+      this.setStatus("Reconnect paused", `Unable to connect after ${maximum} attempts.${suffix} Press Connect to retry now, or unplug and reconnect USB.`);
+      this.scheduleUsbAutoConnect();
+      return;
+    }
+    const delay = reconnectDelayMilliseconds(this.#reconnectCount);
+    const suffix = lastError ? ` Last error: ${lastError}` : "";
+    this.setStatus("Reconnect scheduled", `Attempt ${this.#reconnectCount + 1} of ${maximum ?? "∞"} in ${delay / 1000} seconds.${suffix}`);
+    this.scheduleUsbAutoConnect(delay);
   }
 
   private cancelReconnect(): void {
@@ -1365,7 +1533,8 @@ export class DroidWebDisplayController {
     this.cancelReconnect();
     if (this.#serverSession) await this.cleanupSession();
     await this.refreshDevices();
-    await this.connect();
+    await this.refreshVirtualCapabilities();
+    await this.connectByUser();
   }
 
 
@@ -1375,7 +1544,7 @@ export class DroidWebDisplayController {
       display: this.readDisplayValues(),
       audio: { enabled: this.elements.audioEnabled.checked, muted: this.elements.audioMute.textContent === "Unmute", volume: Number(this.elements.audioVolume.value) },
       clipboard: { automatic: this.elements.clipboardAutoSync.checked, maximumKiB: Number(this.elements.clipboardMaxKib.value) },
-      reconnect: { enabled: this.elements.autoReconnect.checked, attempts: Number(this.elements.reconnectAttempts.value) },
+      reconnect: { enabled: this.elements.autoReconnect.checked, attempts: normalizeReconnectAttemptSelection(this.elements.reconnectAttempts.value) },
       quickApps: { byDevice: this.#quickAppsByDevice },
     };
   }
@@ -1427,7 +1596,7 @@ export class DroidWebDisplayController {
     this.elements.clipboardAutoSync.checked = clipboard?.automatic === true;
     this.elements.clipboardMaxKib.value = String(Math.max(1, Math.min(256, Number(clipboard?.maximumKiB ?? 256))));
     this.elements.autoReconnect.checked = reconnect?.enabled !== false;
-    this.elements.reconnectAttempts.value = String([3, 5, 10].includes(Number(reconnect?.attempts)) ? Number(reconnect?.attempts) : 5);
+    this.elements.reconnectAttempts.value = normalizeReconnectAttemptSelection(reconnect?.attempts);
     this.#quickAppsByDevice = normalizeQuickAppsByDevice(quickApps?.byDevice);
     this.renderQuickApps();
   }
@@ -1443,7 +1612,7 @@ export class DroidWebDisplayController {
     const parsed = JSON.parse(await file.text()) as Record<string, unknown>;
     if (parsed.schemaVersion !== 1) throw new Error("Unsupported settings file version");
     this.applyImportedSettings(parsed);
-    this.saveBrowserSettings();
+    this.handleAutoReconnectChange();
     this.elements.settingsStatus.textContent = "Settings imported. Quick application buttons are updated; reconnect to apply session options.";
     this.elements.settingsFile.value = "";
   }
