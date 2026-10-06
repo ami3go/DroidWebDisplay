@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.9 — File manager and resilient reconnect
+
+- Improved the Android File Explorer actions and corrected storage-volume mapping so Internal storage and SD card selections resolve to the intended device storage.
+- Added a Recent Pictures view that lists up to 50 recent images without previews and supports multi-selection plus batch download.
+- Fixed Android file and folder deletion, including refresh behavior after file operations and safeguards that prevent deletion of protected storage roots.
+- Added the Reconnect control beside the main Connect/Disconnect action so automatic USB reconnection can be enabled or disabled without a separate reconnect button.
+- Added reconnect retry policies for 10 attempts, 100 attempts, or unlimited retries (∞), with progressive retry delays for longer disconnects.
+- Polished the reconnect controls and synchronized the generated web assets so the packaged UI matches the source implementation.
+- Extended API, transfer, storage-volume, reconnect, and UX regression coverage for the new file-manager and connection behavior.
+
 ## 0.11.8 — Quick applications and reliable remote copy
 
 - Added configurable per-device Android quick-application buttons to the web header, allowing installed applications such as ChatGPT, Claude, Grok, and DeepSeek to be opened or brought to the active display.
